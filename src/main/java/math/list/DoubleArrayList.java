@@ -1592,7 +1592,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         final int expectedModCount = modCount;
         final double[] es = elementData;
         final int size = this.size;
-        for (int i = 0; modCount == expectedModCount && i < size; i++) {
+        for (int i = 0; modCount == expectedModCount && i < size; i++) { // "lgtm[java/constant-comparison]"
             action.accept(elementAt(es, i));
         }
         if (modCount != expectedModCount) {
@@ -1723,7 +1723,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
     public DoubleList assignConst(double val) {
         final int expectedModCount = modCount;
         Arrays.fill(elementData, 0, size, val);
-        if (modCount == expectedModCount) {
+        if (modCount == expectedModCount) { // "lgtm[java/constant-comparison]"
             return this;
         }
         throw new ConcurrentModificationException();
@@ -1740,7 +1740,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         for (int i = 0; i < end; ++i) {
             es[i] += val;
         }
-        if (modCount == expectedModCount) {
+        if (modCount == expectedModCount) { // "lgtm[java/constant-comparison]"
             return this;
         }
         throw new ConcurrentModificationException();
@@ -1757,7 +1757,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         for (int i = 0; i < end; ++i) {
             es[i] *= val;
         }
-        if (modCount == expectedModCount) {
+        if (modCount == expectedModCount) { // "lgtm[java/constant-comparison]"
             return this;
         }
         throw new ConcurrentModificationException();
