@@ -216,7 +216,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
                 return Math.max(DEFAULT_CAPACITY, minCapacity);
             }
-            if (minCapacity < 0) { // overflow
+            if (minCapacity < 0) { // overflow // "lgtm[java/constant-comparison]"
                 throw new OutOfMemoryError();
             }
             return minCapacity;
