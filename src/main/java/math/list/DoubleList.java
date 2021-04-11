@@ -29,14 +29,34 @@ import math.fun.DForEachIterator;
  */
 public interface DoubleList {
 
+    /**
+     * Returns a sequential {@code Stream} with this list as its source.
+     * 
+     * @return a sequential {@code Stream} over the elements in this list
+     */
     default DoubleStream stream() {
         return StreamSupport.doubleStream(spliterator(), false);
     }
 
+    /**
+     * Returns a parallel {@code Stream} with this list as its source.
+     * 
+     * @return a parallel {@code Stream} over the elements in this list
+     */
     default DoubleStream parallelStream() {
         return StreamSupport.doubleStream(spliterator(), true);
     }
 
+    /**
+     * Performs the given action for each element of this list in the order of
+     * iteration until all elements have been processed or the action throws an
+     * exception. Exceptions thrown by the action are relayed to the caller.
+     * 
+     * @param action
+     *            The action to be performed for each element
+     * @throws NullPointerException
+     *             if the specified action is null
+     */
     default void forEach(DoubleConsumer action) {
         Objects.requireNonNull(action);
         for (int i = 0; i < this.size(); ++i) {
@@ -44,6 +64,9 @@ public interface DoubleList {
         }
     }
 
+    /**
+     * Sorts this list in ascending order.
+     */
     default void sort() {
         double[] a = this.toArray();
         Arrays.sort(a);
@@ -94,7 +117,8 @@ public interface DoubleList {
      * formally, returns the lowest index {@code i} such that
      * {@code o == get(i)}, or -1 if there is no such index.
      * 
-     * @param o element to search for
+     * @param o
+     *            element to search for
      * @return index of the first occurrence, or {@code -1} if not found
      */
     int indexOf(double o);
@@ -105,7 +129,8 @@ public interface DoubleList {
      * returns the highest index {@code i} such that {@code o == get(i)}, or -1
      * if there is no such index.
      * 
-     * @param o element to search for
+     * @param o
+     *            element to search for
      * @return index of the last occurrence, or {@code -1} if not found
      */
     int lastIndexOf(double o);
