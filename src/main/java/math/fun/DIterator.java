@@ -15,9 +15,26 @@
  */
 package math.fun;
 
+import java.util.NoSuchElementException;
+
+/**
+ * An iterator over a collection of primitive doubles.
+ */
 public interface DIterator {
 
-    public boolean hasNext();
+    /**
+     * Returns {@code true} if the iteration has more elements.
+     *
+     * @return {@code true} if the iteration has more elements
+     */
+    boolean hasNext();
 
-    public double next();
+    /**
+     * Returns the next element in the iteration.
+     *
+     * @return the next element in the iteration
+     * @throws NoSuchElementException
+     *             if the iteration has no more elements
+     */
+    double next();
 }
