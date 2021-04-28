@@ -21,5 +21,5 @@ public interface DIndexIterator extends DIterator {
      * Note that indexes are 1-based!
      * @return the next index
      */
-    public int nextIndex();
+    int nextIndex();
 }

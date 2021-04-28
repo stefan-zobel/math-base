@@ -17,7 +17,7 @@ package math.fun;
 
 public interface DForEachBi {
 
-    public void forEachRemaining(DBiConsumer action);
+    void forEachRemaining(DBiConsumer action);
 
-    public boolean tryAdvance(DBiConsumer action);
+    boolean tryAdvance(DBiConsumer action);
 }

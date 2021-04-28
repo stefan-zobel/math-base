@@ -17,7 +17,7 @@ package math.fun;
 
 public interface DForEach {
 
-    public void forEachRemaining(DConsumer action);
+    void forEachRemaining(DConsumer action);
 
-    public boolean tryAdvance(DConsumer action);
+    boolean tryAdvance(DConsumer action);
 }
