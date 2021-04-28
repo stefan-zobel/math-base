@@ -15,7 +15,16 @@
  */
 package math.fun;
 
+/**
+ * Represents a function that accepts one argument and produces a result.
+ */
 public interface DFunction {
-
-    public double apply(double x);
+    /**
+     * Applies this function to the given argument.
+     *
+     * @param x
+     *            the function argument
+     * @return the function result
+     */
+    double apply(double x);
 }

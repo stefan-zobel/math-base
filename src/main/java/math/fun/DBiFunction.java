@@ -15,7 +15,19 @@
  */
 package math.fun;
 
+/**
+ * Represents a function that accepts two arguments and produces a result. This
+ * is the two-arity specialization of {@link DFunction}.
+ */
 public interface DBiFunction {
-
-    public double apply(double x1, double x2);
+    /**
+     * Applies this function to the given arguments.
+     *
+     * @param x1
+     *            the first function argument
+     * @param x2
+     *            the second function argument
+     * @return the function result
+     */
+    double apply(double x1, double x2);
 }

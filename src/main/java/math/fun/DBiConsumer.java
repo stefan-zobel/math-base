@@ -15,7 +15,20 @@
  */
 package math.fun;
 
+/**
+ * Represents an operation that accepts two input arguments and returns no
+ * result. This is the two-arity specialization of {@link DConsumer}. Unlike
+ * most other functional interfaces, {@code DBiConsumer} is expected to operate
+ * via side-effects.
+ */
 public interface DBiConsumer {
-
-    public void accept(double x, double y);
+    /**
+     * Performs this operation on the given arguments.
+     *
+     * @param x
+     *            the first input argument
+     * @param y
+     *            the second input argument
+     */
+    void accept(double x, double y);
 }

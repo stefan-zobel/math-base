@@ -15,7 +15,17 @@
  */
 package math.fun;
 
+/**
+ * Represents an operation that accepts a single input argument and returns no
+ * result. Unlike most other functional interfaces, {@code DConsumer} is
+ * expected to operate via side-effects.
+ */
 public interface DConsumer {
-
-    public void accept(double x);
+    /**
+     * Performs this operation on the given argument.
+     *
+     * @param x
+     *            the input argument
+     */
+    void accept(double x);
 }
