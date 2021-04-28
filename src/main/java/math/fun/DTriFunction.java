@@ -15,7 +15,21 @@
  */
 package math.fun;
 
+/**
+ * Represents a function that accepts three arguments and produces a result. This
+ * is the three-arity specialization of {@link DFunction}.
+ */
 public interface DTriFunction {
-
-    public double apply(double x1, double x2, double x3);
+    /**
+     * Applies this function to the given arguments.
+     *
+     * @param x1
+     *            the first function argument
+     * @param x2
+     *            the second function argument
+     * @param x3
+     *            the third function argument            
+     * @return the function result
+     */
+    double apply(double x1, double x2, double x3);
 }
