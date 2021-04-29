@@ -15,25 +15,79 @@
  */
 package math.fun;
 
+/**
+ * Describes the final outcome of an iterative evaluation procedure of a
+ * {@link DMultiFunction}.
+ */
 public final class DMultiFunctionEval {
 
+    /**
+     * To which point has the evaluation settled?
+     */
     public final double[] point;
+
+    /**
+     * What is the function's value at {@link #point}?
+     */
     public final double value;
+
+    /**
+     * How many iterations were performed during the evaluation?
+     */
     public final int iterations;
+
+    /**
+     * Has the evaluation converged?
+     */
     public final boolean converged;
 
-    public DMultiFunctionEval(double[] point, double value, int iterations,
-            boolean converged) {
+    /**
+     * Creates a new {@code DMultiFunctionEval} instance from the given
+     * arguments.
+     * 
+     * @param point
+     *            the point at which the evaluation has settled
+     * @param value
+     *            the function's value at {@code point}
+     * @param iterations
+     *            the number of iterations that were performed during the
+     *            evaluation
+     * @param converged
+     *            whether the evaluation has converged
+     */
+    public DMultiFunctionEval(double[] point, double value, int iterations, boolean converged) {
         this.point = point;
         this.value = value;
         this.iterations = iterations;
         this.converged = converged;
     }
 
+    /**
+     * Creates a new {@code DMultiFunctionEval} instance from the given
+     * arguments.
+     * 
+     * @param point
+     *            the point at which the evaluation has settled
+     * @param value
+     *            the function's value at {@code point}
+     * @param iterations
+     *            the number of iterations that were performed during the
+     *            evaluation
+     */
     public DMultiFunctionEval(double[] point, double value, int iterations) {
         this(point, value, iterations, true);
     }
 
+    /**
+     * Creates a new {@code DMultiFunctionEval} instance from the given
+     * arguments.
+     * 
+     * @param point
+     *            the point at which the evaluation has settled
+     * @param value
+     *            the function's value at {@code point}
+     * @param value
+     */
     public DMultiFunctionEval(double[] point, double value) {
         this(point, value, 0);
     }
