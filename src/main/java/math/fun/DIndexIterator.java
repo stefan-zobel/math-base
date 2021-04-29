@@ -15,11 +15,16 @@
  */
 package math.fun;
 
+/**
+ * An iterator over a collection of primitive doubles.
+ */
 public interface DIndexIterator extends DIterator {
 
     /**
-     * Note that indexes are 1-based!
-     * @return the next index
+     * Returns the next index. Note that the first index at the begin of the
+     * iteration will always be {@code 1}.
+     * 
+     * @return the next index (the first index will always be {@code 1})
      */
     int nextIndex();
 }

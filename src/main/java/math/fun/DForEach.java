@@ -15,9 +15,35 @@
  */
 package math.fun;
 
+/**
+ * A device for traversing elements of a source, either sequentially in bulk or
+ * individually.
+ */
 public interface DForEach {
 
+    /**
+     * Performs the given action for each remaining element sequentially until
+     * all elements have been processed or the action throws an exception.
+     * Exceptions thrown by the action are relayed to the caller.
+     *
+     * @param action
+     *            The action
+     * @throws NullPointerException
+     *             if the specified action is null
+     */
     void forEachRemaining(DConsumer action);
 
+    /**
+     * If a remaining element exists, performs the given action on it, returning
+     * {@code true}; else returns {@code false}. Exceptions thrown by the action
+     * are relayed to the caller.
+     *
+     * @param action
+     *            The action
+     * @return {@code false} if no remaining elements existed upon entry to this
+     *         method, else {@code true}.
+     * @throws NullPointerException
+     *             if the specified action is null
+     */
     boolean tryAdvance(DConsumer action);
 }

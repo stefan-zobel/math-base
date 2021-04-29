@@ -19,6 +19,12 @@ package math.fun;
  * A double-valued multivariate function over double[] arrays.
  */
 public interface DMultiFunction {
-
+    /**
+     * Applies this function to the arguments given in the array {@code x}.
+     *
+     * @param x
+     *            the multivariate arguments to the function
+     * @return the function result
+     */
     double apply(double[] x);
 }
