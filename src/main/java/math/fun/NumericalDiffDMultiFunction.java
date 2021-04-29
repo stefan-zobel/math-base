@@ -28,7 +28,7 @@ import math.MathConsts;
 public abstract class NumericalDiffDMultiFunction implements DiffDMultiFunction {
 
     /**
-     * the scaling factor to use for scaling of the individual {@code h}
+     * The scaling factor to use for scaling of the individual {@code h}
      */
     protected final double diffScale;
 
