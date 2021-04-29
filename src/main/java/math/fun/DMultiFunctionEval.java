@@ -86,7 +86,6 @@ public final class DMultiFunctionEval {
      *            the point at which the evaluation has settled
      * @param value
      *            the function's value at {@code point}
-     * @param value
      */
     public DMultiFunctionEval(double[] point, double value) {
         this(point, value, 0);
