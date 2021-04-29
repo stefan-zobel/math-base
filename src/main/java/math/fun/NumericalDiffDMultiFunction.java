@@ -25,19 +25,32 @@ import math.MathConsts;
  * based upon the absolute magnitude of the corresponding element in the vector
  * {@code x}.
  */
-public abstract class NumericalDiffDMultiFunction implements
-        DiffDMultiFunction {
+public abstract class NumericalDiffDMultiFunction implements DiffDMultiFunction {
 
     protected final double diffScale;
 
+    /**
+     * Creates a new {@code NumericalDiffDMultiFunction} with a default scaling
+     * factor.
+     */
     public NumericalDiffDMultiFunction() {
         this(1.5 * Math.sqrt(MathConsts.MACH_EPS_DBL));
     }
 
+    /**
+     * Creates a new {@code NumericalDiffDMultiFunction} with the provided
+     * scaling factor.
+     * 
+     * @param diffScale
+     *            scaling factor to use for {@code h}
+     */
     public NumericalDiffDMultiFunction(double diffScale) {
         this.diffScale = diffScale;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public final void derivativeAt(double[] x, double[] grad) {
         double fx = this.apply(x);
