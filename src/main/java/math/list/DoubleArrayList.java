@@ -1499,6 +1499,22 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public double min() {
+            if (isEmpty()) {
+                throw new NoSuchElementException();
+            }
+            return DoubleArrayList.min(size, offset, root.elementData);
+        }
+
+        @Override
+        public double max() {
+            if (isEmpty()) {
+                throw new NoSuchElementException();
+            }
+            return DoubleArrayList.max(size, offset, root.elementData);
+        }
+
+        @Override
         public double sum() {
             return DoubleArrayList.sum(size, offset, root.elementData);
         }
@@ -1924,12 +1940,42 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         return max + Math.log(s);
     }
 
-    private static double max(int length, int aoff, double[] a) {
+    static double max(int length, int aoff, double[] a) {
         double max = a[aoff];
         for (int i = aoff + 1; i < aoff + length; ++i) {
             max = Math.max(max, a[i]);
         }
         return max;
+    }
+
+    static double min(int length, int aoff, double[] a) {
+        double min = a[aoff];
+        for (int i = aoff + 1; i < aoff + length; ++i) {
+            min = Math.min(min, a[i]);
+        }
+        return min;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double min() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return min(size, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double max() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return max(size, 0, elementData);
     }
 
     /**
