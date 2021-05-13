@@ -510,6 +510,18 @@ public interface DoubleList {
     double norm2();
 
     /**
+     * Returns the logarithm of the sum of the exponentials of this list (see
+     * <a href="https://en.wikipedia.org/wiki/LogSumExp">LogSumExp</a>) if it
+     * has at least one element, otherwise {@code NoSuchElementException} is
+     * thrown.
+     * 
+     * @return the logarithm of the sum of the exponentials of this list
+     * @throws NoSuchElementException
+     *             if this list is empty
+     */
+    double logSumExp();
+
+    /**
      * Add the scalars from the given {@code list} to the elements in this list.
      * Note that {@code list} doesn't have to have the same {@link #size()} as
      * this list as the minimum of both list sizes is used to determine the

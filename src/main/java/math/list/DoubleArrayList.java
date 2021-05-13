@@ -1556,6 +1556,14 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public double logSumExp() {
+            if (isEmpty()) {
+                throw new NoSuchElementException();
+            }
+            return DoubleArrayList.logSumExp(size, offset, root.elementData);
+        }
+
+        @Override
         public DoubleList plusn(DoubleList list) {
             int length = Math.min(size, Objects.requireNonNull(list, "list").size());
             plusn(length, offset, root.elementData, list.offset(), list.getArrayUnsafe());
@@ -1882,10 +1890,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
     }
 
     static double[] softmax(int length, int aoff, double[] a, double[] out) {
-        double max = a[aoff];
-        for (int i = aoff + 1; i < aoff + length; ++i) {
-            max = Math.max(max, a[i]);
-        }
+        double max = max(length, aoff, a);
         double s = 0.0;
         for (int i = aoff; i < aoff + length; ++i) {
             double q = Math.exp(a[i] - max);
@@ -1897,6 +1902,34 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             out[i] *= s;
         }
         return out;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double logSumExp() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return logSumExp(size, 0, elementData);
+    }
+
+    static double logSumExp(int length, int aoff, double[] a) {
+        double max = max(length, aoff, a);
+        double s = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            s += Math.exp(a[i] - max);
+        }
+        return max + Math.log(s);
+    }
+
+    private static double max(int length, int aoff, double[] a) {
+        double max = a[aoff];
+        for (int i = aoff + 1; i < aoff + length; ++i) {
+            max = Math.max(max, a[i]);
+        }
+        return max;
     }
 
     /**
