@@ -485,6 +485,13 @@ public interface DoubleList {
     double dot(double[] array);
 
     /**
+     * Computes the euclidean norm (magnitude) of this list.
+     * 
+     * @return the euclidean norm of this list
+     */
+    double norm2();
+
+    /**
      * Add the scalars from the given {@code list} to the elements in this list.
      * Note that {@code list} doesn't have to have the same {@link #size()} as
      * this list as the minimum of both list sizes is used to determine the

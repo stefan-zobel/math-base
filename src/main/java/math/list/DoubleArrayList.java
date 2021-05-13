@@ -1528,6 +1528,11 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public double norm2() {
+            return Math.sqrt(dot(size, offset, root.elementData, offset, root.elementData));
+        }
+
+        @Override
         public DoubleList plusn(DoubleList list) {
             int length = Math.min(size, Objects.requireNonNull(list, "list").size());
             plusn(length, offset, root.elementData, list.offset(), list.getArrayUnsafe());
@@ -1811,6 +1816,14 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             product += a[i] * b[boff + i];
         }
         return product;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double norm2() {
+        return Math.sqrt(dot(size, elementData, 0, elementData));
     }
 
     /**
