@@ -1499,6 +1499,11 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public double sum() {
+            return DoubleArrayList.sum(size, offset, root.elementData);
+        }
+
+        @Override
         public double plusi(int index, double val) {
             checkIndex(index, size);
             final double[] es = root.elementData;
@@ -1789,6 +1794,22 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             return this;
         }
         throw new ConcurrentModificationException();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double sum() {
+        return sum(size, 0, elementData);
+    }
+
+    static double sum(int length, int aoff, double[] a) {
+        double sum = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            sum += a[i];
+        }
+        return sum;
     }
 
     /**

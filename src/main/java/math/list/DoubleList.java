@@ -443,6 +443,13 @@ public interface DoubleList {
     DoubleList mul(double val);
 
     /**
+     * Returns the sum of the elements in this list.
+     * 
+     * @return the sum of the elements in this list
+     */
+    double sum();
+
+    /**
      * Add the scalar {@code val} to the element at {@code index}.
      * 
      * @param index
