@@ -516,7 +516,7 @@ public interface DoubleList {
      * thrown.
      * 
      * @return the logarithm of the sum of the exponentials of this list
-     * @throws NoSuchElementException
+     * @throws java.util.NoSuchElementException
      *             if this list is empty
      */
     double logSumExp();
