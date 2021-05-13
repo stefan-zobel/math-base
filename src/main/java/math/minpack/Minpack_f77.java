@@ -63,8 +63,8 @@ package math.minpack;
 /**
 *This class contains Java translations of the MINPACK nonlinear least 
 *squares routines.  As of November 2000, it does not yet contain
-*the MINPACK solvers of systems of nonlinear equations.  They should
-*be added in the Spring of 2001.<p>
+*the MINPACK solvers of systems of nonlinear equations.
+*<p>
 *The original FORTRAN MINPACK package was produced by
 *Burton S. Garbow, Kenneth E. Hillstrom, and Jorge J. More
 *as part of the Argonne National Laboratory MINPACK project, March 1980.
@@ -98,8 +98,8 @@ package math.minpack;
 *Meanwhile, if you have suggestions for improving this
 *code, please contact Steve Verrill at steve@www1.fpl.fs.fed.us.
 *
-*@author (translator)Steve Verrill
-*@version .5 --- November 3, 2000
+*@author (translator) Steve Verrill
+*@version 0.5 -- November 3, 2000
 */
 public final class Minpack_f77 {
 
