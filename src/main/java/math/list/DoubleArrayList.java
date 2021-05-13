@@ -1736,7 +1736,12 @@ public class DoubleArrayList implements DoubleList, Cloneable {
      */
     @Override
     public double[] getArrayUnsafe() {
-        return elementData;
+        double[] es = elementData;
+        if (es == DEFAULTCAPACITY_EMPTY_ELEMENTDATA || es == EMPTY_ELEMENTDATA) {
+            es = new double[0];
+            elementData = es;
+        }
+        return es;
     }
 
     /**
