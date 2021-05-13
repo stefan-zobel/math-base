@@ -485,6 +485,17 @@ public interface DoubleList {
     double dot(double[] array);
 
     /**
+     * Returns a new list that contains the contents of this list normalized to
+     * a probability distribution according to the
+     * <a href="https://en.wikipedia.org/wiki/Softmax_function">softmax</a>
+     * function.
+     * 
+     * @return a new list that contains the contents of this list normalized
+     *         according to the softmax function
+     */
+    DoubleList softmax();
+
+    /**
      * Computes the euclidean norm (magnitude) of this list.
      * 
      * @return the euclidean norm of this list

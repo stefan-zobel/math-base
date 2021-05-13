@@ -123,11 +123,20 @@ public class DoubleArrayList implements DoubleList, Cloneable {
      *             if the specified array is null
      */
     public DoubleArrayList(double[] c) {
-        if ((size = c.length) != 0) {
-            elementData = Arrays.copyOf(c, size);
+        this(c, true);
+    }
+
+    DoubleArrayList(double[] c, boolean doCopy) {
+        if (doCopy) {
+            if ((size = c.length) != 0) {
+                elementData = Arrays.copyOf(c, size);
+            } else {
+                // replace with empty array.
+                elementData = EMPTY_ELEMENTDATA;
+            }
         } else {
-            // replace with empty array.
-            elementData = EMPTY_ELEMENTDATA;
+            size = c.length;
+            elementData = c;
         }
     }
 
@@ -1533,6 +1542,15 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public DoubleList softmax() {
+            if (isEmpty()) {
+                return new DoubleArrayList(0);
+            }
+            return new DoubleArrayList(DoubleArrayList.softmax(size, offset, root.elementData, new double[size]),
+                    false);
+        }
+
+        @Override
         public DoubleList plusn(DoubleList list) {
             int length = Math.min(size, Objects.requireNonNull(list, "list").size());
             plusn(length, offset, root.elementData, list.offset(), list.getArrayUnsafe());
@@ -1824,6 +1842,35 @@ public class DoubleArrayList implements DoubleList, Cloneable {
     @Override
     public double norm2() {
         return Math.sqrt(dot(size, elementData, 0, elementData));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList softmax() {
+        if (isEmpty()) {
+            return new DoubleArrayList(0);
+        }
+        return new DoubleArrayList(softmax(size, 0, elementData, new double[size]), false);
+    }
+
+    static double[] softmax(int length, int aoff, double[] a, double[] out) {
+        double max = a[aoff];
+        for (int i = aoff + 1; i < aoff + length; ++i) {
+            max = Math.max(max, a[i]);
+        }
+        double s = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            double q = Math.exp(a[i] - max);
+            s += q;
+            out[i - aoff] = q;
+        }
+        s = 1.0 / s;
+        for (int i = 0; i < length; ++i) {
+            out[i] *= s;
+        }
+        return out;
     }
 
     /**
