@@ -74,6 +74,11 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     @Override
+    public float nextFloat(float min, float max) {
+        return min + (max - min) * nextFloat();
+    }
+
+    @Override
     public int nextInt() {
         return (int) (nextLong() >> 32);
     }

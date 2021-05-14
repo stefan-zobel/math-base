@@ -27,6 +27,8 @@ public interface PseudoRandom {
 
     float nextFloat();
 
+    float nextFloat(float min, float max);
+
     int nextInt();
 
     void nextBytes(byte[] bytes);
