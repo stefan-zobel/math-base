@@ -25,6 +25,8 @@ public interface PseudoRandom {
 
     double nextGaussian();
 
+    double nextGaussian(double mean, double stdDeviation);
+
     float nextFloat();
 
     float nextFloat(float min, float max);

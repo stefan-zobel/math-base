@@ -69,6 +69,11 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     @Override
+    public double nextGaussian(double mean, double stdDeviation) {
+        return mean + stdDeviation * nextGaussian();
+    }
+
+    @Override
     public float nextFloat() {
         return (nextLong() >>> 40) * FLOAT_NORM;
     }
