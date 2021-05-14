@@ -75,6 +75,18 @@ public interface DoubleList {
         }
     }
 
+	/**
+	 * Constructs a list containing the passed values in the order of their
+	 * appearance.
+	 * 
+	 * @param values
+	 *            the values which are to be placed into the list
+	 * @return a new {@code DoubleList} constructed from the passed values
+	 */
+	static DoubleList of(double... values) {
+		return new DoubleArrayList(values, false);
+	}
+
     /**
      * Returns the number of elements in this list.
      *
