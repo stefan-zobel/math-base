@@ -619,8 +619,10 @@ public class DoubleArrayList implements DoubleList, Cloneable {
      * the list by {@code (toIndex - fromIndex)} elements. (If
      * {@code toIndex==fromIndex}, this operation has no effect.)
      *
-     * @param fromIndex start index, inclusive
-     * @param toIndex end index, exclusive
+     * @param fromIndex
+     *            start index, inclusive
+     * @param toIndex
+     *            end index, exclusive
      * @throws IndexOutOfBoundsException
      *             if {@code fromIndex} or {@code toIndex} is out of range
      *             ({@code fromIndex < 0 ||
@@ -1586,6 +1588,21 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public DoubleList cross(DoubleList list) {
+            checkDim3(this, false);
+            checkDim3(list, true);
+            return new DoubleArrayList(
+                    DoubleArrayList.cross(offset, root.elementData, list.offset(), list.getArrayUnsafe()), false);
+        }
+
+        @Override
+        public DoubleList cross(double[] array) {
+            checkDim3(this, false);
+            checkDim3(array);
+            return new DoubleArrayList(DoubleArrayList.cross(offset, root.elementData, 0, array), false);
+        }
+
+        @Override
         public double norm2() {
             return Math.sqrt(dot(size, offset, root.elementData, offset, root.elementData));
         }
@@ -1654,7 +1671,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
-        public String toString()  {
+        public String toString() {
             StringBuilder buf = new StringBuilder();
             final double[] es = root.elementData;
             final int start = offset;
@@ -1918,6 +1935,57 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             product += a[i] * b[boff + i];
         }
         return product;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList cross(DoubleList list) {
+        checkDim3(this, false);
+        checkDim3(list, true);
+        return new DoubleArrayList(cross(0, elementData, list.offset(), list.getArrayUnsafe()), false);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList cross(double[] array) {
+        checkDim3(this, false);
+        checkDim3(array);
+        return new DoubleArrayList(cross(0, elementData, 0, array), false);
+    }
+
+    static void checkDim3(DoubleList list, boolean isArg) {
+        if (Objects.requireNonNull(list, "list").size() != 3) {
+            String msg = "vector dimension needs to be 3 but is ";
+            if (isArg) {
+                throw new IllegalArgumentException(msg + list.size());
+            } else {
+                throw new UnsupportedOperationException(msg + list.size());
+            }
+        }
+    }
+
+    static void checkDim3(double[] array) {
+        if (Objects.requireNonNull(array, "array").length != 3) {
+            throw new IllegalArgumentException("vector dimension needs to be 3 but is " + array.length);
+        }
+    }
+
+    static double[] cross(int aoff, double[] a, int boff, double[] b) {
+        double a1 = a[aoff];
+        double a2 = a[aoff + 1];
+        double a3 = a[aoff + 2];
+        double b1 = b[boff];
+        double b2 = b[boff + 1];
+        double b3 = b[boff + 2];
+        double[] c = new double[3];
+        c[0] = a2 * b3 - a3 * b2;
+        c[1] = a3 * b1 - a1 * b3;
+        c[2] = a1 * b2 - a2 * b1;
+        return c;
     }
 
     /**

@@ -544,6 +544,47 @@ public interface DoubleList {
     double dot(double[] array);
 
     /**
+     * Computes the <a href="https://en.wikipedia.org/wiki/Cross_product">cross
+     * product</a> of this DoubleList and the given {@code list} provided that
+     * both, this DoubleList and the given {@code list}, have a dimension of
+     * <b>3</b>. If this DoubleList is not of {@link #size()} {@code == 3} an
+     * {@code UnsupportedOperationException} is thrown. Also, if the given
+     * {@code list} doesn't satisfy {@code list.size() == 3} an
+     * {@code IllegalArgumentException} is thrown.
+     * 
+     * @param list
+     *            a DoubleList which must have the {@code size() == 3}
+     * @return the the cross product of this DoubleList and the given
+     *         {@code list}
+     * @throws java.lang.UnsupportedOperationException
+     *             if this DoubleList is not of {@code size() == 3}
+     * @throws java.lang.IllegalArgumentException
+     *             if the given {@code list} doesn't satisfy
+     *             {@code list.size() == 3}
+     */
+    DoubleList cross(DoubleList list);
+
+    /**
+     * Computes the <a href="https://en.wikipedia.org/wiki/Cross_product">cross
+     * product</a> of this DoubleList and the given {@code array} provided that
+     * both, this DoubleList and the given {@code array}, have a dimension of
+     * <b>3</b>. If this DoubleList is not of {@link #size()} {@code == 3} an
+     * {@code UnsupportedOperationException} is thrown. Also, if the given
+     * {@code array} doesn't satisfy {@code array.length == 3} an
+     * {@code IllegalArgumentException} is thrown.
+     * 
+     * @param array
+     *            an array which must have {@code length == 3}
+     * @return the cross product of this DoubleList and the given {@code array}
+     * @throws java.lang.UnsupportedOperationException
+     *             if this DoubleList is not of {@code size() == 3}
+     * @throws java.lang.IllegalArgumentException
+     *             if the given {@code array} doesn't satisfy
+     *             {@code array.length == 3}
+     */
+    DoubleList cross(double[] array);
+
+    /**
      * Returns a new list that contains the contents of this list normalized to
      * a probability distribution according to the
      * <a href="https://en.wikipedia.org/wiki/Softmax_function">softmax</a>
