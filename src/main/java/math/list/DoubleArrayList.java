@@ -1592,11 +1592,17 @@ public class DoubleArrayList implements DoubleList, Cloneable {
 
         @Override
         public DoubleList softmax() {
+            return normalizedSoftmax(1.0);
+        }
+
+        @Override
+        public DoubleList normalizedSoftmax(double normalizedSum) {
             if (isEmpty()) {
                 return new DoubleArrayList(0);
             }
             return new DoubleArrayList(
-                    DoubleArrayList.normalizedSoftmax(1.0, size, offset, root.elementData, new double[size]), false);
+                    DoubleArrayList.normalizedSoftmax(normalizedSum, size, offset, root.elementData, new double[size]),
+                    false);
         }
 
         @Override
@@ -1927,10 +1933,18 @@ public class DoubleArrayList implements DoubleList, Cloneable {
      */
     @Override
     public DoubleList softmax() {
+        return normalizedSoftmax(1.0);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList normalizedSoftmax(double normalizedSum) {
         if (isEmpty()) {
             return new DoubleArrayList(0);
         }
-        return new DoubleArrayList(normalizedSoftmax(1.0, size, 0, elementData, new double[size]), false);
+        return new DoubleArrayList(normalizedSoftmax(normalizedSum, size, 0, elementData, new double[size]), false);
     }
 
     static double[] normalizedSoftmax(double normalizedSum, int length, int aoff, double[] a, double[] out) {

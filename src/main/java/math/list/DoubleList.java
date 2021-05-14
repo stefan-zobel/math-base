@@ -75,17 +75,17 @@ public interface DoubleList {
         }
     }
 
-	/**
-	 * Constructs a list containing the passed values in the order of their
-	 * appearance.
-	 * 
-	 * @param values
-	 *            the values which are to be placed into the list
-	 * @return a new {@code DoubleList} constructed from the passed values
-	 */
-	static DoubleList of(double... values) {
-		return new DoubleArrayList(values, false);
-	}
+    /**
+     * Constructs a list containing the passed values in the order of their
+     * appearance.
+     * 
+     * @param values
+     *            the values which are to be placed into the list
+     * @return a new {@code DoubleList} constructed from the passed values
+     */
+    static DoubleList of(double... values) {
+        return new DoubleArrayList(values, false);
+    }
 
     /**
      * Returns the number of elements in this list.
@@ -547,12 +547,26 @@ public interface DoubleList {
      * Returns a new list that contains the contents of this list normalized to
      * a probability distribution according to the
      * <a href="https://en.wikipedia.org/wiki/Softmax_function">softmax</a>
-     * function.
+     * function which sums up to {@code 1.0}.
      * 
      * @return a new list that contains the contents of this list normalized
      *         according to the softmax function
      */
     DoubleList softmax();
+
+    /**
+     * Returns a new list that contains the contents of this list normalized to
+     * a distribution according to the
+     * <a href="https://en.wikipedia.org/wiki/Softmax_function">softmax</a>
+     * function which sums up to {@code normalizedSum}.
+     * 
+     * @param normalizedSum
+     *            the overall sum of the desired distribution
+     * @return a new list that contains the contents of this list normalized
+     *         according to the softmax function which sums up to
+     *         {@code normalizedSum}
+     */
+    DoubleList normalizedSoftmax(double normalizedSum);
 
     /**
      * Computes the euclidean norm (magnitude) of this list.
