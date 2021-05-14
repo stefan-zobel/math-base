@@ -141,6 +141,18 @@ public class DoubleArrayList implements DoubleList, Cloneable {
     }
 
     /**
+     * Constructs a list containing the passed values in the order of their
+     * appearance.
+     * 
+     * @param values
+     *            the values which are to be placed into the list
+     * @return a new {@code DoubleArrayList} constructed from the passed values
+     */
+    public static DoubleArrayList of(double... values) {
+        return new DoubleArrayList(values, false);
+    }
+
+    /**
      * Constructs a list containing the elements of the specified list, in the
      * order they are returned by the list's {@link DoubleList#toArray()}
      * method.
