@@ -24,6 +24,8 @@ import java.util.Spliterator;
 import java.util.function.DoubleConsumer;
 
 import math.fun.DForEachIterator;
+import math.rng.DefaultRng;
+import math.rng.PseudoRandom;
 
 /**
  * Resizable primitive double[] array implementation. This is essentially a
@@ -149,6 +151,27 @@ public class DoubleArrayList implements DoubleList, Cloneable {
      * @return a new {@code DoubleArrayList} constructed from the passed values
      */
     public static DoubleArrayList of(double... values) {
+        return new DoubleArrayList(values, false);
+    }
+
+    /**
+     * Constructs a random list of length {@code size} with random values
+     * uniformly distributed between {@code min} and {@code max}.
+     * 
+     * @param min
+     *            lower bound of the uniform distribution
+     * @param max
+     *            upper bound of the uniform distribution
+     * @param size
+     *            length of the list
+     * @return a random list of length {@code size}
+     */
+    public static DoubleArrayList uniformRandom(double min, double max, int size) {
+        double[] values = new double[size];
+        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        for (int i = 0; i < values.length; ++i) {
+            values[i] = rng.nextDouble(min, max);
+        }
         return new DoubleArrayList(values, false);
     }
 

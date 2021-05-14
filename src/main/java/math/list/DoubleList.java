@@ -88,6 +88,22 @@ public interface DoubleList {
     }
 
     /**
+     * Constructs a random list of length {@code size} with random values
+     * uniformly distributed between {@code min} and {@code max}.
+     * 
+     * @param min
+     *            lower bound of the uniform distribution
+     * @param max
+     *            upper bound of the uniform distribution
+     * @param size
+     *            length of the list
+     * @return a random list of length {@code size}
+     */
+    static DoubleList uniformRandom(double min, double max, int size) {
+        return DoubleArrayList.uniformRandom(min, max, size);
+    }
+
+    /**
      * Returns the number of elements in this list.
      *
      * @return the number of elements in this list
