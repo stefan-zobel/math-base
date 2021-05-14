@@ -37,10 +37,14 @@ public abstract class AbstractRng64 implements PseudoRandom {
     @Override
     public abstract long nextLong();
 
-    // TODO: explain: is this [0, 1] or [0, 1)? { -> rather [0, 1)}
     @Override
     public double nextDouble() {
         return (nextLong() >>> 11) * DOUBLE_NORM;
+    }
+
+    @Override
+    public double nextDouble(double min, double max) {
+        return min + (max - min) * nextDouble();
     }
 
     @Override

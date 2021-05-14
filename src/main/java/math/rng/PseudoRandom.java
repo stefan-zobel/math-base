@@ -19,8 +19,9 @@ public interface PseudoRandom {
 
     long nextLong();
 
-    // TODO: explain: is this [0, 1] or [0, 1)?
     double nextDouble();
+
+    double nextDouble(double min, double max);
 
     double nextGaussian();
 
