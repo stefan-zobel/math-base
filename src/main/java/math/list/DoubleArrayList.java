@@ -15,6 +15,8 @@
  */
 package math.list;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.ConcurrentModificationException;
@@ -1512,6 +1514,18 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public DoubleList round(int scale) {
+            final double[] es = root.elementData;
+            final int start = offset;
+            final int end = start + size;
+            for (int i = start; i < end; ++i) {
+                es[i] = BigDecimal.valueOf(es[i]).setScale(scale, RoundingMode.HALF_EVEN).doubleValue();
+            }
+            checkForComodification();
+            return this;
+        }
+
+        @Override
         public DoubleList plus(double val) {
             final double[] es = root.elementData;
             final int start = offset;
@@ -1854,6 +1868,23 @@ public class DoubleArrayList implements DoubleList, Cloneable {
     public DoubleList assignConst(double val) {
         final int expectedModCount = modCount;
         Arrays.fill(elementData, 0, size, val);
+        if (modCount == expectedModCount) { // "lgtm[java/constant-comparison]"
+            return this;
+        }
+        throw new ConcurrentModificationException();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList round(int scale) {
+        final int expectedModCount = modCount;
+        final double[] es = elementData;
+        final int end = size;
+        for (int i = 0; i < end; ++i) {
+            es[i] = BigDecimal.valueOf(es[i]).setScale(scale, RoundingMode.HALF_EVEN).doubleValue();
+        }
         if (modCount == expectedModCount) { // "lgtm[java/constant-comparison]"
             return this;
         }

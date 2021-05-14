@@ -692,4 +692,16 @@ public interface DoubleList {
      * @return this {@code DoubleList}
      */
     DoubleList muln(double[] array);
+
+    /**
+     * Round the scalars in this list to {@code scale}.
+     * 
+     * @param scale
+     *            if zero or positive, the scale is the number of digits to the
+     *            right of the decimal point. If negative, the unscaled value of
+     *            the number is multiplied by ten to the power of the negation
+     *            of the scale.
+     * @return this {@code DoubleList}
+     */
+    DoubleList round(int scale);
 }
