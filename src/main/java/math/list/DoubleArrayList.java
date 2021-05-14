@@ -1523,6 +1523,14 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public double median() {
+            if (isEmpty()) {
+                throw new NoSuchElementException();
+            }
+            return DoubleArrayList.median(size, offset, root.elementData);
+        }
+
+        @Override
         public double sum() {
             return DoubleArrayList.sum(size, offset, root.elementData);
         }
@@ -1968,6 +1976,21 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         return sum(length, aoff, a) / length;
     }
 
+    static double median(int length, int aoff, double[] a) {
+        double[] b = new double[length];
+        System.arraycopy(a, aoff, b, 0, length);
+        Arrays.sort(b);
+        int len = b.length;
+        if (len == 1) {
+            return b[0];
+        }
+        int mid = b.length / 2;
+        if (len % 2 == 0) {
+            return (b[mid - 1] + b[mid]) / 2.0;
+        }
+        return b[mid];
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -1999,6 +2022,17 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             throw new NoSuchElementException();
         }
         return avg(size, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double median() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return median(size, 0, elementData);
     }
 
     /**

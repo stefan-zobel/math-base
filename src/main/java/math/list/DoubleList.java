@@ -473,6 +473,16 @@ public interface DoubleList {
     double avg();
 
     /**
+     * Returns the median value of the elements in this list if this list has at
+     * least one element, otherwise throws {@code NoSuchElementException}.
+     * 
+     * @return the median value of the elements in this list
+     * @throws java.util.NoSuchElementException
+     *             if this list is empty
+     */
+    double median();
+
+    /**
      * Returns the sum of the elements in this list.
      * 
      * @return the sum of the elements in this list
