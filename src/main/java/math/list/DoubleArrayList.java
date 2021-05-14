@@ -1596,7 +1596,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
                 return new DoubleArrayList(0);
             }
             return new DoubleArrayList(
-                    DoubleArrayList.shiftedSoftmax(1.0, size, offset, root.elementData, new double[size]), false);
+                    DoubleArrayList.normalizedSoftmax(1.0, size, offset, root.elementData, new double[size]), false);
         }
 
         @Override
@@ -1930,10 +1930,10 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         if (isEmpty()) {
             return new DoubleArrayList(0);
         }
-        return new DoubleArrayList(shiftedSoftmax(1.0, size, 0, elementData, new double[size]), false);
+        return new DoubleArrayList(normalizedSoftmax(1.0, size, 0, elementData, new double[size]), false);
     }
 
-    static double[] shiftedSoftmax(double shift, int length, int aoff, double[] a, double[] out) {
+    static double[] normalizedSoftmax(double normalizedSum, int length, int aoff, double[] a, double[] out) {
         double max = max(length, aoff, a);
         double s = 0.0;
         for (int i = aoff; i < aoff + length; ++i) {
@@ -1941,7 +1941,7 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             s += q;
             out[i - aoff] = q;
         }
-        s = shift / s;
+        s = normalizedSum / s;
         for (int i = 0; i < length; ++i) {
             out[i] *= s;
         }
