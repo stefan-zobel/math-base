@@ -463,6 +463,16 @@ public interface DoubleList {
     double max();
 
     /**
+     * Returns the average value of the elements in this list if this list has
+     * at least one element, otherwise throws {@code NoSuchElementException}.
+     * 
+     * @return the average value of the elements in this list
+     * @throws java.util.NoSuchElementException
+     *             if this list is empty
+     */
+    double avg();
+
+    /**
      * Returns the sum of the elements in this list.
      * 
      * @return the sum of the elements in this list

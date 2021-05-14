@@ -1515,6 +1515,14 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         }
 
         @Override
+        public double avg() {
+            if (isEmpty()) {
+                throw new NoSuchElementException();
+            }
+            return DoubleArrayList.avg(size, offset, root.elementData);
+        }
+
+        @Override
         public double sum() {
             return DoubleArrayList.sum(size, offset, root.elementData);
         }
@@ -1956,6 +1964,10 @@ public class DoubleArrayList implements DoubleList, Cloneable {
         return min;
     }
 
+    static double avg(int length, int aoff, double[] a) {
+        return sum(length, aoff, a) / length;
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -1976,6 +1988,17 @@ public class DoubleArrayList implements DoubleList, Cloneable {
             throw new NoSuchElementException();
         }
         return max(size, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double avg() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        return avg(size, 0, elementData);
     }
 
     /**
