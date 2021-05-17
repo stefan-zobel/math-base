@@ -15,6 +15,10 @@
  */
 package math.list;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -34,7 +38,7 @@ import math.rng.PseudoRandom;
  * shameless stripped-down copy of {@link ArrayList} specialized for primitive
  * doubles.
  */
-public class DoubleArrayList implements DoubleList, Cloneable {
+public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     /**
      * Default initial capacity.
      */
@@ -2268,4 +2272,21 @@ public class DoubleArrayList implements DoubleList, Cloneable {
     }
 
     private static final String FORMAT_D = "%.12E";
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void writeExternal(ObjectOutput out) throws IOException {
+        int expectedModCount = modCount;
+        out.writeInt(size);
+        out.writeObject(elementData);
+        if (modCount != expectedModCount) {
+            throw new ConcurrentModificationException();
+        }
+    }
+
+    @Override
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        size = in.readInt();
+        elementData = (double[]) in.readObject();
+    }
 }
