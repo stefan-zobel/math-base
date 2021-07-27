@@ -3,4 +3,4 @@
 
 # math-base
 
-Mathematical function interfaces with a focus on non-linear optimization, interpolation and solvers
+Elementary math utilities with a focus on non-linear optimization, random number generation, interpolation and solvers
