@@ -36,7 +36,7 @@ import math.rng.PseudoRandom;
 /**
  * Resizable primitive double[] array implementation. This is essentially a
  * shameless stripped-down copy of {@link ArrayList} specialized for primitive
- * doubles.
+ * doubles and augmented with mathematical vector operations.
  */
 public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     /**

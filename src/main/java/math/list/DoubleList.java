@@ -25,7 +25,8 @@ import java.util.stream.StreamSupport;
 import math.fun.DForEachIterator;
 
 /**
- * A resizable primitive double[] array.
+ * A resizable primitive double[] array with vector operations that behaves
+ * similarly to a {@code java.util.List}.
  */
 public interface DoubleList {
 
