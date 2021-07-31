@@ -109,7 +109,7 @@ public final class Minpack_f77 {
 
 // minmag is the smallest magnitude
 
-    private static final double minmag = 2.22507385852e-308;
+    private static final double minmag = Double.MIN_NORMAL;
 
     private static final double zero = 0.0;
     private static final double one = 1.0;
