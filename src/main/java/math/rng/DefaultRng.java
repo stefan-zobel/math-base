@@ -25,15 +25,15 @@ public final class DefaultRng {
         return new MersenneTwister64();
     }
 
-    public static PseudoRandom newPseudoRandom(final long seed) {
+    public static PseudoRandom newPseudoRandom(long seed) {
         return new MersenneTwister64(seed);
     }
 
-    public static PseudoRandom newPseudoRandom(final long[] seed) {
+    public static PseudoRandom newPseudoRandom(long[] seed) {
         return new MersenneTwister64(seed);
     }
 
-    public static PseudoRandom[] newIndepPseudoRandoms(final int count) {
+    public static PseudoRandom[] newIndepPseudoRandoms(int count) {
         if (count <= 0) {
             throw new IllegalArgumentException("count <= 0 : " + count);
         }
@@ -53,16 +53,14 @@ public final class DefaultRng {
         return multiplePrng;
     }
 
-    public static PseudoRandom newIndepPseudoRandom(
-            final PseudoRandom prng) {
+    public static PseudoRandom newIndepPseudoRandom(PseudoRandom prng) {
         final int NN = 312;
         final long[] seed = new long[NN];
         reseed(NN, seed, prng);
         return newPseudoRandom(seed);
     }
 
-    private static void reseed(final int len, final long[] seed,
-            final PseudoRandom prng) {
+    private static void reseed(int len, long[] seed, PseudoRandom prng) {
         prng.nextLongs(seed);
         int j = 0;
         while (j < seed.length && seed[j] == 0L) {

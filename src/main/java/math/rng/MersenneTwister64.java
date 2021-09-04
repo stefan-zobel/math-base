@@ -98,18 +98,18 @@ public class MersenneTwister64 extends AbstractRng64 {
         setSeed(MarsagliaXOR64Star.getDefault().nextLong());
     }
 
-    public MersenneTwister64(final long seed) {
-        setSeed(seed == 0L ? -1 : seed);
+    public MersenneTwister64(long seed) {
+        setSeed(seed == 0L ? -1L : seed);
     }
 
-    public MersenneTwister64(final long[] seedArray) {
+    public MersenneTwister64(long[] seedArray) {
         setSeed(seedArray);
     }
 
     /*
      * Initialize the RNG with a 64-bit seed.
      */
-    private void setSeed(final long seed) {
+    private void setSeed(long seed) {
         mt[0] = seed;
         for (mti = 1; mti < NN; mti++) {
             mt[mti] = (6364136223846793005L * (mt[mti - 1] ^ (mt[mti - 1] >>> 62)) + mti);
@@ -119,7 +119,7 @@ public class MersenneTwister64 extends AbstractRng64 {
     /*
      * Initialize the RNG by an array.
      */
-    private void setSeed(final long[] seedArray) {
+    private void setSeed(long[] seedArray) {
         setSeed(19650218L);
         int i = 1;
         int j = 0;
@@ -178,7 +178,7 @@ public class MersenneTwister64 extends AbstractRng64 {
         return x;
     }
 
-    public static MersenneTwister64 getDefault() {
+    public static PseudoRandom getDefault() {
         return defaultRng;
     }
 
