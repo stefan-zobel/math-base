@@ -22,31 +22,19 @@ package math.rng;
  * {@link java.util.concurrent.ThreadLocalRandom}. This generator has a period
  * of 2<sup>64</sup>&nbsp;&minus;&nbsp;1.
  */
-public class MarsagliaXOR64Star extends AbstractRng64 {
+public class MarsagliaXOR64Star extends Marsaglia64 {
 
     private static final MarsagliaXOR64Star defaultRng = new MarsagliaXOR64Star();
 
-    private long seed;
-
     public MarsagliaXOR64Star() {
-        long seed = 0L;
-        do {
-            seed = Seed.seed();
-        } while (seed == 0L);
-        this.seed = seed;
-        recover();
     }
 
-    public MarsagliaXOR64Star(final long seed) {
-        this.seed = (seed == 0L) ? -1L : seed;
-        recover();
+    public MarsagliaXOR64Star(long seed) {
+        super(seed);
     }
 
-    public MarsagliaXOR64Star(final long[] seed) {
-        MersenneTwister64 seeder = new MersenneTwister64(seed);
-        long seed_ = seeder.nextLong();
-        this.seed = (seed_ == 0L) ? -1L : seed_;
-        recover();
+    public MarsagliaXOR64Star(long[] seed) {
+        super(seed);
     }
 
     public final long nextLong() {
@@ -60,19 +48,5 @@ public class MarsagliaXOR64Star extends AbstractRng64 {
 
     public static PseudoRandom getDefault() {
         return defaultRng;
-    }
-
-    /*
-     * Protect against poor seeds.
-     */
-    private void recover() {
-        long l = 0L;
-        for (int i = 0; i < 10; ++i) {
-            l = nextLong();
-        }
-        if (l == 0L) {
-            // this cannot happen
-            throw new AssertionError("0L");
-        }
     }
 }
