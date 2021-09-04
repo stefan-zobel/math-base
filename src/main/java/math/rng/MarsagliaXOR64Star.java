@@ -58,7 +58,7 @@ public class MarsagliaXOR64Star extends AbstractRng64 {
         return x * 0x2545F4914F6CDD1DL;
     }
 
-    public static MarsagliaXOR64Star getDefault() {
+    public static PseudoRandom getDefault() {
         return defaultRng;
     }
 
