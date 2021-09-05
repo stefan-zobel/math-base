@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2021 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     @Override
-    public void nextBytes(final byte[] bytes) {
+    public void nextBytes(byte[] bytes) {
         // awful code (adapted from java.util.Random)
         for (int i = 0, len = bytes.length; i < len; /**/) {
             for (long rnd = nextLong(), n = Math.min(len - i, Long.SIZE
@@ -100,7 +100,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     @Override
-    public void nextLongs(final long[] longs) {
+    public void nextLongs(long[] longs) {
         for (int i = 0; i < longs.length; ++i) {
             longs[i] = nextLong();
         }
@@ -112,7 +112,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     @Override
-    public long nextLong(final long n) {
+    public long nextLong(long n) {
         if (n <= 0) {
             throw new IllegalArgumentException("n must be positive");
         }
@@ -126,22 +126,27 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     @Override
-    public int nextInt(final int n) {
+    public int nextInt(int n) {
         return (int) nextLong(n);
     }
 
     @Override
-    public int nextInt(final int min, final int max) {
+    public int nextInt(int min, int max) {
         return (int) nextLong(min, max);
     }
 
     @Override
-    public long nextLong(final long min, final long max) {
+    public long nextLong(long min, long max) {
         return min + nextLong((max - min) + 1);
     }
 
     @Override
-    public int next(final int bits) {
+    public int next(int bits) {
         return (int) (nextLong() >>> (64 - bits));
+    }
+
+    @Override
+    public String getAlgorithm() {
+        return getClass().getSimpleName();
     }
 }
