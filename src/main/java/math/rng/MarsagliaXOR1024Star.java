@@ -19,7 +19,9 @@ package math.rng;
  * 1024-bit Xorshift pseudo random generator suggested by
  * <a href=https://www.jstatsoft.org/article/view/v008i14>George Marsaglia
  * (2003)</a> as studied by
- * <a href=https://arxiv.org/pdf/1402.6246.pdf>Sebastiano Vigna (2016)</a>.
+ * <a href=https://arxiv.org/pdf/1402.6246.pdf>Sebastiano Vigna (2016)</a>. It
+ * has better statistical properties than {@link MarsagliaXOR64Star} and
+ * {@link Marsaglia64} and is about 25% faster despite its larger state size.
  * <p>
  * This generator has a period of 2<sup>1024</sup>&nbsp;&minus;&nbsp;1.
  */
