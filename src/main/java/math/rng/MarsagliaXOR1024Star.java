@@ -66,11 +66,13 @@ public class MarsagliaXOR1024Star extends AbstractRng64 {
     /*
      * Protect against poor seeds.
      */
-    private long recover() {
+    private void recover() {
         long l = 0L;
         for (int i = 0; i < 10; ++i) {
             l = nextLong();
         }
-        return l;
+        if (l == 0L) {
+            pos = 0;
+        }
     }
 }
