@@ -37,6 +37,15 @@ public final class Seed {
         long seed = nextSeedUniquifier() ^ System.nanoTime();
 
         // apply Austin Appleby's fmix64() hash
+        seed ^= fmix64(seed);
+
+        return seed;
+    }
+
+    /*
+     * Austin Appleby's fmix64() hash
+     */
+    private static long fmix64(long seed) {
         seed ^= seed >>> 33;
         seed *= 0xff51afd7ed558ccdL;
         seed ^= seed >>> 33;
