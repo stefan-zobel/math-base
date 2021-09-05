@@ -50,4 +50,6 @@ public interface PseudoRandom {
     void nextLongs(long[] longs);
 
     String getAlgorithm();
+
+    long[] getSeed();
 }

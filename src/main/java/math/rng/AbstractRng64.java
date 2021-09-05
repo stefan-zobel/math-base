@@ -154,6 +154,11 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return getClass().getSimpleName();
     }
 
+    @Override
+    public long[] getSeed() {
+        return initialSeed;
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }
