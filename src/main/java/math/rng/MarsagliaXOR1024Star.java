@@ -33,16 +33,19 @@ public class MarsagliaXOR1024Star extends AbstractRng64 {
     public MarsagliaXOR1024Star() {
         MarsagliaXOR64Star seeder = new MarsagliaXOR64Star();
         seeder.nextLongs(this.seed);
+        recover();
     }
 
     public MarsagliaXOR1024Star(long seed) {
         MarsagliaXOR64Star seeder = new MarsagliaXOR64Star(seed);
         seeder.nextLongs(this.seed);
+        recover();
     }
 
     public MarsagliaXOR1024Star(long[] seed) {
         MersenneTwister64 seeder = new MersenneTwister64(seed);
         seeder.nextLongs(this.seed);
+        recover();
     }
 
     @Override
@@ -58,5 +61,16 @@ public class MarsagliaXOR1024Star extends AbstractRng64 {
 
     public static PseudoRandom getDefault() {
         return defaultRng;
+    }
+
+    /*
+     * Protect against poor seeds.
+     */
+    private long recover() {
+        long l = 0L;
+        for (int i = 0; i < 10; ++i) {
+            l = nextLong();
+        }
+        return l;
     }
 }
