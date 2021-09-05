@@ -124,7 +124,7 @@ public class MersenneTwister64 extends AbstractRng64 {
      * Initialize the RNG by an array.
      */
     private void setSeed(long[] seedArray) {
-        setSeed(19650218L);
+        setSeed(19650218L); // birthday of Makoto Matsumoto
         int i = 1;
         int j = 0;
         int k = (NN > seedArray.length ? NN : seedArray.length);
