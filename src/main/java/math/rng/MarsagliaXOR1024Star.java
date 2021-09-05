@@ -71,7 +71,7 @@ public class MarsagliaXOR1024Star extends AbstractRng64 {
      */
     private void escape() {
         long l = 0L;
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 200; ++i) {
             l = nextLong();
         }
         if (l == 0L) {
