@@ -29,25 +29,25 @@ public abstract class Marsaglia64 extends AbstractRng64 {
             seed = SplitMix64Seed.seed();
         } while (seed == 0L);
         this.seed = seed;
-        recover();
+        escape();
     }
 
     public Marsaglia64(long seed) {
         this.seed = (seed == 0L) ? -1L : seed;
-        recover();
+        escape();
     }
 
     public Marsaglia64(long[] seed) {
         MersenneTwister64 seeder = new MersenneTwister64(seed);
         long seed_ = seeder.nextLong();
         this.seed = (seed_ == 0L) ? -1L : seed_;
-        recover();
+        escape();
     }
 
     /*
-     * Protect against poor seeds.
+     * Escape from "zeroland"
      */
-    private void recover() {
+    private void escape() {
         long l = 0L;
         for (int i = 0; i < 10; ++i) {
             l = nextLong();
