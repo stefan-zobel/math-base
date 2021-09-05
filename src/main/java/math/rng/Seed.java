@@ -35,11 +35,8 @@ public final class Seed {
      */
     private static long pseudoRandomSeed() {
         long seed = nextSeedUniquifier() ^ System.nanoTime();
-
         // apply Austin Appleby's fmix64() hash
-        seed ^= fmix64(seed);
-
-        return seed;
+        return fmix64(seed);
     }
 
     /*
