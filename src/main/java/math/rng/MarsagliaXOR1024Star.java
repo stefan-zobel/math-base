@@ -70,6 +70,7 @@ public class MarsagliaXOR1024Star extends AbstractRng64 {
      * Escape from "zeroland"
      */
     private void escape() {
+        saveSeed(seed);
         long l = 0L;
         for (int i = 0; i < 200; ++i) {
             l = nextLong();

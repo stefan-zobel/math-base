@@ -15,6 +15,8 @@
  */
 package math.rng;
 
+import java.util.Arrays;
+
 /**
  * Abstract base class for 64-bit pseudo RNGs.
  * <p>
@@ -30,6 +32,8 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     protected static final double DOUBLE_NORM = 1.0 / (1L << 53);
     protected static final float FLOAT_NORM = 1.0F / (1 << 24);
+
+    private long[] initialSeed;
 
     /** cache for the next gaussian */
     protected double nextGaussian = Double.NaN;
@@ -148,5 +152,13 @@ public abstract class AbstractRng64 implements PseudoRandom {
     @Override
     public String getAlgorithm() {
         return getClass().getSimpleName();
+    }
+
+    protected void saveSeed(long[] seed) {
+        initialSeed = Arrays.copyOf(seed, seed.length);
+    }
+
+    protected void saveSeed(long seed) {
+        initialSeed = new long[] { seed };
     }
 }

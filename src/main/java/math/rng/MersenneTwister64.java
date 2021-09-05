@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2021 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,14 +97,17 @@ public class MersenneTwister64 extends AbstractRng64 {
 
     public MersenneTwister64() {
         setSeed(MarsagliaXOR1024Star.getDefault().nextLong());
+        saveSeed(mt);
     }
 
     public MersenneTwister64(long seed) {
         setSeed(seed == 0L ? -1L : seed);
+        saveSeed(mt);
     }
 
     public MersenneTwister64(long[] seedArray) {
         setSeed(seedArray);
+        saveSeed(mt);
     }
 
     /*

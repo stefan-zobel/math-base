@@ -48,6 +48,7 @@ public abstract class Marsaglia64 extends AbstractRng64 {
      * Escape from "zeroland"
      */
     private void escape() {
+        saveSeed(seed);
         long l = 0L;
         for (int i = 0; i < 10; ++i) {
             l = nextLong();
