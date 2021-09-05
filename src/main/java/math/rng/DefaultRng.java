@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2021 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ public final class DefaultRng {
         }
         final long nucleus = (j < seed.length) ? seed[j] : -1L;
         final long[] half_seed = new long[len / 2];
-        new MarsagliaXOR64Star(nucleus ^ Seed.seed()).nextLongs(half_seed);
+        new MarsagliaXOR64Star(nucleus ^ SplitMix64Seed.seed()).nextLongs(half_seed);
         System.arraycopy(half_seed, 0, seed, 0, half_seed.length);
     }
 

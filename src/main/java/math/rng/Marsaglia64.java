@@ -26,7 +26,7 @@ public abstract class Marsaglia64 extends AbstractRng64 {
     public Marsaglia64() {
         long seed = 0L;
         do {
-            seed = Seed.seed();
+            seed = SplitMix64Seed.seed();
         } while (seed == 0L);
         this.seed = seed;
         recover();
