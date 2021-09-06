@@ -90,7 +90,7 @@ public final class SplitMix64Seed {
         s = (s ^ (s >>> 33)) * 0xc4ceb9fe1a85ec53L;
         // force to be odd
         s = (s ^ (s >>> 33)) | 1L;
-        // ensure enough transitions
+        // try to support enough transitions
         int n = Long.bitCount(s ^ (s >>> 1));
         return (n < 24) ? s ^ 0xaaaaaaaaaaaaaaaaL : s;
     }

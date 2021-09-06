@@ -67,7 +67,7 @@ public class XorShift1024Star extends AbstractRng64 {
     }
 
     /*
-     * Escape from "zeroland"
+     * Attempt to protect against poor seeds
      */
     private void escape() {
         saveSeed(seed);
