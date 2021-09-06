@@ -96,7 +96,7 @@ public class MersenneTwister64 extends AbstractRng64 {
     private int mti = NN + 1;
 
     public MersenneTwister64() {
-        setSeed(MarsagliaXOR1024Star.getDefault().nextLong());
+        setSeed(XorShift1024Star.getDefault().nextLong());
         saveSeed(mt);
     }
 
@@ -194,7 +194,7 @@ public class MersenneTwister64 extends AbstractRng64 {
                 randSeed[i] = sr.nextLong();
             }
         } catch (Exception e) {
-            PseudoRandom rng = MarsagliaXOR1024Star.getDefault();
+            PseudoRandom rng = XorShift1024Star.getDefault();
             for (int i = 0; i < NN; ++i) {
                 randSeed[i] = rng.nextLong();
             }

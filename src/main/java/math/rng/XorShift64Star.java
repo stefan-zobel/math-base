@@ -22,18 +22,18 @@ package math.rng;
  * {@link java.util.concurrent.ThreadLocalRandom}. This generator has a period
  * of 2<sup>64</sup>&nbsp;&minus;&nbsp;1.
  */
-public class MarsagliaXOR64Star extends Marsaglia64 {
+public class XorShift64Star extends Marsaglia64 {
 
-    private static final MarsagliaXOR64Star defaultRng = new MarsagliaXOR64Star();
+    private static final XorShift64Star defaultRng = new XorShift64Star();
 
-    public MarsagliaXOR64Star() {
+    public XorShift64Star() {
     }
 
-    public MarsagliaXOR64Star(long seed) {
+    public XorShift64Star(long seed) {
         super(seed);
     }
 
-    public MarsagliaXOR64Star(long[] seed) {
+    public XorShift64Star(long[] seed) {
         super(seed);
     }
 

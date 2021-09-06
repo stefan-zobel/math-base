@@ -68,7 +68,7 @@ public final class DefaultRng {
         }
         final long nucleus = (j < seed.length) ? seed[j] : -1L;
         final long[] half_seed = new long[len / 2];
-        new MarsagliaXOR1024Star(nucleus ^ SplitMix64Seed.seed()).nextLongs(half_seed);
+        new XorShift1024Star(nucleus ^ SplitMix64Seed.seed()).nextLongs(half_seed);
         System.arraycopy(half_seed, 0, seed, 0, half_seed.length);
     }
 

@@ -18,7 +18,7 @@ package math.rng;
 /**
  * 128-bit {@code xorshift128+} pseudo random generator suggested by
  * <a href=https://vigna.di.unimi.it/ftp/papers/xorshiftplus.pdf>Sebastiano
- * Vigna (2017)</a>. It is about 40% faster than {@link MarsagliaXOR64Star}
+ * Vigna (2017)</a>. It is about 40% faster than {@link XorShift64Star}
  * despite its larger state size.
  * <p>
  * This generator has a period of 2<sup>128</sup>&nbsp;&minus;&nbsp;1.
@@ -37,14 +37,14 @@ public class XorShift128Plus extends AbstractRng64 {
     }
 
     public XorShift128Plus(long seed) {
-        this(new MarsagliaXOR64Star(seed));
+        this(new XorShift64Star(seed));
     }
 
     public XorShift128Plus(long[] seed) {
-        this(new MarsagliaXOR64Star(seed));
+        this(new XorShift64Star(seed));
     }
 
-    private XorShift128Plus(MarsagliaXOR64Star seeder) {
+    private XorShift128Plus(XorShift64Star seeder) {
         long[] x = new long[2];
         seeder.nextLongs(x);
         x0 = x[0];

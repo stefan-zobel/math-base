@@ -20,33 +20,33 @@ package math.rng;
  * <a href=https://www.jstatsoft.org/article/view/v008i14>George Marsaglia
  * (2003)</a> as studied by
  * <a href=https://arxiv.org/pdf/1402.6246.pdf>Sebastiano Vigna (2016)</a>. It
- * has better statistical properties than {@link MarsagliaXOR64Star} and other
+ * has better statistical properties than {@link XorShift64Star} and other
  * 64-bit xorshift generators and is about 25% faster despite its larger state
  * size.
  * <p>
  * This generator has a period of 2<sup>1024</sup>&nbsp;&minus;&nbsp;1.
  */
-public class MarsagliaXOR1024Star extends AbstractRng64 {
+public class XorShift1024Star extends AbstractRng64 {
 
-    private static final MarsagliaXOR1024Star defaultRng = new MarsagliaXOR1024Star();
+    private static final XorShift1024Star defaultRng = new XorShift1024Star();
 
     private int pos = 0;
     private final long[] seed = new long[16];
 
-    public MarsagliaXOR1024Star() {
-        MarsagliaXOR64Star seeder = new MarsagliaXOR64Star();
+    public XorShift1024Star() {
+        XorShift64Star seeder = new XorShift64Star();
         seeder.nextLongs(this.seed);
         escape();
     }
 
-    public MarsagliaXOR1024Star(long seed) {
-        MarsagliaXOR64Star seeder = new MarsagliaXOR64Star(seed);
+    public XorShift1024Star(long seed) {
+        XorShift64Star seeder = new XorShift64Star(seed);
         seeder.nextLongs(this.seed);
         escape();
     }
 
-    public MarsagliaXOR1024Star(long[] seed) {
-        MarsagliaXOR64Star seeder = new MarsagliaXOR64Star(seed);
+    public XorShift1024Star(long[] seed) {
+        XorShift64Star seeder = new XorShift64Star(seed);
         seeder.nextLongs(this.seed);
         escape();
     }

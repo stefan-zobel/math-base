@@ -16,7 +16,7 @@
 package math.rng;
 
 /**
- * Abstract base class for {@link MarsagliaXOR64Star} and other 64-bit xorshift
+ * Abstract base class for {@link XorShift64Star} and other 64-bit xorshift
  * generators.
  */
 abstract class Marsaglia64 extends AbstractRng64 {
