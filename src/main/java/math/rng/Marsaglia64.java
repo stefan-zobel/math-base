@@ -33,14 +33,12 @@ abstract class Marsaglia64 extends AbstractRng64 {
     }
 
     Marsaglia64(long seed) {
-        this.seed = (seed == 0L) ? -1L : seed;
+        this.seed = SplitMix64Seed.seed(seed);
         escape();
     }
 
     Marsaglia64(long[] seed) {
-        MersenneTwister64 seeder = new MersenneTwister64(seed);
-        long seed_ = seeder.nextLong();
-        this.seed = (seed_ == 0L) ? -1L : seed_;
+        this.seed = SplitMix64Seed.seed(seed);
         escape();
     }
 
