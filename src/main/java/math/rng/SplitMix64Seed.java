@@ -20,18 +20,51 @@ package math.rng;
  */
 public final class SplitMix64Seed {
 
+    // the golden ratio scaled to 64 bits
+    private static final long GOLDEN = 0x9e3779b97f4a7c15L;
+
     private static long state = Seed.seed();
 
     /**
      * Returns a statistically good long random seed.
      * 
-     * @return a long random seed.
+     * @return a random long seed
      */
     public static synchronized long seed() {
-        long seed = (state += 0x9e3779b97f4a7c15L);
+        return mix64(state += GOLDEN);
+    }
+
+    private static long mix64(long seed) {
         seed = (seed ^ (seed >>> 30)) * 0xbf58476d1ce4e5b9L;
         seed = (seed ^ (seed >>> 27)) * 0x94d049bb133111ebL;
         return seed ^ (seed >>> 31);
+    }
+
+    /**
+     * Returns a statistically good long[] random seed array.
+     * 
+     * @param numLongs
+     *            length ({@code >= 0}) of the seed array
+     * @return a random long[] seed array
+     */
+    public static synchronized long[] seed(int numLongs) {
+        long[] seed = new long[numLongs];
+        for (int i = 0; i < seed.length; ++i) {
+            seed[i] = seed();
+        }
+        return seed;
+    }
+
+    /**
+     * Computes a deterministic seed value from a given value.
+     * 
+     * @param seed
+     *            the seed to start with
+     * @return a deterministically computed seed value
+     */
+    public static long seed(long seed) {
+        seed = (seed == 0L) ? -1L : seed;
+        return mix64(seed + GOLDEN);
     }
 
     private SplitMix64Seed() {
