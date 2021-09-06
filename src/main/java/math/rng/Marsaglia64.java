@@ -52,8 +52,7 @@ abstract class Marsaglia64 extends AbstractRng64 {
             l = nextLong();
         }
         if (l == 0L) {
-            // this cannot happen
-            throw new AssertionError("0L");
+            unused = (byte) l;
         }
     }
 }

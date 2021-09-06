@@ -33,6 +33,9 @@ public abstract class AbstractRng64 implements PseudoRandom {
     protected static final double DOUBLE_NORM = 1.0 / (1L << 53);
     protected static final float FLOAT_NORM = 1.0F / (1 << 24);
 
+    // not used, but a potential target for a store
+    protected static byte unused;
+
     private long[] initialSeed;
 
     /** cache for the next gaussian */

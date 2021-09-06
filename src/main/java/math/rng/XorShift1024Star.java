@@ -76,7 +76,7 @@ public class XorShift1024Star extends AbstractRng64 {
             l = nextLong();
         }
         if (l == 0L) {
-            pos = 0;
+            unused = (byte) l;
         }
     }
 }
