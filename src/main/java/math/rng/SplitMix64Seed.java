@@ -67,6 +67,34 @@ public final class SplitMix64Seed {
         return mix64(seed + GOLDEN);
     }
 
+    /**
+     * Computes a deterministic seed value from a given sequence of seed values.
+     * 
+     * @param seed
+     *            the sequence of seed values to start with
+     * @return a deterministically computed seed value
+     */
+    public static long seed(long[] seed) {
+        if (seed == null || seed.length == 0) {
+            return seed(0L);
+        }
+        long s = seed(seed[0]);
+        for (int i = 1; i < seed.length; ++i) {
+            s += ((i & 1) != 0) ? flipMix64(seed[i] + GOLDEN) : seed(seed[i]);
+        }
+        return (seed.length > 1) ? seed(s) : s;
+    }
+
+    private static long flipMix64(long s) {
+        s = (s ^ (s >>> 33)) * 0xff51afd7ed558ccdL;
+        s = (s ^ (s >>> 33)) * 0xc4ceb9fe1a85ec53L;
+        // force to be odd
+        s = (s ^ (s >>> 33)) | 1L;
+        // ensure enough transitions
+        int n = Long.bitCount(s ^ (s >>> 1));
+        return (n < 24) ? s ^ 0xaaaaaaaaaaaaaaaaL : s;
+    }
+
     private SplitMix64Seed() {
     }
 }
