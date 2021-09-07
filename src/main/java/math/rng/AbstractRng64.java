@@ -92,7 +92,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public int nextInt() {
-        return (int) (nextLong() >> 32);
+        return (int) (nextLong() >>> 32);
     }
 
     @Override
@@ -115,7 +115,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public boolean nextBoolean() {
-        return (nextLong() >> 63) != 0L;
+        return nextLong() < 0L;
     }
 
     @Override
