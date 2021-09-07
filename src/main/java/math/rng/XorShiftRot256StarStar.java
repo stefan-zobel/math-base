@@ -22,35 +22,17 @@ package math.rng;
  * <p>
  * This generator has a period of 2<sup>256</sup>&nbsp;&minus;&nbsp;1.
  */
-public class XorShiftRot256StarStar extends AbstractRng64 {
-
-    private long x0;
-    private long x1;
-    private long x2;
-    private long x3;
+public class XorShiftRot256StarStar extends Xoshiro256 {
 
     public XorShiftRot256StarStar() {
-        x0 = SplitMix64Seed.seed();
-        x1 = SplitMix64Seed.seed();
-        x2 = SplitMix64Seed.seed();
-        x3 = SplitMix64Seed.seed();
-        escape();
     }
 
     public XorShiftRot256StarStar(long seed) {
-        this(new XorShift64Star(seed));
+        super(seed);
     }
 
     public XorShiftRot256StarStar(long[] seed) {
-        this(new XorShift64Star(seed));
-    }
-
-    private XorShiftRot256StarStar(XorShift64Star seeder) {
-        x0 = seeder.nextLong();
-        x1 = seeder.nextLong();
-        x2 = seeder.nextLong();
-        x3 = seeder.nextLong();
-        escape();
+        super(seed);
     }
 
     @Override
@@ -70,16 +52,5 @@ public class XorShiftRot256StarStar extends AbstractRng64 {
         x3 = ((s3 << 45) | (s3 >>> 19));
 
         return rnd;
-    }
-
-    private void escape() {
-        saveSeed(new long[] { x0, x1, x2, x3 });
-        long l = 0L;
-        for (int i = 0; i < 20; ++i) {
-            l = nextLong();
-        }
-        if (l == 0L) {
-            unused = (byte) l;
-        }
     }
 }
