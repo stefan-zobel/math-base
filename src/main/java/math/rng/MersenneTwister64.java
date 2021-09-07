@@ -54,11 +54,10 @@ import java.security.SecureRandom;
 
 /**
  * 64-bit Mersenne Twister. This generator has a period of
- * 2<sup>19937</sup>&nbsp;&minus;&nbsp;1. It is about 30% slower than
- * {@link java.util.concurrent.ThreadLocalRandom} and more than twice as fast as
- * {@link java.util.Random}. Mersenne Twister (mostly in its 32-bit incarnation)
- * has been the <i>de facto</i> standard PRNG for scientific applications in the
- * last two decades.
+ * 2<sup>19937</sup>&nbsp;&minus;&nbsp;1. It is 3 to 7 times faster than
+ * {@link java.util.Random} depending on the kind of output you want. Mersenne
+ * Twister (mostly in its 32-bit incarnation) has been the <i>de facto</i>
+ * standard PRNG for scientific applications in the last two decades.
  * <p>
  * The recursion is similar to the 32-bit Mersenne Twister but different, so the
  * output is totally different from the 32-bit version.
