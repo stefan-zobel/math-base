@@ -120,16 +120,20 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public long nextLong(long n) {
-        if (n <= 0) {
+        if (n <= 0L) {
             throw new IllegalArgumentException("n must be positive");
         }
-        while (true) {
-            final long x = nextLong() >>> 1;
-            final long y = x % n;
-            if (x - y + (n - 1) >= 0) {
-                return y;
-            }
+        final long nMinus1 = n - 1L;
+        long x = nextLong();
+        if ((n & nMinus1) == 0L) {
+            // power of two shortcut
+            return x & nMinus1;
         }
+        // rejection-based algorithm to get uniform longs
+        for (long y = x >>> 1; y + nMinus1 - (x = y % n) < 0L; y = nextLong() >>> 1) {
+            ;
+        }
+        return x;
     }
 
     @Override
@@ -144,7 +148,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public long nextLong(long min, long max) {
-        return min + nextLong((max - min) + 1);
+        return min + nextLong((max - min) + 1L);
     }
 
     @Override
