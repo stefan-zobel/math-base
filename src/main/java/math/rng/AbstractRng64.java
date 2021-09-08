@@ -114,6 +114,13 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     @Override
+    public void nextDoubles(double[] doubles) {
+        for (int i = 0; i < doubles.length; ++i) {
+            doubles[i] = nextDouble();
+        }
+    }
+
+    @Override
     public boolean nextBoolean() {
         return nextLong() < 0L;
     }

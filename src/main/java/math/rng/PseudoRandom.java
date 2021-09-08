@@ -49,6 +49,8 @@ public interface PseudoRandom {
 
     void nextLongs(long[] longs);
 
+    void nextDoubles(double[] doubles);
+
     String getAlgorithm();
 
     long[] getSeed();
