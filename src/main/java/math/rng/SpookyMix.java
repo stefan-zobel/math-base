@@ -441,7 +441,7 @@ final class SpookyMix {
             }
         }
 
-        h11 += ((long) (remaining << 3)) << 56;
+        h11 += ((long) (length << 3)) << 56;
 
         for (int i = 0; i < 3; i++) {
             h11 += h1;
