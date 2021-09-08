@@ -118,16 +118,13 @@ public final class Seed {
         return Arrays.copyOf(SEED_CONSTS, 16);
     }
 
-    private static final long[] SEED_CONSTS = new long[] { 0xfb63c85670523L, 0xffb06d21227c513dL, 0x7cd1b425e308cfL,
-            0xffebb439653890b1L, 0x17bf13dc64c0f9L, 0xffcdc5812b9c1c35L, 0x760766c165e061L, 0xff60c2e1247a67ffL,
-            0x1ade60fd4a549fL, 0xffe8a88888bba4b3L, 0x1b99773f1f2057L, 0xfff999fc9821f955L, 0xb8c87efd73765L,
-            0xff5baad0dc7d4c29L, 0x1452ce895b75b1L, 0xffe969f89db83bc9L, 0x1af6bf9ba4ac6bL, 0xffe45311488750f7L,
-            0x23966d39269badL, 0xffd610f20b54043fL, 0x491f62192df0d5L, 0xff80dcb71e4dd83bL, 0xe754446507ed7L,
-            0xff5891e9cf4d3f97L, 0x1d7bd8283bf89L, 0xffa2dc029f151763L, 0x6a8b2b6fb43e1fL, 0xff7b0ee546175dd9L,
-            0x963fd0afe8e43bL, 0xff546e4ec30df0a9L, 0x13abc5414dadd3L, 0xffeaadc5a9f14463L, 0x1a279681925db3L,
-            0xffe50e5f20621bb5L, 0x1ed2e4d7050c75L, 0xfff5d25d0d9a3887L, 0xa85d5a975eb3bL, 0xfffe92ee3892e807L,
-            0x1c2061e9eade7L, 0xffe8f0fb46d751cdL, 0x18016e82575aefL, 0xffe6bda6502d6f19L, 0x1b1ee8a24225e9L,
-            0xffe4437f8aa9baabL, 0x2dd92bafa1cf3L, 0xffe220c306f2da2dL, 0x1f61423134717bL, 0xffdcc3fa2171603bL };
+    // These are fractional parts of the third root of prime numbers where each
+    // second number has been multiplied by -1 and then filtered for odd numbers
+    // that have a bit count of 32
+    private static final long[] SEED_CONSTS = new long[] { 0x4f92dedd83aec3L, 0xffe50940645b5395L, 0x1baceeb778af09L,
+            0xffd610f20b54043fL, 0x6a8b2b6fb43e1fL, 0xff4edb408816c467L, 0x1ddf25ab6283f7L, 0xffe8b4dd40032167L,
+            0x9be4fd33558f7L, 0xffc86ea752251419L, 0x1bbaaccf48bfe1L, 0xff688d3f400d4a8bL, 0x9a6eb695e11f3dL,
+            0xff64b00aa59c9369L, 0x9df0e7c6b2d267L, 0xffea4f554090c1d1L };
 
     private Seed() {
     }
