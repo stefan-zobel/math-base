@@ -18,7 +18,8 @@ package math.rng;
 /**
  * 256-bit {@code xoshiro256**} pseudo random generator suggested by
  * <a href=https://arxiv.org/pdf/1805.01407.pdf>D. Blackman and S. Vigna
- * (2019)</a>
+ * (2019)</a>. It is about 40% faster than {@link XorShift64Star} despite having
+ * a 4 times larger state space.
  * <p>
  * This generator has a period of 2<sup>256</sup>&nbsp;&minus;&nbsp;1.
  */
