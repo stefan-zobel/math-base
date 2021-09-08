@@ -118,9 +118,11 @@ public final class Seed {
         return Arrays.copyOf(SEED_CONSTS, 16);
     }
 
-    // These are fractional parts of the third root of prime numbers where each
-    // second number has been multiplied by -1 and then filtered for odd numbers
-    // that have a bit count of 32
+    // These are the fractional parts of the third root of prime numbers where
+    // each second number has been multiplied by -1 and then filtered for odd
+    // numbers that have a bit count of 32. The primes that have been used are
+    // (11, 191, 193, 229, 389, 857, 953, 2027, 2339, 2837, 3229, 3671, 3677,
+    // 4441, 4447, 4583, 5471, 6217, 6761, 7027, 7681)
     private static final long[] SEED_CONSTS = new long[] { 0x4f92dedd83aec3L, 0xffe50940645b5395L, 0x1baceeb778af09L,
             0xffd610f20b54043fL, 0x6a8b2b6fb43e1fL, 0xff4edb408816c467L, 0x1ddf25ab6283f7L, 0xffe8b4dd40032167L,
             0x9be4fd33558f7L, 0xffc86ea752251419L, 0x1bbaaccf48bfe1L, 0xff688d3f400d4a8bL, 0x9a6eb695e11f3dL,
