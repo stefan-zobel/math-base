@@ -26,7 +26,7 @@ package math.rng;
  * <p>
  * This generator has a period of 2<sup>1024</sup>&nbsp;&minus;&nbsp;1.
  */
-public class XorShift1024Star extends AbstractRng64 {
+public class XorShift1024Star extends AbstractRng64 implements SplittablePseudoRandom {
 
     private static final XorShift1024Star defaultRng = new XorShift1024Star();
 
@@ -51,6 +51,14 @@ public class XorShift1024Star extends AbstractRng64 {
         escape();
     }
 
+    protected XorShift1024Star(long[] seed, boolean unused) {
+        if (seed.length != this.seed.length) {
+            throw new IllegalArgumentException("long[] seed has wrong length");
+        }
+        System.arraycopy(seed, 0, this.seed, 0, seed.length);
+        saveSeed(seed);
+    }
+
     @Override
     public final long nextLong() {
         long[] x = seed;
@@ -59,10 +67,21 @@ public class XorShift1024Star extends AbstractRng64 {
         s1 ^= (s1 << 31);
         long s = s1 ^ s0 ^ (s1 >>> 11) ^ (s0 >>> 30);
         x[pos] = s;
-        return s * 0x106689D45497FDB5L;
+        return s * 0x106689d45497fdb5L;
     }
 
-    public static PseudoRandom getDefault() {
+    @Override
+    public XorShift1024Star split() {
+        long l = 0L;
+        if ((l = nextLong()) == 0L) {
+            unused = (byte) l;
+        }
+        long[] mix = Seed.get16Constants();
+        SpookyMix.mix(seed, mix);
+        return new XorShift1024Star(mix, true);
+    }
+
+    public static SplittablePseudoRandom getDefault() {
         return defaultRng;
     }
 
