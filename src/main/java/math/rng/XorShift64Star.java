@@ -18,9 +18,8 @@ package math.rng;
 /**
  * 64-bit Xorshift* pseudo random generator by George Marsaglia (2003).
  * <p>
- * A faster and statistically better pseudo RNG than {@link java.util.Random} or
- * {@link java.util.concurrent.ThreadLocalRandom}. This generator has a period
- * of 2<sup>64</sup>&nbsp;&minus;&nbsp;1.
+ * A faster and statistically better pseudo RNG than {@link java.util.Random}
+ * This generator has a period of 2<sup>64</sup>&nbsp;&minus;&nbsp;1.
  */
 public class XorShift64Star extends Marsaglia64 {
 
