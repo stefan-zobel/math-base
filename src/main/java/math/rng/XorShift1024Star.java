@@ -67,7 +67,7 @@ public class XorShift1024Star extends AbstractRng64 implements SplittablePseudoR
         s1 ^= (s1 << 31);
         long s = s1 ^ s0 ^ (s1 >>> 11) ^ (s0 >>> 30);
         x[pos] = s;
-        return s * 0x106689d45497fdb5L;
+        return s * 0x9e3779b97f4a7c13L;
     }
 
     @Override
