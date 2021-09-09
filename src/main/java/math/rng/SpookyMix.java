@@ -306,7 +306,7 @@ final class SpookyMix {
         long h11 = SC_CONST;
 
         // handle whole blocks of up to 12 values
-        while (remaining > 0) {
+        while (remaining > 0) { // "lgtm[java/constant-comparison]"
 
             h0 += src[pos];
             h2 ^= h10;
