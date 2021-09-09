@@ -19,7 +19,7 @@ package math.rng;
  * Abstract base class for {@link XorShiftRot256PlusPlus} and
  * {@link XorShiftRot256StarStar}.
  */
-abstract class Xoshiro256 extends AbstractRng64 {
+abstract class Xoshiro256 extends AbstractRng64 implements SplittablePseudoRandom {
 
     protected long x0;
     protected long x1;
@@ -48,6 +48,14 @@ abstract class Xoshiro256 extends AbstractRng64 {
         x2 = seeder.nextLong();
         x3 = seeder.nextLong();
         escape();
+    }
+
+    protected Xoshiro256(long x0, long x1, long x2, long x3) {
+        this.x0 = x0;
+        this.x1 = x1;
+        this.x2 = x2;
+        this.x3 = x3;
+        saveSeed(new long[] { x0, x1, x2, x3 });
     }
 
     private void escape() {
