@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2021 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ public final class Seed {
     }
 
     /**
-     * Returns a reasonably good long random seed.
+     * Returns a reasonably good <b>pseudo-random</b> long seed.
      * 
      * @return a long random seed.
      */
@@ -74,7 +74,7 @@ public final class Seed {
      * 
      * @return an array that contains {@code 1} fixed seed
      */
-    public static long[] get1Constants() {
+    public static long[] get1Constant() {
         return Arrays.copyOf(SEED_CONSTS, 1);
     }
 
