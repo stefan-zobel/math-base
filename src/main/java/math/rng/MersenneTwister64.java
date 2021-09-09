@@ -174,8 +174,8 @@ public class MersenneTwister64 extends AbstractRng64 {
         x = mt[mti++];
 
         x ^= (x >>> 29) & 0x5555555555555555L;
-        x ^= (x << 17) & 0x71D67FFFEDA60000L;
-        x ^= (x << 37) & 0xFFF7EEE000000000L;
+        x ^= (x << 17) & 0x71d67fffeda60000L;
+        x ^= (x << 37) & 0xfff7eee000000000L;
         x ^= (x >>> 43);
 
         return x;

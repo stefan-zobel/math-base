@@ -44,7 +44,7 @@ public class XorShift64Star extends Marsaglia64 {
         x ^= (x << 25);
         x ^= (x >>> 27);
         seed = x;
-        return x * 0x2545F4914F6CDD1DL;
+        return x * 0x2545f4914f6cdd1dL;
     }
 
     public static PseudoRandom getDefault() {
