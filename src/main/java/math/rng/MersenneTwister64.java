@@ -65,7 +65,7 @@ import java.security.SecureRandom;
  * <p>
  * This is a port of the <a href=
  * "http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/VERSIONS/C-LANG/mt19937-64.c"
- * > "mt19937-64.c" C code (2004/9/29 version).</a>.
+ * > "mt19937-64.c" C code (2004/9/29 version)</a>.
  * </p>
  * See: <a href="http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html"> The
  * Mersenne Twister Home Page </a>
