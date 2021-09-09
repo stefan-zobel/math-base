@@ -55,10 +55,13 @@ public class Sfc64 extends AbstractRng64 implements SplittablePseudoRandom {
 
     @Override
     public final long nextLong() {
-        long rnd = a + b + counter++;
-        a = b ^ (b >>> 11);
-        b = c + (c << 3);
-        c = ((c << 24) | (c >>> 40)) + rnd;
+        long xa = a;
+        long xb = b;
+        long xc = c;
+        long rnd = xa + xb + counter++;
+        a = xb ^ (xb >>> 11);
+        b = xc + (xc << 3);
+        c = ((xc << 24) | (xc >>> 40)) + rnd;
         return rnd;
     }
 
