@@ -21,7 +21,9 @@ package math.rng;
  * This generator has a guaranteed period of at least 2<sup>64</sup> but the
  * average period can be larger.
  */
-public class Sfc64 extends AbstractRng64 {
+public class Sfc64 extends AbstractRng64 implements SplittablePseudoRandom {
+
+    private static final Sfc64 defaultRng = new Sfc64();
 
     private long a;
     private long b;
@@ -43,6 +45,14 @@ public class Sfc64 extends AbstractRng64 {
         escape();
     }
 
+    protected Sfc64(long a, long b, long c, long counter) {
+        this.a = a;
+        this.b = b;
+        this.c = c;
+        this.counter = counter;
+        saveSeed(new long[] { a, b, c, counter });
+    }
+
     @Override
     public final long nextLong() {
         long rnd = a + b + counter++;
@@ -50,6 +60,21 @@ public class Sfc64 extends AbstractRng64 {
         b = c + (c << 3);
         c = ((c << 24) | (c >>> 40)) + rnd;
         return rnd;
+    }
+
+    @Override
+    public Sfc64 split() {
+        long l = 0L;
+        if ((l = nextLong()) == 0L) {
+            unused = (byte) l;
+        }
+        long[] mix = Seed.get4Constants();
+        SpookyMix.mix(new long[] { a, b, c, counter }, mix);
+        return new Sfc64(mix[0], mix[1], mix[2], mix[3]);
+    }
+
+    public static SplittablePseudoRandom getDefault() {
+        return defaultRng;
     }
 
     private void escape() {
