@@ -25,6 +25,13 @@ package math.rng;
  * size.
  * <p>
  * This generator has a period of 2<sup>1024</sup>&nbsp;&minus;&nbsp;1.
+ * <p>
+ * At least the two lowest bits of a {@code xorshift*} generator satisfy a
+ * linear recurrence and will therefore fail linearity tests (MatrixRank and
+ * LinearComp in TestU01) which were designed to catch these linear relations.
+ * However, low linear complexity of the lowest bits has rarely an effect in
+ * practice, and certainly has no impact at all when the generator is only used
+ * to generate floating-point numbers.
  */
 public class XorShift1024Star extends AbstractRng64 implements SplittablePseudoRandom {
 
