@@ -29,6 +29,8 @@ package math.rng;
  * However, low linear complexity of the lowest bits has rarely an effect in
  * practice, and certainly has no impact at all when the generator is only used
  * to generate floating-point numbers.
+ * <p>
+ * This generator is {@code 1}-dimensionally equidistributed.
  */
 public class XorShift128Plus extends AbstractRng64 {
 

@@ -22,6 +22,8 @@ package math.rng;
  * having a 4 times larger state space.
  * <p>
  * This generator has a period of 2<sup>256</sup>&nbsp;&minus;&nbsp;1.
+ * <p>
+ * This generator is {@code 4}-dimensionally equidistributed.
  */
 public class XorShiftRot256StarStar extends Xoshiro256 {
 
