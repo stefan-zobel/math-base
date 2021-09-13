@@ -34,13 +34,7 @@ public final class SplitMix64Seed {
      * @return a random long seed
      */
     public static synchronized long seed() {
-        return mix64(state += GOLDEN);
-    }
-
-    private static long mix64(long seed) {
-        seed = (seed ^ (seed >>> 30)) * 0xbf58476d1ce4e5b9L;
-        seed = (seed ^ (seed >>> 27)) * 0x94d049bb133111ebL;
-        return seed ^ (seed >>> 31);
+        return BitMix.staffordMix13(state += GOLDEN);
     }
 
     /**
@@ -67,7 +61,7 @@ public final class SplitMix64Seed {
      */
     public static long seed(long seed) {
         seed = (seed == 0L) ? -1L : seed;
-        return mix64(seed + GOLDEN);
+        return BitMix.staffordMix13(seed + GOLDEN);
     }
 
     /**

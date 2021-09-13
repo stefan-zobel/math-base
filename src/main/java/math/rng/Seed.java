@@ -38,20 +38,7 @@ public final class Seed {
     private static long pseudoRandomSeed() {
         long seed = nextSeedUniquifier() ^ System.nanoTime();
         // apply Austin Appleby's fmix64() hash
-        return fmix64(seed);
-    }
-
-    /*
-     * Austin Appleby's fmix64() hash
-     */
-    private static long fmix64(long seed) {
-        seed ^= seed >>> 33;
-        seed *= 0xff51afd7ed558ccdL;
-        seed ^= seed >>> 33;
-        seed *= 0xc4ceb9fe1a85ec53L;
-        seed ^= seed >>> 33;
-
-        return seed;
+        return BitMix.murmurhash3(seed);
     }
 
     /**
