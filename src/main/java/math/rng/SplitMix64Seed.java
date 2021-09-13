@@ -16,10 +16,11 @@
 package math.rng;
 
 /**
- * The splitmix64() generator which is based on
- * <a href=http://gee.cs.oswego.edu/dl/papers/oopsla14.pdf>Guy Steele, Doug Lea,
- * Christine Flood (2014)</a> and has been included in Java 8
- * {@link java.util.SplittableRandom}.
+ * The splitmix64() generator (here only used for seed generation) which is
+ * based on <a href=http://gee.cs.oswego.edu/dl/papers/oopsla14.pdf>Guy Steele,
+ * Doug Lea, Christine Flood (2014)</a> and has been included in Java 8 as
+ * {@link java.util.SplittableRandom} (this implementation uses a mixing
+ * function which is different from that used in {@code SplittableRandom}.
  */
 public final class SplitMix64Seed {
 
@@ -34,7 +35,7 @@ public final class SplitMix64Seed {
      * @return a random long seed
      */
     public static synchronized long seed() {
-        return BitMix.staffordMix13(state += GOLDEN);
+        return BitMix.rrxmrrxmsx(state += GOLDEN);
     }
 
     /**
@@ -61,7 +62,7 @@ public final class SplitMix64Seed {
      */
     public static long seed(long seed) {
         seed = (seed == 0L) ? -1L : seed;
-        return BitMix.staffordMix13(seed + GOLDEN);
+        return BitMix.rrxmrrxmsx(seed + GOLDEN);
     }
 
     /**
