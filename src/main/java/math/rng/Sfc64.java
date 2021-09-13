@@ -18,8 +18,8 @@ package math.rng;
 /**
  * Chris Doty-Humphrey's 256-bit "Small Fast Counting RNG" ({@code sfc64}).
  * <p>
- * This generator has a guaranteed period of at least 2<sup>64</sup> but the
- * average period can be larger.
+ * This generator has a guaranteed period of at least 2<sup>64</sup> and an
+ * average period of 2<sup>255</sup>.
  */
 public class Sfc64 extends AbstractRng64 implements SplittablePseudoRandom {
 
