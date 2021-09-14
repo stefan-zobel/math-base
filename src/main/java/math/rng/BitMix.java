@@ -16,7 +16,8 @@
 package math.rng;
 
 /**
- * A selection of 64-bit mixing functions for longs.
+ * A selection of 64-bit mixing functions for longs and 32-bit mixing functions
+ * for ints.
  */
 public final class BitMix {
 
@@ -75,7 +76,8 @@ public final class BitMix {
     }
 
     /**
-     * A variant of {@link #xnasam(long, long)} where {@code 0xff64b00aa59c9369}
+     * A variant of {@link #xnasam(long, long)} where
+     * {@code 0x6a09e667f3bcc909L}
      * (<a href="https://dilbert.com/strip/2001-10-25">chosen at random</a>) is
      * used as a fixed value for the constant {@code c}.
      * 
@@ -84,7 +86,8 @@ public final class BitMix {
      * @return the mixed long
      */
     public static long xnasam(long v) {
-        return xnasam(v, 0xff64b00aa59c9369L);
+        // first 64 bits of 1 + sqrt(2), forced to be odd
+        return xnasam(v, 0x6a09e667f3bcc909L);
     }
 
     /**
@@ -131,6 +134,20 @@ public final class BitMix {
         v ^= v >>> 33;
         v *= 0xc4ceb9fe1a85ec53L;
         return v ^ (v >>> 33);
+    }
+
+    /**
+     * Doug Lea's 32-bit mixing function. Note that if the argument {@code v} is
+     * 0, the result is 0.
+     * 
+     * @param v
+     *            int to mix
+     * @return the mixed int
+     */
+    public static int leaMix32(int v) {
+        v = (v ^ (v >>> 16)) * 0xd36d884b;
+        v = (v ^ (v >>> 16)) * 0xd36d884b;
+        return v ^ (v >>> 16);
     }
 
     private BitMix() {
