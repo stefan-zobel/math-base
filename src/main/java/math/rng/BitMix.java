@@ -71,8 +71,7 @@ public final class BitMix {
         v *= 0x9e6c63d0676a9a99L;
         v ^= (v >>> 23) ^ (v >>> 51);
         v *= 0x9e6d62d06f6a9a9bL;
-        v ^= (v >>> 23) ^ (v >>> 51);
-        return v;
+        return v ^ ((v >>> 23) ^ (v >>> 51));
     }
 
     /**
@@ -89,8 +88,9 @@ public final class BitMix {
     }
 
     /**
-     * David Stafford's variant 13 of his 64-bit mix functions. See
-     * "http://zimbry.blogspot.com/2011/09/better-bit-mixing-improving-on.html"
+     * David Stafford's variant 13 of his 64-bit mixing functions. See
+     * "http://zimbry.blogspot.com/2011/09/better-bit-mixing-improving-on.html".
+     * Note that if the argument {@code v} is 0, the result is 0.
      * 
      * @param v
      *            long to mix
@@ -103,6 +103,20 @@ public final class BitMix {
     }
 
     /**
+     * Doug Lea's 64-bit mixing function. Note that if the argument {@code v} is
+     * 0, the result is 0.
+     * 
+     * @param v
+     *            long to mix
+     * @return the mixed long
+     */
+    public static long leaMix64(long v) {
+        v = (v ^ (v >>> 32)) * 0xdaba0b6eb09322e3L;
+        v = (v ^ (v >>> 32)) * 0xdaba0b6eb09322e3L;
+        return v ^ (v >>> 32);
+    }
+
+    /**
      * Austin Appleby's fmix64() mix function used in {@code MurmurHash3}. See
      * "https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp".
      * Note that if the argument {@code v} is 0, the result is 0.
@@ -111,13 +125,12 @@ public final class BitMix {
      *            long to mix
      * @return the mixed long
      */
-    public static long murmurMix64(long v) {
+    public static long applebyMix64(long v) {
         v ^= v >>> 33;
         v *= 0xff51afd7ed558ccdL;
         v ^= v >>> 33;
         v *= 0xc4ceb9fe1a85ec53L;
-        v ^= v >>> 33;
-        return v;
+        return v ^ (v >>> 33);
     }
 
     private BitMix() {
