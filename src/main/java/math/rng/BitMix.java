@@ -77,7 +77,8 @@ public final class BitMix {
 
     /**
      * A variant of {@link #xnasam(long, long)} where {@code 0xff64b00aa59c9369}
-     * is used as a fixed value for the constant {@code c}.
+     * (<a href="https://dilbert.com/strip/2001-10-25">chosen at random</a>) is
+     * used as a fixed value for the constant {@code c}.
      * 
      * @param v
      *            long to mix
@@ -102,14 +103,15 @@ public final class BitMix {
     }
 
     /**
-     * Austin Appleby's fmix64() hash function used in {@code MurmurHash3}. See
+     * Austin Appleby's fmix64() mix function used in {@code MurmurHash3}. See
      * "https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp".
+     * Note that if the argument {@code v} is 0, the result is 0.
      * 
      * @param v
      *            long to mix
      * @return the mixed long
      */
-    public static long murmurhash3(long v) {
+    public static long murmurMix64(long v) {
         v ^= v >>> 33;
         v *= 0xff51afd7ed558ccdL;
         v ^= v >>> 33;
