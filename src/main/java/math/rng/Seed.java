@@ -37,8 +37,8 @@ public final class Seed {
      */
     private static long pseudoRandomSeed() {
         long seed = nextSeedUniquifier() ^ System.nanoTime();
-        // apply Austin Appleby's fmix64() hash
-        return BitMix.applebyMix64(seed);
+        // apply David Stafford's variant 13 of his 64-bit mixers
+        return BitMix.staffordMix13(seed);
     }
 
     /**
