@@ -84,9 +84,9 @@ public final class SplitMix64Seed {
     }
 
     private static long flipMix64(long s) {
-        // force to be odd
+        // force s to be odd
         s = BitMix.applebyMix64(s) | 1L;
-        // try to support enough transitions
+        // try to support enough 01 and 10 transitions
         int n = Long.bitCount(s ^ (s >>> 1));
         return (n < 24) ? s ^ 0xaaaaaaaaaaaaaaaaL : s;
     }
