@@ -54,7 +54,7 @@ public class Stc64 extends AbstractRng64 implements SplittablePseudoRandom {
         s2 = seed + 0x70c72c95cd592d04L;
         s3 = seed + 0x504f333d3aa0b359L;
         // seq must be odd
-        return (((seed + 0x3504f333d3aa0b37L) << 1) | 1);
+        return (((seed + 0x3504f333d3aa0b37L) << 1) | 1L);
     }
 
     protected Stc64(long s0, long s1, long s2, long s3, long seq) {
