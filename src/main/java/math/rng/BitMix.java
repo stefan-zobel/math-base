@@ -137,6 +137,21 @@ public final class BitMix {
     }
 
     /**
+     * David Stafford's variant 4 of his 64-bit mixing functions adapted to
+     * return the 32 high bits as an int. See
+     * "http://zimbry.blogspot.com/2011/09/better-bit-mixing-improving-on.html".
+     * Note that if the argument {@code v} is 0, the result is 0.
+     * 
+     * @param v
+     *            long to mix
+     * @return a mixed int
+     */
+    public static int staffordMix04(long v) {
+        v = (v ^ (v >>> 33)) * 0x62a9d9ed799705f5L;
+        return (int) (((v ^ (v >>> 28)) * 0xcb24d0a5c88c35b3L) >>> 32);
+    }
+
+    /**
      * Doug Lea's 32-bit mixing function. Note that if the argument {@code v} is
      * 0, the result is 0.
      * 
