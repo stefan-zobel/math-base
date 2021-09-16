@@ -20,7 +20,7 @@ package math.rng;
  * round-robin fashion, i.e., first {@code gen_0}, then {@code gen_1}, then
  * {@code gen_2}, then {@code gen_3}, then again {@code gen_0} and so on. This
  * should still be a little faster than a {@link MersenneTwister64} but is a lot
- * slower (about {@code 2.4x}) than working with a single {@code Stc64}
+ * slower (about {@code 2.5x}) than working with a single {@code Stc64}
  * generator. The generators following {@code gen_0} are constructed by calling
  * {@link SplittablePseudoRandom#split()} on the respective predecessor
  * generator.
