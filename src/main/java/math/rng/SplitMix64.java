@@ -71,7 +71,7 @@ public class SplitMix64 extends AbstractRng64 implements SplittablePseudoRandom 
     }
 
     @Override
-    public SplittablePseudoRandom split() {
+    public SplitMix64 split() {
         return new SplitMix64(nextLong(), mixGamma(state += gamma));
     }
 
