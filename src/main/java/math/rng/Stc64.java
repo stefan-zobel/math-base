@@ -52,6 +52,7 @@ public class Stc64 extends AbstractRng64 implements SplittablePseudoRandom {
     public Stc64(long seed, long seq) {
         init(SplitMix64Seed.seed(seed));
         this.seq = seq | 1L;
+        escape();
     }
 
     private long init(long seed) {
