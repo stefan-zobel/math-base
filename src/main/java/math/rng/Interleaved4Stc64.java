@@ -56,9 +56,9 @@ public class Interleaved4Stc64 extends AbstractRng64 implements SplittablePseudo
         long[] seed0 = gen0.getSeed();
         long[] seed = new long[4 * seed0.length];
         System.arraycopy(seed0, 0, seed, 0, seed0.length);
-        System.arraycopy(gen1.getSeed(), 0, seed, 4, seed0.length);
-        System.arraycopy(gen2.getSeed(), 0, seed, 8, seed0.length);
-        System.arraycopy(gen3.getSeed(), 0, seed, 12, seed0.length);
+        System.arraycopy(gen1.getSeed(), 0, seed, seed0.length, seed0.length);
+        System.arraycopy(gen2.getSeed(), 0, seed, 2 * seed0.length, seed0.length);
+        System.arraycopy(gen3.getSeed(), 0, seed, 3 * seed0.length, seed0.length);
         saveSeed(seed);
     }
 
