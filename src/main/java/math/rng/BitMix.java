@@ -91,6 +91,19 @@ public final class BitMix {
     }
 
     /**
+     * Tommy Ettinger's {@code Pelican} mixer. See
+     * "https://github.com/tommyettinger/sarong/blob/master/src/main/java/sarong/PelicanRNG.java".
+     * 
+     * @param v
+     *            long to mix
+     * @return the mixed long
+     */
+    public static long pelican(long v) {
+        return (v = ((v = (v ^ (v << 41 | v >>> 23) ^ (v << 17 | v >>> 47) ^ 0xd1b54a32d192ed03L) * 0xaef17502108ef2d9L)
+                ^ v >>> 43 ^ v >>> 31 ^ v >>> 23) * 0xdb4f0b9175ae2165L) ^ v >>> 28;
+    }
+
+    /**
      * David Stafford's variant 13 of his 64-bit mixing functions. See
      * "http://zimbry.blogspot.com/2011/09/better-bit-mixing-improving-on.html".
      * Note that if the argument {@code v} is 0, the result is 0.
