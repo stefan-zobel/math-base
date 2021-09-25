@@ -17,12 +17,12 @@ package math.rng;
 
 /**
  * 64-bit {@code SplitMix}-type pseudo random generator suggested by
- * <a href=http://gee.cs.oswego.edu/dl/papers/oopsla14.pdf>Guy Steele, Doug Lea,
+ * <a href="http://gee.cs.oswego.edu/dl/papers/oopsla14.pdf">Guy Steele, Doug Lea,
  * Christine Flood (2014)</a>. This implementation is basically the same
  * algorithm as used in {@link java.util.SplittableRandom} but it employs
  * different mixing functions to (hopefully) protect better against the possible
- * problems with weak gamma values reported in <a
- * href=https://labs.oracle.com/pls/apex/f?p=LABS:0::APPLICATION_PROCESS%3DGETDOC_INLINE:::DOC_ID:1050>Steele
+ * problems with weak gamma values reported in
+ * <a href="https://labs.oracle.com/pls/apex/f?p=LABS:0::APPLICATION_PROCESS%3DGETDOC_INLINE:::DOC_ID:1050">Steele
  * (2017)</a>. Performance should about the same as for
  * {@code SplittableRandom}.
  * <p>

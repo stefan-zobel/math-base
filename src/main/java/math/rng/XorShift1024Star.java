@@ -17,9 +17,9 @@ package math.rng;
 
 /**
  * 1024-bit Xorshift pseudo random generator suggested by
- * <a href=https://www.jstatsoft.org/article/view/v008i14>George Marsaglia
+ * <a href="https://www.jstatsoft.org/article/view/v008i14">George Marsaglia
  * (2003)</a> as studied by
- * <a href=https://arxiv.org/pdf/1402.6246.pdf>Sebastiano Vigna (2016)</a>. It
+ * <a href="https://arxiv.org/pdf/1402.6246.pdf">Sebastiano Vigna (2016)</a>. It
  * has better statistical properties than {@link XorShift64Star} and other
  * 64-bit xorshift generators and is about 25% faster despite its larger state
  * size.
