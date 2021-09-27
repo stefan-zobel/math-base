@@ -56,9 +56,9 @@ public interface PseudoRandomStream {
      * @param streamSize
      *            the number of values to generate
      * @param min
-     *            the least value that can be produced
+     *            the smallest value that can be produced
      * @param max
-     *            the largest value (inclusive) that can be produced
+     *            the largest value that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code int} values, each
      *         between the specified min (inclusive) and the specified max
@@ -76,9 +76,9 @@ public interface PseudoRandomStream {
      * (inclusive) and the specified max (inclusive).
      *
      * @param min
-     *            the least value that can be produced
+     *            the smallest value that can be produced
      * @param max
-     *            the largest value (inclusive) that can be produced
+     *            the largest value that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code int} values, each
      *         between the specified min (inclusive) and the specified max
@@ -119,9 +119,9 @@ public interface PseudoRandomStream {
      * @param streamSize
      *            the number of values to generate
      * @param min
-     *            the least value that can be produced
+     *            the smallest value that can be produced
      * @param max
-     *            the largest value (inclusive) that can be produced
+     *            the largest value that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code long} values, each
      *         between the specified min (inclusive) and the specified max
@@ -139,9 +139,9 @@ public interface PseudoRandomStream {
      * (inclusive) and the specified max (inclusive).
      *
      * @param min
-     *            the least value that can be produced
+     *            the smallest value that can be produced
      * @param max
-     *            the largest value (inclusive) that can be produced
+     *            the largest value that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code long} values, each
      *         between the specified min (inclusive) and the specified max
@@ -182,13 +182,12 @@ public interface PseudoRandomStream {
      * @param streamSize
      *            the number of values to generate
      * @param min
-     *            the least value that can be produced
+     *            the smallest value that can be produced
      * @param max
-     *            the largest value (inclusive) that can be produced
+     *            the largest value that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code double} values, each
-     *         between the specified min (inclusive) and the specified max
-     *         (inclusive)
+     *         between the specified min and the specified max
      *
      * @throws IllegalArgumentException
      *             if {@code streamSize} is less than zero, or {@code min} is
@@ -203,13 +202,12 @@ public interface PseudoRandomStream {
      * (inclusive) and the specified max (inclusive).
      *
      * @param min
-     *            the least value that can be produced
+     *            the smallest value that can be produced
      * @param max
-     *            the largest value (inclusive) that can be produced
+     *            the largest value that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code double} values, each
-     *         between the specified min (inclusive) and the specified max
-     *         (inclusive)
+     *         between the specified min and the specified max
      *
      * @throws IllegalArgumentException
      *             if {@code min} is not finite, or {@code max} is not finite,
