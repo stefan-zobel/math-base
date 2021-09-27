@@ -51,41 +51,41 @@ public interface PseudoRandomStream {
     /**
      * Returns a stream producing the given {@code streamSize} number of
      * pseudorandomly chosen {@code int} values, where each value is between the
-     * specified origin (inclusive) and the specified bound (inclusive).
+     * specified min (inclusive) and the specified max (inclusive).
      *
      * @param streamSize
      *            the number of values to generate
      * @param min
      *            the least value that can be produced
      * @param max
-     *            the upper bound (inclusive) for each value produced
+     *            the largest value (inclusive) that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code int} values, each
-     *         between the specified origin (inclusive) and the specified bound
+     *         between the specified min (inclusive) and the specified max
      *         (inclusive)
      *
      * @throws IllegalArgumentException
      *             if {@code streamSize} is less than zero, or {@code min} is
-     *             greater than or equal to {@code max}
+     *             greater than {@code max}
      */
     IntStream ints(long streamSize, int min, int max);
 
     /**
      * Returns an effectively unlimited stream of pseudorandomly chosen
-     * {@code int} values, where each value is between the specified origin
-     * (inclusive) and the specified bound (inclusive).
+     * {@code int} values, where each value is between the specified min
+     * (inclusive) and the specified max (inclusive).
      *
      * @param min
      *            the least value that can be produced
      * @param max
-     *            the upper bound (inclusive) for each value produced
+     *            the largest value (inclusive) that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code int} values, each
-     *         between the specified origin (inclusive) and the specified bound
+     *         between the specified min (inclusive) and the specified max
      *         (inclusive)
      *
      * @throws IllegalArgumentException
-     *             if {@code min} is greater than or equal to {@code max}
+     *             if {@code min} is greater than {@code max}
      */
     IntStream ints(int min, int max);
 
@@ -114,41 +114,41 @@ public interface PseudoRandomStream {
     /**
      * Returns a stream producing the given {@code streamSize} number of
      * pseudorandomly chosen {@code long} values, where each value is between
-     * the specified origin (inclusive) and the specified bound (inclusive).
+     * the specified min (inclusive) and the specified max (inclusive).
      *
      * @param streamSize
      *            the number of values to generate
      * @param min
      *            the least value that can be produced
      * @param max
-     *            the upper bound (inclusive) for each value produced
+     *            the largest value (inclusive) that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code long} values, each
-     *         between the specified origin (inclusive) and the specified bound
+     *         between the specified min (inclusive) and the specified max
      *         (inclusive)
      *
      * @throws IllegalArgumentException
      *             if {@code streamSize} is less than zero, or {@code min} is
-     *             greater than or equal to {@code max}
+     *             greater than {@code max}
      */
     LongStream longs(long streamSize, long min, long max);
 
     /**
      * Returns an effectively unlimited stream of pseudorandomly chosen
-     * {@code long} values, where each value is between the specified origin
-     * (inclusive) and the specified bound (inclusive).
+     * {@code long} values, where each value is between the specified min
+     * (inclusive) and the specified max (inclusive).
      *
      * @param min
      *            the least value that can be produced
      * @param max
-     *            the upper bound (inclusive) for each value produced
+     *            the largest value (inclusive) that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code long} values, each
-     *         between the specified origin (inclusive) and the specified bound
+     *         between the specified min (inclusive) and the specified max
      *         (inclusive)
      *
      * @throws IllegalArgumentException
-     *             if {@code min} is greater than or equal to {@code max}
+     *             if {@code min} is greater than {@code max}
      */
     LongStream longs(long min, long max);
 
@@ -177,43 +177,43 @@ public interface PseudoRandomStream {
     /**
      * Returns a stream producing the given {@code streamSize} number of
      * pseudorandomly chosen {@code double} values, where each value is between
-     * the specified origin (inclusive) and the specified bound (inclusive).
+     * the specified min (inclusive) and the specified max (inclusive).
      *
      * @param streamSize
      *            the number of values to generate
      * @param min
      *            the least value that can be produced
      * @param max
-     *            the upper bound (inclusive) for each value produced
+     *            the largest value (inclusive) that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code double} values, each
-     *         between the specified origin (inclusive) and the specified bound
+     *         between the specified min (inclusive) and the specified max
      *         (inclusive)
      *
      * @throws IllegalArgumentException
      *             if {@code streamSize} is less than zero, or {@code min} is
      *             not finite, or {@code max} is not finite, or {@code min} is
-     *             greater than or equal to {@code max}
+     *             greater than {@code max}
      */
     DoubleStream doubles(long streamSize, double min, double max);
 
     /**
      * Returns an effectively unlimited stream of pseudorandomly chosen
-     * {@code double} values, where each value is between the specified origin
-     * (inclusive) and the specified bound (inclusive).
+     * {@code double} values, where each value is between the specified min
+     * (inclusive) and the specified max (inclusive).
      *
      * @param min
      *            the least value that can be produced
      * @param max
-     *            the upper bound (inclusive) for each value produced
+     *            the largest value (inclusive) that can be produced
      *
      * @return a stream of pseudorandomly chosen {@code double} values, each
-     *         between the specified origin (inclusive) and the specified bound
+     *         between the specified min (inclusive) and the specified max
      *         (inclusive)
      *
      * @throws IllegalArgumentException
      *             if {@code min} is not finite, or {@code max} is not finite,
-     *             or {@code min} is greater than or equal to {@code max}
+     *             or {@code min} is greater than {@code max}
      */
     DoubleStream doubles(double min, double max);
 }
