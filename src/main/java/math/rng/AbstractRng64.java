@@ -16,6 +16,11 @@
 package math.rng;
 
 import java.util.Arrays;
+import java.util.Spliterator;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.StreamSupport;
 
 /**
  * Abstract base class for 64-bit pseudo RNGs.
@@ -33,7 +38,6 @@ public abstract class AbstractRng64 implements PseudoRandom {
     protected static final double DOUBLE_NORM = 1.0 / (1L << 53);
     protected static final float FLOAT_NORM = 1.0F / (1 << 24);
 
-    private static final String BAD_MAX = "max must be positive";
     private static final String BAD_RANGE = "max must be >= min";
 
     // not used, but a potential target for a store
@@ -102,8 +106,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
     public void nextBytes(byte[] bytes) {
         // awful code (adapted from java.util.Random)
         for (int i = 0, len = bytes.length; i < len; /**/) {
-            for (long rnd = nextLong(), n = Math.min(len - i, Long.SIZE
-                    / Byte.SIZE); n-- > 0; rnd >>= Byte.SIZE) {
+            for (long rnd = nextLong(), n = Math.min(len - i, Long.SIZE / Byte.SIZE); n-- > 0; rnd >>= Byte.SIZE) {
                 bytes[i++] = (byte) rnd;
             }
         }
@@ -176,12 +179,45 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return initialSeed;
     }
 
+    public IntStream ints() {
+        return intStream(
+                new PseudoRandomIntSpliterator(this, 0L, Long.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE));
+    }
+
+    public IntStream ints(long streamSize) {
+        checkStreamSize(streamSize);
+        return intStream(new PseudoRandomIntSpliterator(this, 0L, streamSize, Integer.MIN_VALUE, Integer.MAX_VALUE));
+    }
+
+    public IntStream ints(int min, int max) {
+        checkRange(min, max);
+        return intStream(new PseudoRandomIntSpliterator(this, 0L, Long.MAX_VALUE, min, max));
+    }
+
+    public IntStream ints(long streamSize, int min, int max) {
+        checkStreamSize(streamSize);
+        checkRange(min, max);
+        return intStream(new PseudoRandomIntSpliterator(this, 0L, streamSize, min, max));
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }
 
     protected void saveSeed(long seed) {
         initialSeed = new long[] { seed };
+    }
+
+    private static IntStream intStream(Spliterator.OfInt spliterator) {
+        return StreamSupport.intStream(spliterator, false);
+    }
+
+    private static LongStream longStream(Spliterator.OfLong spliterator) {
+        return StreamSupport.longStream(spliterator, false);
+    }
+
+    private static DoubleStream doubleStream(Spliterator.OfDouble spliterator) {
+        return StreamSupport.doubleStream(spliterator, false);
     }
 
     private static void checkStreamSize(long streamSize) {
@@ -205,24 +241,6 @@ public abstract class AbstractRng64 implements PseudoRandom {
     private static void checkRange(long min, long max) {
         if (min > max) {
             throw new IllegalArgumentException(BAD_RANGE);
-        }
-    }
-
-    private static void checkMax(int max) {
-        if (max <= 0) {
-            throw new IllegalArgumentException(BAD_MAX);
-        }
-    }
-
-    private static void checkMax(long max) {
-        if (max <= 0) {
-            throw new IllegalArgumentException(BAD_MAX);
-        }
-    }
-
-    private static void checkMax(double max) {
-        if (!(max > 0.0 && max < Double.POSITIVE_INFINITY)) {
-            throw new IllegalArgumentException("max must be finite and positive");
         }
     }
 }
