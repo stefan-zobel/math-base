@@ -33,6 +33,9 @@ public abstract class AbstractRng64 implements PseudoRandom {
     protected static final double DOUBLE_NORM = 1.0 / (1L << 53);
     protected static final float FLOAT_NORM = 1.0F / (1 << 24);
 
+    private static final String BAD_MAX = "max must be positive";
+    private static final String BAD_RANGE = "max must be >= min";
+
     // not used, but a potential target for a store
     protected static byte unused;
 
@@ -179,5 +182,47 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     protected void saveSeed(long seed) {
         initialSeed = new long[] { seed };
+    }
+
+    private static void checkStreamSize(long streamSize) {
+        if (streamSize < 0L) {
+            throw new IllegalArgumentException("stream size must be non-negative");
+        }
+    }
+
+    private static void checkRange(double min, double max) {
+        if (!(min <= max && (max - min) < Double.POSITIVE_INFINITY)) {
+            throw new IllegalArgumentException(BAD_RANGE);
+        }
+    }
+
+    private static void checkRange(int min, int max) {
+        if (min > max) {
+            throw new IllegalArgumentException(BAD_RANGE);
+        }
+    }
+
+    private static void checkRange(long min, long max) {
+        if (min > max) {
+            throw new IllegalArgumentException(BAD_RANGE);
+        }
+    }
+
+    private static void checkMax(int max) {
+        if (max <= 0) {
+            throw new IllegalArgumentException(BAD_MAX);
+        }
+    }
+
+    private static void checkMax(long max) {
+        if (max <= 0) {
+            throw new IllegalArgumentException(BAD_MAX);
+        }
+    }
+
+    private static void checkMax(double max) {
+        if (!(max > 0.0 && max < Double.POSITIVE_INFINITY)) {
+            throw new IllegalArgumentException("max must be finite and positive");
+        }
     }
 }
