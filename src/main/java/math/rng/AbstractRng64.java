@@ -179,25 +179,80 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return initialSeed;
     }
 
+    @Override
     public IntStream ints() {
         return intStream(
                 new PseudoRandomIntSpliterator(this, 0L, Long.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE));
     }
 
+    @Override
     public IntStream ints(long streamSize) {
         checkStreamSize(streamSize);
         return intStream(new PseudoRandomIntSpliterator(this, 0L, streamSize, Integer.MIN_VALUE, Integer.MAX_VALUE));
     }
 
+    @Override
     public IntStream ints(int min, int max) {
         checkRange(min, max);
         return intStream(new PseudoRandomIntSpliterator(this, 0L, Long.MAX_VALUE, min, max));
     }
 
+    @Override
     public IntStream ints(long streamSize, int min, int max) {
         checkStreamSize(streamSize);
         checkRange(min, max);
         return intStream(new PseudoRandomIntSpliterator(this, 0L, streamSize, min, max));
+    }
+
+    @Override
+    public LongStream longs() {
+        return longStream(
+                new PseudoRandomLongSpliterator(this, 0L, Long.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE));
+    }
+
+    @Override
+    public LongStream longs(long streamSize) {
+        checkStreamSize(streamSize);
+        return longStream(new PseudoRandomLongSpliterator(this, 0L, streamSize, Integer.MIN_VALUE, Integer.MAX_VALUE));
+    }
+
+    @Override
+    public LongStream longs(long min, long max) {
+        checkRange(min, max);
+        return longStream(new PseudoRandomLongSpliterator(this, 0L, Long.MAX_VALUE, min, max));
+    }
+
+    @Override
+    public LongStream longs(long streamSize, long min, long max) {
+        checkStreamSize(streamSize);
+        checkRange(min, max);
+        return longStream(new PseudoRandomLongSpliterator(this, 0L, streamSize, min, max));
+    }
+
+    @Override
+    public DoubleStream doubles() {
+        return doubleStream(
+                new PseudoRandomDoubleSpliterator(this, 0L, Long.MAX_VALUE, -Double.MAX_VALUE, Double.MAX_VALUE));
+    }
+
+    @Override
+    public DoubleStream doubles(long streamSize) {
+        checkStreamSize(streamSize);
+        return doubleStream(
+                new PseudoRandomDoubleSpliterator(this, 0L, streamSize, -Double.MAX_VALUE, Double.MAX_VALUE));
+    }
+
+    @Override
+    public DoubleStream doubles(double min, double max) {
+        checkRange(min, max);
+        return doubleStream(new PseudoRandomDoubleSpliterator(this, 0L, Long.MAX_VALUE, min, max));
+    }
+
+    @Override
+    public DoubleStream doubles(long streamSize, double min, double max) {
+        checkStreamSize(streamSize);
+        checkRange(min, max);
+        return doubleStream(new PseudoRandomDoubleSpliterator(this, 0L, streamSize, min, max));
     }
 
     protected void saveSeed(long[] seed) {

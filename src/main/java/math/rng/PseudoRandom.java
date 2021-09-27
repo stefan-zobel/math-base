@@ -15,7 +15,7 @@
  */
 package math.rng;
 
-public interface PseudoRandom {
+public interface PseudoRandom extends PseudoRandomStream {
 
     long nextLong();
 
