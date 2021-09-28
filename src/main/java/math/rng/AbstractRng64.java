@@ -266,6 +266,17 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return doubleStream(new GaussianSpliterator(this, 0L, streamSize, mu, sigma));
     }
 
+    @Override
+    public DoubleStream cauchy(double location, double scale) {
+        return doubleStream(new CauchySpliterator(this, 0L, Long.MAX_VALUE, location, scale));
+    }
+
+    @Override
+    public DoubleStream cauchy(long streamSize, double location, double scale) {
+        checkStreamSize(streamSize);
+        return doubleStream(new CauchySpliterator(this, 0L, streamSize, location, scale));
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }

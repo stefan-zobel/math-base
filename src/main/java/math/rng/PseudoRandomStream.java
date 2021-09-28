@@ -217,7 +217,7 @@ public interface PseudoRandomStream {
 
     /**
      * Returns an effectively unlimited stream of pseudorandomly chosen normal
-     * variates which expectation {@code mu} and standard deviation
+     * variates with expectation {@code mu} and standard deviation
      * {@code sigma}.
      * 
      * @param mu
@@ -234,11 +234,9 @@ public interface PseudoRandomStream {
 
     /**
      * Returns a stream producing the given {@code streamSize} number of
-     * pseudorandomly chosen normal variates which expectation {@code mu} and
+     * pseudorandomly chosen normal variates with expectation {@code mu} and
      * standard deviation {@code sigma}.
      * 
-     * @param streamSize
-     *            the number of values to generate
      * @param mu
      *            the expectation of the normal variate
      * @param sigma
@@ -251,4 +249,39 @@ public interface PseudoRandomStream {
      *             not greater than zero
      */
     DoubleStream normal(long streamSize, double mu, double sigma);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * Cauchy-distributed variates with location parameter {@code location} and
+     * scale parameter {@code scale}.
+     * 
+     * @param location
+     *            the location parameter of the Cauchy distribution
+     * @param scale
+     *            the scale parameter of the Cauchy distribution
+     * @return a stream of pseudorandomly chosen Cauchy-distributed variates
+     *         with the specified location and scale
+     * @throws IllegalArgumentException
+     *             if {@code scale} is not greater than zero
+     */
+    DoubleStream cauchy(double location, double scale);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen Cauchy-distributed variates with location parameter
+     * {@code location} and scale parameter {@code scale}.
+     * 
+     * @return a stream of pseudorandomly chosen Cauchy-distributed variates
+     *         with the specified location and scale
+     * @param location
+     *            the location parameter of the Cauchy distribution
+     * @param scale
+     *            the scale parameter of the Cauchy distribution
+     * @return a stream of pseudorandomly chosen Cauchy-distributed variates
+     *         with the specified location and scale
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code scale} is
+     *             not greater than zero
+     */
+    DoubleStream cauchy(long streamSize, double location, double scale);
 }
