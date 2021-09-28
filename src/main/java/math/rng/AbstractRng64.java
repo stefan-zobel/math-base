@@ -299,7 +299,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     AbstractRng64 newInstance() {
         try {
-            Constructor<? extends AbstractRng64> cons = this.getClass().getDeclaredConstructor(Long.class);
+            Constructor<? extends AbstractRng64> cons = this.getClass().getDeclaredConstructor(long.class);
             long seed0 = this.getSeed()[0];
             return cons.newInstance(BitMix.pelican(seed0));
         } catch (Throwable t) {
