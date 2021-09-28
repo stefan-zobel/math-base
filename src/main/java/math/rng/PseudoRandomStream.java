@@ -214,4 +214,41 @@ public interface PseudoRandomStream {
      *             or {@code min} is greater than {@code max}
      */
     DoubleStream doubles(double min, double max);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen normal
+     * variates which expectation {@code mu} and standard deviation
+     * {@code sigma}.
+     * 
+     * @param mu
+     *            the expectation of the normal variate
+     * @param sigma
+     *            the standard deviation of the normal variate
+     * @return a stream of pseudorandomly chosen normal variates with the
+     *         specified expecation and standard deviation
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code sigma} is not greater than zero
+     */
+    DoubleStream normal(double mu, double sigma);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen normal variates which expectation {@code mu} and
+     * standard deviation {@code sigma}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param mu
+     *            the expectation of the normal variate
+     * @param sigma
+     *            the standard deviation of the normal variate
+     * @return a stream of pseudorandomly chosen normal variates with the
+     *         specified expecation and standard deviation
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code sigma} is
+     *             not greater than zero
+     */
+    DoubleStream normal(long streamSize, double mu, double sigma);
 }
