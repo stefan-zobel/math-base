@@ -15,6 +15,7 @@
  */
 package math.rng;
 
+import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Spliterator;
 import java.util.stream.DoubleStream;
@@ -294,6 +295,16 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     protected void saveSeed(long seed) {
         initialSeed = new long[] { seed };
+    }
+
+    AbstractRng64 newInstance() {
+        try {
+            Constructor<? extends AbstractRng64> cons = this.getClass().getDeclaredConstructor(Long.class);
+            long seed0 = this.getSeed()[0];
+            return cons.newInstance(BitMix.pelican(seed0));
+        } catch (Throwable t) {
+            throw new IllegalStateException(t);
+        }
     }
 
     private static IntStream intStream(Spliterator.OfInt spliterator) {
