@@ -79,10 +79,10 @@ final class GammaSpliterator extends PseudoRandomSpliterator implements Splitera
         }
     }
 
-    private static double sample(PseudoRandom prng, double shape_k, double scale_theta) {
+    static double sample(PseudoRandom prng, double shape_k, double scale_theta) {
         if (shape_k < 1.0) {
             // [1]: p. 228, Algorithm GS
-            final double bGS = 1.0 + shape_k / Math.E;
+            double bGS = 1.0 + shape_k / Math.E;
 
             while (true) {
                 // Step 1:
