@@ -237,6 +237,8 @@ public interface PseudoRandomStream {
      * pseudorandomly chosen normal variates with expectation {@code mu} and
      * standard deviation {@code sigma}.
      * 
+     * @param streamSize
+     *            the number of values to generate
      * @param mu
      *            the expectation of the normal variate
      * @param sigma
@@ -271,8 +273,8 @@ public interface PseudoRandomStream {
      * pseudorandomly chosen Cauchy-distributed variates with location parameter
      * {@code location} and scale parameter {@code scale}.
      * 
-     * @return a stream of pseudorandomly chosen Cauchy-distributed variates
-     *         with the specified location and scale
+     * @param streamSize
+     *            the number of values to generate
      * @param location
      *            the location parameter of the Cauchy distribution
      * @param scale
@@ -284,4 +286,35 @@ public interface PseudoRandomStream {
      *             not greater than zero
      */
     DoubleStream cauchy(long streamSize, double location, double scale);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * exponentially distributed variates with rate parameter {@code lambda}.
+     * 
+     * @param lambda
+     *            the rate parameter {@code lambda} of the Exponential
+     *            distribution
+     * @return a stream of pseudorandomly chosen exponentially distributed
+     *         variates with parameter {@code lambda}
+     * @throws IllegalArgumentException
+     *             if {@code lambda} is not greater than zero
+     */
+    DoubleStream exponential(double lambda);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * exponentially distributed variates with rate parameter {@code lambda}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param lambda
+     *            the rate parameter {@code lambda} of the Exponential
+     *            distribution
+     * @return a stream of pseudorandomly chosen exponentially distributed
+     *         variates with parameter {@code lambda}
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code lambda} is
+     *             not greater than zero
+     */
+    DoubleStream exponential(long streamSize, double lambda);
 }
