@@ -297,8 +297,12 @@ public abstract class AbstractRng64 implements PseudoRandom {
         initialSeed = new long[] { seed };
     }
 
+    // deterministically create a second seeded instance from a first instance
+    // without knowing that instance's runtime type
     AbstractRng64 newInstance() {
         try {
+            // caution: this assumes that there always exists a constructor that
+            // takes a long but we can't guarantee this
             Constructor<? extends AbstractRng64> cons = this.getClass().getDeclaredConstructor(long.class);
             long seed0 = this.getSeed()[0];
             return cons.newInstance(BitMix.pelican(seed0));
