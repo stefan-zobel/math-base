@@ -97,7 +97,7 @@ final class BetaSpliterator extends PseudoRandomSpliterator implements Spliterat
         }
     }
 
-    private static double sample(PseudoRandom prng_U, PseudoRandom prng_V, double alpha, double beta) {
+    static double sample(PseudoRandom prng_U, PseudoRandom prng_V, double alpha, double beta) {
         // This may not be the most efficient solution,
         // but it doesn't get any simpler. The problem is
         // alpha and beta must not be too small, especially
@@ -105,6 +105,14 @@ final class BetaSpliterator extends PseudoRandomSpliterator implements Spliterat
         // inaccurate. But this seems to be true for all algorithms
         // (commons.math appears to be even more inaccurate than this
         // simple implementation - not to mention that it is much slower)
+        //
+        // An alpha and/or beta of 0.125 (1/8) should be ok, values below are
+        // not. If you need to have a beta in the range 1/8 <= beta < 1 then
+        // alpha must not be too large. A ratio of beta : alpha of 1 : 1800
+        // should be ok (e.g. alpha = 225 for beta = 0.125). Don't go above
+        // that. If only alpha is small (but not less than code 1/8) there seems
+        // to exist no practically relevant limit for the magnitude of beta
+        // (other than the lower bound of 1/8).
         double u = GammaSpliterator.sample(prng_U, alpha, 1.0);
         return u / (u + GammaSpliterator.sample(prng_V, beta, 1.0));
     }
