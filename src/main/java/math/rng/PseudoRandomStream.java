@@ -390,4 +390,34 @@ public interface PseudoRandomStream {
      *             zero
      */
     DoubleStream beta(long streamSize, double alpha, double beta);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * Chi-squared distributed variates with {@code k} degrees of freedom.
+     * 
+     * @param k
+     *            the number of degrees of freedom
+     * @return a stream of pseudorandomly chosen Chi-squared distributed
+     *         variates with {@code k} degrees of freedom
+     * @throws IllegalArgumentException
+     *             if {@code k} is not greater than zero
+     */
+    DoubleStream chiSquare(double k);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen Chi-squared distributed variates with {@code k}
+     * degrees of freedom.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param k
+     *            the number of degrees of freedom
+     * @return a stream of pseudorandomly chosen Chi-squared distributed
+     *         variates with {@code k} degrees of freedom
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code k} is not
+     *             greater than zero
+     */
+    DoubleStream chiSquare(long streamSize, double k);
 }

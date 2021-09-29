@@ -311,6 +311,17 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return doubleStream(new BetaSpliterator(this, 0L, streamSize, alpha, beta));
     }
 
+    @Override
+    public DoubleStream chiSquare(double degreesOfFreedom) {
+        return doubleStream(new ChiSquareSpliterator(this, 0L, Long.MAX_VALUE, degreesOfFreedom));
+    }
+
+    @Override
+    public DoubleStream chiSquare(long streamSize, double degreesOfFreedom) {
+        checkStreamSize(streamSize);
+        return doubleStream(new ChiSquareSpliterator(this, 0L, streamSize, degreesOfFreedom));
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }
