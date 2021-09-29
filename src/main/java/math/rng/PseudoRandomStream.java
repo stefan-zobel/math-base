@@ -317,4 +317,40 @@ public interface PseudoRandomStream {
      *             not greater than zero
      */
     DoubleStream exponential(long streamSize, double lambda);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * Gamma-distributed variates with shape parameter {@code k} and scale
+     * parameter {@code theta}.
+     * 
+     * @param k
+     *            the shape parameter of the Gamma distribution
+     * @param theta
+     *            the scale parameter of the Gamma distribution
+     * @return a stream of pseudorandomly chosen Gamma-distributed variates with
+     *         with shape parameter {@code k} and scale parameter {@code theta}
+     * @throws IllegalArgumentException
+     *             if {@code k} is not greater than zero, or {@code theta} is
+     *             not greater than zero
+     */
+    DoubleStream gamma(double k, double theta);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen Gamma-distributed variates with shape parameter
+     * {@code k} and scale parameter {@code theta}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param k
+     *            the shape parameter of the Gamma distribution
+     * @param theta
+     *            the scale parameter of the Gamma distribution
+     * @return a stream of pseudorandomly chosen Gamma-distributed variates with
+     *         with shape parameter {@code k} and scale parameter {@code theta}
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code k} is not
+     *             greater than zero, or {@code theta} is not greater than zero
+     */
+    DoubleStream gamma(long streamSize, double k, double theta);
 }

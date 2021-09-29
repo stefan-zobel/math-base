@@ -289,6 +289,17 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return doubleStream(new ExponentialSpliterator(this, 0L, streamSize, lambda));
     }
 
+    @Override
+    public DoubleStream gamma(double k, double theta) {
+        return doubleStream(new GammaSpliterator(this, 0L, Long.MAX_VALUE, k, theta));
+    }
+
+    @Override
+    public DoubleStream gamma(long streamSize, double k, double theta) {
+        checkStreamSize(streamSize);
+        return doubleStream(new GammaSpliterator(this, 0L, streamSize, k, theta));
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }
