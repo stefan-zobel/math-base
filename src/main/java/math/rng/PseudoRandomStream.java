@@ -353,4 +353,41 @@ public interface PseudoRandomStream {
      *             greater than zero, or {@code theta} is not greater than zero
      */
     DoubleStream gamma(long streamSize, double k, double theta);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * Beta-distributed variates with shape parameters {@code alpha} and
+     * {@code beta}.
+     * 
+     * @param alpha
+     *            the shape parameter {@code alpha} of the Beta distribution
+     * @param beta
+     *            the shape parameter {@code beta} of the Beta distribution
+     * @return a stream of pseudorandomly chosen Beta-distributed variates with
+     *         shape parameters {@code alpha} and {@code beta}
+     * @throws IllegalArgumentException
+     *             if {@code alpha} is not greater than zero, or {@code beta} is
+     *             not greater than zero
+     */
+    DoubleStream beta(double alpha, double beta);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen Beta-distributed variates with shape parameters
+     * {@code alpha} and {@code beta}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param alpha
+     *            the shape parameter {@code alpha} of the Beta distribution
+     * @param beta
+     *            the shape parameter {@code beta} of the Beta distribution
+     * @return a stream of pseudorandomly chosen Beta-distributed variates with
+     *         shape parameters {@code alpha} and {@code beta}
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code alpha} is
+     *             not greater than zero, or {@code beta} is not greater than
+     *             zero
+     */
+    DoubleStream beta(long streamSize, double alpha, double beta);
 }
