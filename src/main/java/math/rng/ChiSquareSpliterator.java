@@ -21,7 +21,7 @@ import java.util.function.DoubleConsumer;
 
 final class ChiSquareSpliterator extends PseudoRandomSpliterator implements Spliterator.OfDouble {
 
-    private final double degreesOfFreedom;
+    final double degreesOfFreedom;
     final PseudoRandom prng;
 
     ChiSquareSpliterator(PseudoRandom prng, long index, long fence, double degreesOfFreedom) {
