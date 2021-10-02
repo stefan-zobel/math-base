@@ -420,4 +420,43 @@ public interface PseudoRandomStream {
      *             greater than zero
      */
     DoubleStream chiSquare(long streamSize, double k);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen FisherF
+     * distributed variates with {@code numeratorDF} and {@code denominatorDF}
+     * degrees of freedom.
+     * 
+     * @param numeratorDF
+     *            degrees of freedom of the numerator
+     * @param denominatorDF
+     *            degrees of freedom of the denominator
+     * @return a stream of pseudorandomly chosen FisherF distributed variates
+     *         with {@code numeratorDF} and {@code denominatorDF} degrees of
+     *         freedom
+     * @throws IllegalArgumentException
+     *             if {@code numeratorDF} is less than one, or
+     *             {@code denominatorDF} is less than one
+     */
+    DoubleStream fisherF(int numeratorDF, int denominatorDF);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen FisherF distributed variates with
+     * {@code numeratorDF} and {@code denominatorDF} degrees of freedom.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param numeratorDF
+     *            degrees of freedom of the numerator
+     * @param denominatorDF
+     *            degrees of freedom of the denominator
+     * @return a stream of pseudorandomly chosen FisherF distributed variates
+     *         with {@code numeratorDF} and {@code denominatorDF} degrees of
+     *         freedom
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or
+     *             {@code numeratorDF} is less than one, or
+     *             {@code denominatorDF} is less than one
+     */
+    DoubleStream fisherF(long streamSize, int numeratorDF, int denominatorDF);
 }
