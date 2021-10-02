@@ -459,4 +459,47 @@ public interface PseudoRandomStream {
      *             {@code denominatorDF} is less than one
      */
     DoubleStream fisherF(long streamSize, int numeratorDF, int denominatorDF);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * Log-normal variates whose natural logarithm has expectation {@code mu}
+     * and standard deviation {@code sigma}.
+     * 
+     * @param mu
+     *            the expectation of the natural logarithm of the Log-normal
+     *            variate
+     * @param sigma
+     *            the standard deviation of the natural logarithm of the
+     *            Log-normal variate
+     * @return a stream of pseudorandomly chosen Log-normal variates whose
+     *         natural logarithm has the specified expecation and standard
+     *         deviation
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code sigma} is not greater than zero
+     */
+    DoubleStream logNormal(double mu, double sigma);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen Log-normal variates whose natural logarithm has
+     * expectation {@code mu} and standard deviation {@code sigma}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param mu
+     *            the expectation of the natural logarithm of the Log-normal
+     *            variate
+     * @param sigma
+     *            the standard deviation of the natural logarithm of the
+     *            Log-normal variate
+     * @return a stream of pseudorandomly chosen Log-normal variates whose
+     *         natural logarithm has the specified expecation and standard
+     *         deviation
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code sigma} is
+     *             not greater than zero
+     */
+    DoubleStream logNormal(long streamSize, double mu, double sigma);
 }

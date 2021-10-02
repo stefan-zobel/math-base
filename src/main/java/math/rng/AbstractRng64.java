@@ -333,6 +333,17 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return doubleStream(new FisherFSpliterator(this, 0L, streamSize, numeratorDF, denominatorDF));
     }
 
+    @Override
+    public DoubleStream logNormal(double mu, double sigma) {
+        return doubleStream(new LogNormalSpliterator(this, 0L, Long.MAX_VALUE, mu, sigma));
+    }
+
+    @Override
+    public DoubleStream logNormal(long streamSize, double mu, double sigma) {
+        checkStreamSize(streamSize);
+        return doubleStream(new LogNormalSpliterator(this, 0L, streamSize, mu, sigma));
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }
