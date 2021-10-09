@@ -3,4 +3,4 @@
 
 # math-base
 
-Elementary math utilities with a focus on non-linear optimization, random number generation, interpolation and solvers
+Elementary math utilities with a focus on random number generation, non-linear optimization, interpolation and solvers
