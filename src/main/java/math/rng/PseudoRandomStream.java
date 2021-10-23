@@ -502,4 +502,36 @@ public interface PseudoRandomStream {
      *             not greater than zero
      */
     DoubleStream logNormal(long streamSize, double mu, double sigma);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen StudentT
+     * distributed variates with {@code df} degrees of freedom.
+     * 
+     * @param df
+     *            degrees of freedom
+     * @return a stream of pseudorandomly chosen StudentT distributed variates
+     *         with {@code df} degrees of freedom
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code df} is not greater than zero
+     */
+    DoubleStream studentT(double df);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen StudentT distributed variates with {@code df}
+     * degrees of freedom.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param df
+     *            degrees of freedom
+     * @return a stream of pseudorandomly chosen StudentT distributed variates
+     *         with {@code df} degrees of freedom
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code df} is not
+     *             greater than zero
+     */
+    DoubleStream studentT(long streamSize, double df);
 }
