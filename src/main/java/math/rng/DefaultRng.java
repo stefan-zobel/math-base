@@ -15,6 +15,10 @@
  */
 package math.rng;
 
+/**
+ * Factory methods for the default {@link PseudoRandom} algorithm which is
+ * currently a {@link MersenneTwister64}.
+ */
 public final class DefaultRng {
 
     public static PseudoRandom getGlobalPseudoRandom() {

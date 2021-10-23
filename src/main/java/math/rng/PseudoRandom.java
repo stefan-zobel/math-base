@@ -15,6 +15,9 @@
  */
 package math.rng;
 
+/**
+ * A generator of uniform pseudorandom values.
+ */
 public interface PseudoRandom extends PseudoRandomStream {
 
     long nextLong();

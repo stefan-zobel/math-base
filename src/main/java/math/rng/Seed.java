@@ -17,6 +17,9 @@ package math.rng;
 
 import java.util.Arrays;
 
+/**
+ * Generates a pseudo-random long seed.
+ */
 public final class Seed {
 
     // from java.util.Random
