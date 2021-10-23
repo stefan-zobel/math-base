@@ -6,7 +6,7 @@
     <packaging>jar</packaging>
     <version>1.0.0</version>
     <name>math-base</name>
-    <description>Elementary math utilities with a focus on non-linear optimization, random number generation, interpolation and solvers</description>
+    <description>Elementary math utilities with a focus on random number generation, non-linear optimization, interpolation and solvers</description>
     <url>https://github.com/stefan-zobel/math-base/</url>
 
     <licenses>
