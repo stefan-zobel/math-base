@@ -534,4 +534,40 @@ public interface PseudoRandomStream {
      *             greater than zero
      */
     DoubleStream studentT(long streamSize, double df);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen Weibull
+     * distributed variates with parameters {@code scale} and {@code shape}.
+     * 
+     * @param scale
+     *            the scale parameter of the Weibull distribution
+     * @param shape
+     *            the shape parameter of the Weibull distribution
+     * @return a stream of pseudorandomly chosen Weibull distributed variates
+     *         with parameters {@code scale} and {@code shape}
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code scale} and {@code shape} are not greater than zero
+     */
+    DoubleStream weibull(double scale, double shape);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen Weibull distributed variates with parameters
+     * {@code scale} and {@code shape}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param scale
+     *            the scale parameter of the Weibull distribution
+     * @param shape
+     *            the shape parameter of the Weibull distribution
+     * @return a stream of pseudorandomly chosen Weibull distributed variates
+     *         with parameters {@code scale} and {@code shape}
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code scale} and
+     *             {@code shape} are not greater than zero
+     */
+    DoubleStream weibull(long streamSize, double scale, double shape);
 }
