@@ -23,7 +23,7 @@ package math.rng;
  * different mixing functions to (hopefully) protect better against the possible
  * problems with weak gamma values reported in
  * <a href="https://labs.oracle.com/pls/apex/f?p=LABS:0::APPLICATION_PROCESS%3DGETDOC_INLINE:::DOC_ID:1050">Steele
- * (2017)</a>. Performance should about the same as for
+ * (2017)</a>. Performance should be about the same as for
  * {@code SplittableRandom}.
  * <p>
  * This generator has a period of 2<sup>64</sup>.
