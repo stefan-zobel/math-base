@@ -916,7 +916,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return new SubList(this, fromIndex, toIndex);
     }
 
-    private static abstract class AbstractDoubleList {
+    private abstract static class AbstractDoubleList {
         int modCount;
 
         public abstract int size();
