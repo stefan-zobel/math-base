@@ -256,7 +256,23 @@ public interface DoubleList {
     boolean equals(Object o);
 
     /**
-     * {@inheritDoc}
+     * Returns the hash code value for this DoubleList. The hash code of a
+     * DoubleList is defined to be the result of the following calculation:
+     * 
+     * <pre>{@code
+     *  int hashCode = 1;
+     *  for (int i = 0; i < list.size(); i++) {
+     *      hashCode = 31 * hashCode + Double.hashCode(list.get(i));
+     *  }
+     * }
+     * </pre>
+     * 
+     * This ensures that {@code list1.equals(list2)} implies that
+     * {@code list1.hashCode()==list2.hashCode()} for any two DoubleLists,
+     * {@code list1} and {@code list2}, as required by the general contract of
+     * {@link Object#hashCode}.
+     *
+     * @return the hash code value for this DoubleList
      */
     int hashCode();
 
