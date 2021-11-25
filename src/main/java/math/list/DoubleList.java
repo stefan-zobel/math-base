@@ -243,7 +243,15 @@ public interface DoubleList {
     double remove(int index);
 
     /**
-     * {@inheritDoc}
+     * Compares the specified object with this DoubleList for equality. Returns
+     * {@code true} if and only if the specified object is also a DoubleList,
+     * both lists have the same size, and all corresponding pairs of elements in
+     * the two lists are <i>equal</i>. In other words, two DoubleList are
+     * defined to be equal if they contain the same elements in the same order.
+     *
+     * @param o
+     *            the object to be compared for equality with this DoubleList
+     * @return {@code true} if the specified object is equal to this DoubleList
      */
     boolean equals(Object o);
 
