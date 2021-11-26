@@ -1604,6 +1604,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         }
 
         @Override
+        public double stddev() {
+            return DoubleArrayList.stddev(size, offset, root.elementData);
+        }
+
+        @Override
         public double median() {
             if (isEmpty()) {
                 throw new NoSuchElementException();
@@ -1977,6 +1982,23 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return sum;
     }
 
+    static double stddev(int length, int aoff, double[] a) {
+        if (length < 2) {
+            throw new IllegalArgumentException("length is : " + length);
+        }
+        double sum = 0.0;
+        double sumSqr = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            double x = a[i];
+            sum += x;
+            sumSqr += x * x;
+        }
+        sumSqr = sumSqr / length;
+        double mean = sum / length;
+        double var = sumSqr - (mean * mean);
+        return Math.sqrt(var);
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -2226,6 +2248,14 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             throw new NoSuchElementException();
         }
         return avg(size, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double stddev() {
+        return stddev(size, 0, elementData);
     }
 
     /**

@@ -640,6 +640,17 @@ public interface DoubleList {
     double avg();
 
     /**
+     * Returns the standard deviation of the elements in this list if this list
+     * has at least two elements, otherwise throws
+     * {@code IllegalArgumentException}.
+     * 
+     * @return the standard deviation of the elements in this list
+     * @throws java.lang.IllegalArgumentException
+     *             if this list has less than two elements
+     */
+    double stddev();
+
+    /**
      * Returns the median value of the elements in this list if this list has at
      * least one element, otherwise throws {@code NoSuchElementException}.
      * 
