@@ -89,6 +89,72 @@ public interface DoubleList {
     }
 
     /**
+     * Tests for approximate equality (or "closeness") of the two DoubleLists
+     * {@code a} and {@code b} where {@code a} and {@code b} must have the same
+     * length and each element {@code xa} of {@code a} is tested for approximate
+     * equality against the corresponding element {@code xb} of {@code b}.
+     * <p>
+     * If, for all pairs {@code (xa, xb)},
+     * 
+     * <pre>
+     * {@code abs(xa - xb) <= max( relTol * max(abs(xa), abs(xb)), absTol )}
+     * </pre>
+     * 
+     * the lists {@code a} and {@code b} are considered approximately equal,
+     * otherwise they are not. This test is symmetric, so interchanging
+     * {@code a} and {@code b} doesn't change the result.
+     * <p>
+     * <b>Implementation Note:</b><br>
+     * The definition of approximate equality used here is the one employed in
+     * Python's {@code math.isclose()} function defined in <a
+     * href=https://www.python.org/dev/peps/pep-0485/>PEP 485 - A Function for
+     * testing approximate equality</a>. This document gives a nice discussion
+     * of the rationale for this approach, how to use it, and the alternatives
+     * they had considered.
+     * 
+     * @param a
+     *            one of the two DoubleLists to test for approximate equality
+     *            (it doesn't matter which one since the test is symmetric)
+     * @param b
+     *            the other one of the two DoubleLists to test for approximate
+     *            equality (it doesn't matter which one since the test is
+     *            symmetric)
+     * @param relTol
+     *            relative tolerance, must be {@code >= 0.0}
+     * @param absTol
+     *            absolute tolerance, must be {@code >= 0.0}
+     * @return {@code true} if {@code a} and {@code b} are approximately equal
+     *         according to the criterion defined above, otherwise {@code false}
+     * @throws IllegalArgumentException
+     *             if {@code relTol < 0.0} or {@code absTol < 0.0}
+     */
+    static boolean approxEqual(DoubleList a, DoubleList b, double relTol, double absTol) {
+        if (!DoubleArrayList.checkApproxEqualArgs(a, b, relTol, absTol)) {
+            return false;
+        }
+        if (a == b) {
+            return true;
+        }
+        double[] _a = a.getArrayUnsafe();
+        double[] _b = b.getArrayUnsafe();
+        int aoff = a.offset();
+        int boff = b.offset();
+        // a.size() == b.size() guaranteed here
+        int len = a.size();
+        for (int i = 0; i < len; ++i) {
+            double xa = _a[aoff + i];
+            double xb = _b[boff + i];
+            if (xa != xb) {
+                double diff = Math.abs(xa - xb);
+                if (!((diff <= relTol * Math.max(Math.abs(xa), Math.abs(xb))) || (diff <= absTol))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
      * Constructs a random list of length {@code size} with random values
      * uniformly distributed between {@code min} and {@code max}.
      * 

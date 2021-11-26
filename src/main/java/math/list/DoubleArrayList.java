@@ -2332,6 +2332,19 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         }
     }
 
+    static boolean checkApproxEqualArgs(DoubleList a, DoubleList b, double relTol, double absTol) {
+        if (relTol < 0.0 || Double.isNaN(relTol) || Double.isInfinite(relTol)) {
+            throw new IllegalArgumentException("illegal relTol : " + relTol);
+        }
+        if (absTol < 0.0 || Double.isNaN(absTol) || Double.isInfinite(absTol)) {
+            throw new IllegalArgumentException("illegal absTol : " + absTol);
+        }
+        if (a.size() != b.size()) {
+            return false;
+        }
+        return true;
+    }
+
     private static final String FORMAT_D = "%.12E";
     private static final long serialVersionUID = 1L;
 
