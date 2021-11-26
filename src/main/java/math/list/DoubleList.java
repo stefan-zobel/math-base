@@ -105,6 +105,24 @@ public interface DoubleList {
     }
 
     /**
+     * Constructs a random list of length {@code size} with random values
+     * normally distributed with mean {@code mu} and standard deviation
+     * {@code sigma}.
+     * 
+     * @param mu
+     *            mean (expectation) of the normal distribution
+     * @param sigma
+     *            standard deviation of the normal distribution, must be
+     *            {@code > 0.0}
+     * @param size
+     *            length of the list
+     * @return a random list of length {@code size}
+     */
+    static DoubleList uniformNormal(double mu, double sigma, int size) {
+        return DoubleArrayList.uniformNormal(mu, sigma, size);
+    }
+
+    /**
      * Returns the number of elements in this list.
      *
      * @return the number of elements in this list
