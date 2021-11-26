@@ -642,7 +642,8 @@ public interface DoubleList {
     /**
      * Returns the standard deviation of the elements in this list if this list
      * has at least two elements, otherwise throws
-     * {@code IllegalArgumentException}.
+     * {@code IllegalArgumentException}. The value is computed without Bessel's
+     * correction, i.e., we divide by {@code n}, not by {@code n - 1}.
      * 
      * @return the standard deviation of the elements in this list
      * @throws java.lang.IllegalArgumentException
