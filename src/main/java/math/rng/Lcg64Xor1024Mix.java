@@ -95,7 +95,7 @@ public class Lcg64Xor1024Mix extends AbstractRng64 implements SplittablePseudoRa
         return new Lcg64Xor1024Mix(mix[0], mix[1], mixSeed);
     }
 
-    // this is actually faster than the JDK 17 implementation
+    // same algorithm but faster than the JDK 17 implementation
     @Override
     public final long nextLong() {
         // xoroshiro1024: part 1
