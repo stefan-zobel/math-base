@@ -736,11 +736,16 @@ public interface DoubleList {
      * {@code posInfSurrogate} and {@code negInfSurrogate} arguments.
      * 
      * @param nanSurrogate
-     *            the substitution value to use for NaN values
+     *            the substitution value to use for NaN values, NaNs won't get
+     *            substituted if you pass {@link Double#NaN}
      * @param posInfSurrogate
-     *            the substitution value to use for positive infinity values
+     *            the substitution value to use for positive infinity values, no
+     *            substitution happens if you pass
+     *            {@link Double#POSITIVE_INFINITY}
      * @param negInfSurrogate
-     *            the substitution value to use for negative infinity values
+     *            the substitution value to use for negative infinity values, no
+     *            substitution happens if you pass
+     *            {@link Double#NEGATIVE_INFINITY}
      * @return this {@code DoubleList}
      */
     DoubleList sanitizeNonFinite(double nanSurrogate, double posInfSurrogate, double negInfSurrogate);
