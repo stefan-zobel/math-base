@@ -92,6 +92,36 @@ public interface DoubleList {
      * Tests for approximate equality (or "closeness") of the two DoubleLists
      * {@code a} and {@code b} where {@code a} and {@code b} must have the same
      * length and each element {@code xa} of {@code a} is tested for approximate
+     * equality against the corresponding element {@code xb} of {@code b} as
+     * defined in {@link #approxEqual(DoubleList, DoubleList, double, double)}.
+     * This method is equivalent to a call of
+     * {@linkplain #approxEqual(DoubleList, DoubleList, double, double)} with an
+     * {@code relTol} argument of value {@code 1.0e-8} and an {@code absTol}
+     * argument equal to {@code 0.0}:
+     * 
+     * <pre>
+     * {@code approxEqual(a, b, 1.0e-8, 0.0)}
+     * </pre>
+     * 
+     * @param a
+     *            one of the two DoubleLists to test for approximate equality
+     *            (it doesn't matter which one since the test is symmetric)
+     * @param b
+     *            the other one of the two DoubleLists to test for approximate
+     *            equality (it doesn't matter which one since the test is
+     *            symmetric)
+     * @return {@code true} if {@code a} and {@code b} are approximately equal
+     *         according to the criterion defined in
+     *         {@link #approxEqual(DoubleList, DoubleList, double, double)}
+     */
+    static boolean approxEqual(DoubleList a, DoubleList b) {
+        return approxEqual(a, b, 1.0e-8, 0.0);
+    }
+
+    /**
+     * Tests for approximate equality (or "closeness") of the two DoubleLists
+     * {@code a} and {@code b} where {@code a} and {@code b} must have the same
+     * length and each element {@code xa} of {@code a} is tested for approximate
      * equality against the corresponding element {@code xb} of {@code b}.
      * <p>
      * If, for all pairs {@code (xa, xb)},
