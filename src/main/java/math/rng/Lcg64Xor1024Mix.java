@@ -16,7 +16,15 @@
 package math.rng;
 
 /**
- * The {@code L64X1024MixRandom} algorithm from JDK 17.
+ * The {@code L64X1024MixRandom} algorithm from JDK 17 which uses a linear
+ * congruential generator (LCG) as a first subgenerator and a Xor-based
+ * generator (xoroshiro1024) as a second subgenerator and then applies a 64-bit
+ * mixing function identified by Doug Lea.
+ * <p>
+ * This generator has a {@code 1088}-bit state and a period of
+ * 2<sup>64</sup>(2<sup>1024</sup>&minus;1).
+ * <p>
+ * This generator is {@code 16}-dimensionally equidistributed.
  */
 public class Lcg64Xor1024Mix extends AbstractRng64 implements SplittablePseudoRandom {
 
