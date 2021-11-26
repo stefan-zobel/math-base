@@ -175,7 +175,35 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     public static DoubleArrayList uniformRandom(double min, double max, int size) {
         double[] values = new double[size];
         PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
-        rng.nextDoubles(values);
+        for (int i = 0; i < values.length; ++i) {
+            values[i] = rng.nextDouble(min, max);
+        }
+        return new DoubleArrayList(values, false);
+    }
+
+    /**
+     * Constructs a random list of length {@code size} with random values
+     * normally distributed with mean {@code mu} and standard deviation
+     * {@code sigma}.
+     * 
+     * @param mu
+     *            mean (expectation) of the normal distribution
+     * @param sigma
+     *            standard deviation of the normal distribution, must be
+     *            {@code > 0.0}
+     * @param size
+     *            length of the list
+     * @return a random list of length {@code size}
+     */
+    public static DoubleArrayList uniformNormal(double mu, double sigma, int size) {
+        if (sigma <= 0.0) {
+            throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
+        }
+        double[] values = new double[size];
+        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        for (int i = 0; i < values.length; ++i) {
+            values[i] = rng.nextGaussian(mu, sigma);
+        }
         return new DoubleArrayList(values, false);
     }
 
