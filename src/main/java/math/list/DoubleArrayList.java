@@ -175,9 +175,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     public static DoubleArrayList uniformRandom(double min, double max, int size) {
         double[] values = new double[size];
         PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
-        for (int i = 0; i < values.length; ++i) {
-            values[i] = rng.nextDouble(min, max);
-        }
+        rng.nextDoubles(values);
         return new DoubleArrayList(values, false);
     }
 
