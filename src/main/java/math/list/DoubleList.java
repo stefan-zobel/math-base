@@ -729,4 +729,19 @@ public interface DoubleList {
      * @return this {@code DoubleList}
      */
     DoubleList round(int scale);
+
+    /**
+     * Set all scalars that are either NaN, positive or negative infinity to the
+     * respective ersatz value provided by the {@code nanSurrogate},
+     * {@code posInfSurrogate} and {@code negInfSurrogate} arguments.
+     * 
+     * @param nanSurrogate
+     *            the substitution value to use for NaN values
+     * @param posInfSurrogate
+     *            the substitution value to use for positive infinity values
+     * @param negInfSurrogate
+     *            the substitution value to use for negative infinity values
+     * @return this {@code DoubleList}
+     */
+    DoubleList sanitizeNonFinite(double nanSurrogate, double posInfSurrogate, double negInfSurrogate);
 }

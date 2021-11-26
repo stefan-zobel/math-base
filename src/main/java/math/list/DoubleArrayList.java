@@ -1738,6 +1738,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         }
 
         @Override
+        public DoubleList sanitizeNonFinite(double nanSurrogate, double posInfSurrogate, double negInfSurrogate) {
+            DoubleArrayList.sanitize(size, offset, root.elementData, nanSurrogate, posInfSurrogate, negInfSurrogate);
+            return this;
+        }
+
+        @Override
         public String toString() {
             StringBuilder buf = new StringBuilder();
             final double[] es = root.elementData;
@@ -2169,6 +2175,26 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return b[mid];
     }
 
+    static void sanitize(int length, int aoff, double[] a, double nanSurrogate, double posInfSurrogate,
+            double negInfSurrogate) {
+        boolean subNan = (nanSurrogate == nanSurrogate); // "lgtm[java/comparison-of-identical-expressions]"
+        boolean subPInf = (posInfSurrogate != Double.POSITIVE_INFINITY);
+        boolean subNInf = (negInfSurrogate != Double.NEGATIVE_INFINITY);
+        if (!subNan && !subPInf && !subNInf) {
+            return;
+        }
+        for (int i = aoff; i < aoff + length; ++i) {
+            double x = a[i];
+            if (x != x && subNan) { // "lgtm[java/comparison-of-identical-expressions]"
+                a[i] = nanSurrogate;
+            } else if (x == Double.POSITIVE_INFINITY && subPInf) {
+                a[i] = posInfSurrogate;
+            } else if (x == Double.NEGATIVE_INFINITY && subNInf) {
+                a[i] = negInfSurrogate;
+            }
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -2263,6 +2289,15 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         for (int i = 0; i < length; ++i) {
             a[i] *= b[boff + i];
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList sanitizeNonFinite(double nanSurrogate, double posInfSurrogate, double negInfSurrogate) {
+        sanitize(size, 0, elementData, nanSurrogate, posInfSurrogate, negInfSurrogate);
+        return this;
     }
 
     @Override
