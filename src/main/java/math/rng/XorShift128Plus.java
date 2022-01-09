@@ -65,7 +65,7 @@ public class XorShift128Plus extends AbstractRng64 {
     public final long nextLong() {
         long s0 = x1;
         long s1 = x0;
-        long s = x0 + x1;
+        long s = s1 + s0;
         s1 ^= (s1 << 23);
         x1 = s1 ^ s0 ^ (s1 >>> 18) ^ (s0 >>> 5);
         x0 = s0;
