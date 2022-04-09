@@ -437,7 +437,7 @@ public interface PseudoRandomStream {
      *             if {@code numeratorDF} is less than one, or
      *             {@code denominatorDF} is less than one
      */
-    DoubleStream fisherF(int numeratorDF, int denominatorDF);
+//    DoubleStream fisherF(int numeratorDF, int denominatorDF);
 
     /**
      * Returns a stream producing the given {@code streamSize} number of
@@ -458,7 +458,7 @@ public interface PseudoRandomStream {
      *             {@code numeratorDF} is less than one, or
      *             {@code denominatorDF} is less than one
      */
-    DoubleStream fisherF(long streamSize, int numeratorDF, int denominatorDF);
+//    DoubleStream fisherF(long streamSize, int numeratorDF, int denominatorDF);
 
     /**
      * Returns an effectively unlimited stream of pseudorandomly chosen

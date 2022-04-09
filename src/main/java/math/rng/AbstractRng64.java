@@ -322,16 +322,16 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return doubleStream(new ChiSquareSpliterator(this, 0L, streamSize, degreesOfFreedom));
     }
 
-    @Override
-    public DoubleStream fisherF(int numeratorDF, int denominatorDF) {
-        return doubleStream(new FisherFSpliterator(this, 0L, Long.MAX_VALUE, numeratorDF, denominatorDF));
-    }
+//    @Override
+//    public DoubleStream fisherF(int numeratorDF, int denominatorDF) {
+//        return doubleStream(new FisherFSpliterator(this, 0L, Long.MAX_VALUE, numeratorDF, denominatorDF));
+//    }
 
-    @Override
-    public DoubleStream fisherF(long streamSize, int numeratorDF, int denominatorDF) {
-        checkStreamSize(streamSize);
-        return doubleStream(new FisherFSpliterator(this, 0L, streamSize, numeratorDF, denominatorDF));
-    }
+//    @Override
+//    public DoubleStream fisherF(long streamSize, int numeratorDF, int denominatorDF) {
+//        checkStreamSize(streamSize);
+//        return doubleStream(new FisherFSpliterator(this, 0L, streamSize, numeratorDF, denominatorDF));
+//    }
 
     @Override
     public DoubleStream logNormal(double mu, double sigma) {
