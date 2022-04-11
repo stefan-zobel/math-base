@@ -27,11 +27,10 @@ import java.util.ConcurrentModificationException;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Spliterator;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleConsumer;
 
 import math.fun.DForEachIterator;
-import math.rng.DefaultRng;
-import math.rng.PseudoRandom;
 
 /**
  * Resizable primitive double[] array implementation. This is essentially a
@@ -174,9 +173,10 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     public static DoubleArrayList uniformRandom(double min, double max, int size) {
         double[] values = new double[size];
-        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
+        double spread = max - min;
         for (int i = 0; i < values.length; ++i) {
-            values[i] = rng.nextDouble(min, max);
+            values[i] = min + spread * rng.nextDouble();
         }
         return new DoubleArrayList(values, false);
     }
@@ -200,9 +200,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
         }
         double[] values = new double[size];
-        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
         for (int i = 0; i < values.length; ++i) {
-            values[i] = rng.nextGaussian(mu, sigma);
+            values[i] = mu + sigma * rng.nextGaussian();
         }
         return new DoubleArrayList(values, false);
     }
