@@ -171,7 +171,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      *            length of the list
      * @return a random list of length {@code size}
      */
-    public static DoubleArrayList uniformRandom(double min, double max, int size) {
+    public static DoubleArrayList randomUniform(double min, double max, int size) {
         double[] values = new double[size];
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         double spread = max - min;
@@ -195,7 +195,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      *            length of the list
      * @return a random list of length {@code size}
      */
-    public static DoubleArrayList uniformNormal(double mu, double sigma, int size) {
+    public static DoubleArrayList randomNormal(double mu, double sigma, int size) {
         if (sigma <= 0.0) {
             throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
         }

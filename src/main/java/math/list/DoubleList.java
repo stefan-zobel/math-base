@@ -196,8 +196,8 @@ public interface DoubleList {
      *            length of the list
      * @return a random list of length {@code size}
      */
-    static DoubleList uniformRandom(double min, double max, int size) {
-        return DoubleArrayList.uniformRandom(min, max, size);
+    static DoubleList randomUniform(double min, double max, int size) {
+        return DoubleArrayList.randomUniform(min, max, size);
     }
 
     /**
@@ -214,8 +214,8 @@ public interface DoubleList {
      *            length of the list
      * @return a random list of length {@code size}
      */
-    static DoubleList uniformNormal(double mu, double sigma, int size) {
-        return DoubleArrayList.uniformNormal(mu, sigma, size);
+    static DoubleList randomNormal(double mu, double sigma, int size) {
+        return DoubleArrayList.randomNormal(mu, sigma, size);
     }
 
     /**
