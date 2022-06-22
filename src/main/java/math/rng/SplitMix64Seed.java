@@ -17,10 +17,10 @@ package math.rng;
 
 /**
  * The splitmix64() generator (here only used for seed generation) which is
- * based on <a href="http://gee.cs.oswego.edu/dl/papers/oopsla14.pdf">Guy Steele,
- * Doug Lea, Christine Flood (2014)</a> and has been included in Java 8 as
- * {@link java.util.SplittableRandom} (this implementation uses a mixing
- * function which is different from that used in {@code SplittableRandom}.
+ * based on <a href="http://gee.cs.oswego.edu/dl/papers/oopsla14.pdf">Guy
+ * Steele, Doug Lea, Christine Flood (2014)</a> and has been included in Java 8
+ * as {@link java.util.SplittableRandom} (this implementation uses a mixing
+ * function which is different from the one used in {@code SplittableRandom}.
  */
 public final class SplitMix64Seed {
 
