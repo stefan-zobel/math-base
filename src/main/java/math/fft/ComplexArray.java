@@ -15,6 +15,8 @@
  */
 package math.fft;
 
+import math.MathConsts;
+
 /**
  * For computations with arrays of complex numbers.
  * <p>
@@ -22,10 +24,7 @@ package math.fft;
  */
 public final class ComplexArray {
 
-    /** The IEEE 754 machine epsilon from Cephes: {@code (2^-53)} */
-    private static final double MACH_EPS = 1.11022302462515654042e-16;
-    static final double TOL = 5.0 * MACH_EPS;
-    private static final double TWO_PI = 2.0 * Math.PI;
+    static final double TOL = 5.0 * MathConsts.MACH_EPS_DBL;
 
     private final double[] re;
     private final double[] im;
@@ -80,7 +79,7 @@ public final class ComplexArray {
         double[] cos = new double[N];
         double[] sin = new double[N];
         for (int i = 0; i < N; ++i) {
-            double angle = (sign * TWO_PI * i) / N;
+            double angle = (sign * MathConsts.TWO_PI * i) / N;
             cos[i] = Math.cos(angle);
             sin[i] = Math.sin(angle);
         }

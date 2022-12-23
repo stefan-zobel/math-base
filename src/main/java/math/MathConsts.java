@@ -47,6 +47,9 @@ public final class MathConsts {
     /** The value of {@code Math.PI * Math.PI} (9.869604401089358) */
     public static final double PI_SQUARED = Math.PI * Math.PI;
 
+    /** The value of {@code 2 * Math.PI} (6.283185307179586) */
+    public static final double TWO_PI = 2.0 * Math.PI;
+
     /** The value of {@code ln(PI)} */
     public static final double LN_PI = 1.14472988584940017414; /* ln(PI) */
 
