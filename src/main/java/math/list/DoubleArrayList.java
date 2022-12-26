@@ -1652,8 +1652,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             double iqr = q3 - q1;
             double lowerF = q1 - 1.5 * iqr;
             double upperF = q3 + 1.5 * iqr;
-            lowerF = Math.max(min(), lowerF);
-            upperF = Math.min(max(), upperF);
+            double[] minmax = minmax(size, offset, root.elementData);
+            lowerF = Math.max(minmax[0], lowerF);
+            upperF = Math.min(minmax[1], upperF);
             return new double[] { lowerF, upperF };
         }
 
@@ -2247,6 +2248,17 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return min;
     }
 
+    static double[] minmax(int length, int aoff, double[] a) {
+        double min = a[aoff];
+        double max = min;
+        for (int i = aoff + 1; i < aoff + length; ++i) {
+            double x = a[i];
+            min = Math.min(min, x);
+            max = Math.max(max, x);
+        }
+        return new double[] { min, max };
+    }
+
     static double avg(int length, int aoff, double[] a) {
         return sum(length, aoff, a) / length;
     }
@@ -2379,8 +2391,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         double iqr = q3 - q1;
         double lowerF = q1 - 1.5 * iqr;
         double upperF = q3 + 1.5 * iqr;
-        lowerF = Math.max(min(), lowerF);
-        upperF = Math.min(max(), upperF);
+        double[] minmax = minmax(size, 0, elementData);
+        lowerF = Math.max(minmax[0], lowerF);
+        upperF = Math.min(minmax[1], upperF);
         return new double[] { lowerF, upperF };
     }
 
