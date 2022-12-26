@@ -708,6 +708,19 @@ public interface DoubleList {
     double upperQuartile();
 
     /**
+     * Obtain the upper and lower limits from which to check for outliers
+     * (calculated based on the 1.5 IQR value) if this list has at least two
+     * elements, otherwise throws {@code IllegalArgumentException}. The limits
+     * are truncated at the lowest (largest) observed data point in this list
+     * respectively.
+     * 
+     * @return the lower (at index 0) and upper (at index 1) limit for outliers
+     * @throws java.lang.IllegalArgumentException
+     *             if this list has less than two elements
+     */
+    double[] getOutlierFences();
+
+    /**
      * Returns the sum of the elements in this list.
      * 
      * @return the sum of the elements in this list

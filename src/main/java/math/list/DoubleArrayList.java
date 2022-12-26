@@ -1645,6 +1645,21 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return q3 - DoubleArrayList.median(size, offset, root.elementData);
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public double[] getOutlierFences() {
+            double q1 = lowerQuartile();
+            double q3 = upperQuartile();
+            double iqr = iqr();
+            double lowerF = q1 - 1.5 * iqr;
+            double upperF = q3 + 1.5 * iqr;
+            lowerF = Math.max(min(), lowerF);
+            upperF = Math.min(max(), upperF);
+            return new double[] { lowerF, upperF };
+        }
+
         @Override
         public double lowerQuartile() {
             int length = checkLength(size());
@@ -2355,6 +2370,21 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             q3 = median(size, size + 1, elementData);
         }
         return q3 - median(size, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double[] getOutlierFences() {
+        double q1 = lowerQuartile();
+        double q3 = upperQuartile();
+        double iqr = iqr();
+        double lowerF = q1 - 1.5 * iqr;
+        double upperF = q3 + 1.5 * iqr;
+        lowerF = Math.max(min(), lowerF);
+        upperF = Math.min(max(), upperF);
+        return new double[] { lowerF, upperF };
     }
 
     /**
