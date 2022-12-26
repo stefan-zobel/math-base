@@ -1646,6 +1646,29 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         }
 
         @Override
+        public double lowerQuartile() {
+            int length = checkLength(size());
+            if (length == 2) {
+                return get(0);
+            }
+            return DoubleArrayList.median(length / 2, offset, root.elementData);
+        }
+
+        @Override
+        public double upperQuartile() {
+            int length = checkLength(size());
+            if (length == 2) {
+                return get(1);
+            }
+            int size = length / 2;
+            if (length % 2 == 0) {
+                return DoubleArrayList.median(size, offset + size, root.elementData);
+            } else {
+                return DoubleArrayList.median(size, offset + size + 1, root.elementData);
+            }
+        }
+
+        @Override
         public double sum() {
             return DoubleArrayList.sum(size, offset, root.elementData);
         }
@@ -2332,6 +2355,35 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             q3 = median(size, size + 1, elementData);
         }
         return q3 - median(size, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double lowerQuartile() {
+        int length = checkLength(size());
+        if (length == 2) {
+            return get(0);
+        }
+        return median(length / 2, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double upperQuartile() {
+        int length = checkLength(size());
+        if (length == 2) {
+            return get(1);
+        }
+        int size = length / 2;
+        if (length % 2 == 0) {
+            return median(size, size, elementData);
+        } else {
+            return median(size, size + 1, elementData);
+        }
     }
 
     /**

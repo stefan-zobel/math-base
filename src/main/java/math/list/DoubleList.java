@@ -686,6 +686,28 @@ public interface DoubleList {
     double median();
 
     /**
+     * Returns the <a href="https://en.wikipedia.org/wiki/Quartile">first
+     * quartile</a> of the elements in this list if this list has at least two
+     * elements, otherwise throws {@code IllegalArgumentException}.
+     * 
+     * @return the first quartile (25th quantile) of the elements in this list
+     * @throws java.lang.IllegalArgumentException
+     *             if this list has less than two elements
+     */
+    double lowerQuartile();
+
+    /**
+     * Returns the <a href="https://en.wikipedia.org/wiki/Quartile">third
+     * quartile</a> of the elements in this list if this list has at least two
+     * elements, otherwise throws {@code IllegalArgumentException}.
+     * 
+     * @return the third quartile (75th quantile) of the elements in this list
+     * @throws java.lang.IllegalArgumentException
+     *             if this list has less than two elements
+     */
+    double upperQuartile();
+
+    /**
      * Returns the sum of the elements in this list.
      * 
      * @return the sum of the elements in this list
