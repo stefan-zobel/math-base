@@ -1645,9 +1645,6 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return q3 - DoubleArrayList.median(size, offset, root.elementData);
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public double[] getOutlierFences() {
             double q1 = lowerQuartile();
