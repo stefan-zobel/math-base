@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Stefan Zobel
+ * Copyright 2021, 2022 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -650,6 +650,18 @@ public interface DoubleList {
      *             if this list has less than two elements
      */
     double stddev();
+
+    /**
+     * Returns the
+     * <a href="https://en.wikipedia.org/wiki/Interquartile_range">interquartile
+     * range (IQR)</a> of the elements in this list if this list has at least
+     * two elements, otherwise throws {@code IllegalArgumentException}.
+     * 
+     * @return the interquartile range of the elements in this list
+     * @throws java.lang.IllegalArgumentException
+     *             if this list has less than two elements
+     */
+    double iqr();
 
     /**
      * Returns the median value of the elements in this list if this list has at

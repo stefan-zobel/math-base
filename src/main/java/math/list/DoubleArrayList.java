@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Stefan Zobel
+ * Copyright 2021, 2022 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1617,6 +1617,22 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         }
 
         @Override
+        public double iqr() {
+            int length = checkLength(size());
+            if (length == 2) {
+                return get(1) - get(0);
+            }
+            int size = length / 2;
+            double q3;
+            if (length % 2 == 0) {
+                q3 = DoubleArrayList.median(size, offset + size, root.elementData);
+            } else {
+                q3 = DoubleArrayList.median(size, offset + size + 1, root.elementData);
+            }
+            return q3 - DoubleArrayList.median(size, offset, root.elementData);
+        }
+
+        @Override
         public double sum() {
             return DoubleArrayList.sum(size, offset, root.elementData);
         }
@@ -1982,10 +1998,15 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return sum;
     }
 
-    static double stddev(int length, int aoff, double[] a) {
+    static int checkLength(int length) {
         if (length < 2) {
             throw new IllegalArgumentException("length is : " + length);
         }
+        return length;
+    }
+
+    static double stddev(int length, int aoff, double[] a) {
+        length = checkLength(length);
         double sum = 0.0;
         double sumSqr = 0.0;
         for (int i = aoff; i < aoff + length; ++i) {
@@ -2183,14 +2204,14 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     }
 
     static double median(int length, int aoff, double[] a) {
+        if (length == 1) {
+            return a[aoff];
+        }
         double[] b = new double[length];
         System.arraycopy(a, aoff, b, 0, length);
         Arrays.sort(b);
         int len = b.length;
-        if (len == 1) {
-            return b[0];
-        }
-        int mid = b.length / 2;
+        int mid = len / 2;
         if (len % 2 == 0) {
             return (b[mid - 1] + b[mid]) / 2.0;
         }
@@ -2267,6 +2288,25 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             throw new NoSuchElementException();
         }
         return median(size, 0, elementData);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double iqr() {
+        int length = checkLength(size());
+        if (length == 2) {
+            return get(1) - get(0);
+        }
+        int size = length / 2;
+        double q3;
+        if (length % 2 == 0) {
+            q3 = median(size, size, elementData);
+        } else {
+            q3 = median(size, size + 1, elementData);
+        }
+        return q3 - median(size, 0, elementData);
     }
 
     /**
