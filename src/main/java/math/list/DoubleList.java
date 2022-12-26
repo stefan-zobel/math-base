@@ -934,4 +934,13 @@ public interface DoubleList {
      * @return this {@code DoubleList}
      */
     DoubleList sanitizeNonFinite(double nanSurrogate, double posInfSurrogate, double negInfSurrogate);
+
+    /**
+     * Randomly permutes the elements in this list in place using a default
+     * source of randomness. All permutations occur with approximately equal
+     * probability.
+     * 
+     * @return this list with elements randomly permuted
+     */
+    DoubleList shuffle();
 }

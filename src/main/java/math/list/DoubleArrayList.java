@@ -736,6 +736,15 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      * {@inheritDoc}
      */
     @Override
+    public DoubleList shuffle() {
+        shuffle(size, 0, elementData);
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public boolean removeAll(DoubleList c) {
         return batchRemove(c, false, 0, size);
     }
@@ -1248,6 +1257,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         public DoubleList filter(DoublePredicate predicate) {
             return DoubleArrayList.filter(size, offset, root.elementData, predicate);
+        }
+
+        public DoubleList shuffle() {
+            DoubleArrayList.shuffle(size, offset, root.elementData);
+            return this;
         }
 
         public boolean removeAll(DoubleList c) {
@@ -2292,6 +2306,21 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         System.arraycopy(a, aoff, b, 0, length);
         Arrays.sort(b);
         return b;
+    }
+
+    static void shuffle(int length, int aoff, double[] a) {
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        for (int i = length; i > 1; --i) {
+            swap(aoff, a, i - 1, rnd.nextInt(i));
+        }
+    }
+
+    static void swap(int aoff, double[] a, int i, int j) {
+        int ii = aoff + i;
+        int jj = aoff + j;
+        double tmp = a[ii];
+        a[ii] = a[jj];
+        a[jj] = tmp;
     }
 
     static void sanitize(int length, int aoff, double[] a, double nanSurrogate, double posInfSurrogate,
