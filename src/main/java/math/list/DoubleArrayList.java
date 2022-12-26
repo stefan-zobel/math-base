@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Spliterator;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleConsumer;
+import java.util.function.DoublePredicate;
 
 import math.fun.DForEachIterator;
 
@@ -727,6 +728,14 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      * {@inheritDoc}
      */
     @Override
+    public DoubleList filter(DoublePredicate predicate) {
+        return filter(size, 0, elementData, predicate);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public boolean removeAll(DoubleList c) {
         return batchRemove(c, false, 0, size);
     }
@@ -1235,6 +1244,10 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             root.addAll(offset + index, c);
             updateSizeAndModCount(cSize);
             return true;
+        }
+
+        public DoubleList filter(DoublePredicate predicate) {
+            return DoubleArrayList.filter(size, offset, root.elementData, predicate);
         }
 
         public boolean removeAll(DoubleList c) {
@@ -2236,6 +2249,18 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 a[i] = negInfSurrogate;
             }
         }
+    }
+
+    static DoubleList filter(int length, int aoff, double[] a, DoublePredicate predicate) {
+        predicate = Objects.requireNonNull(predicate, "predicate");
+        DoubleArrayList result = new DoubleArrayList();
+        for (int i = aoff; i < aoff + length; ++i) {
+            double x = a[i];
+            if (predicate.test(x)) {
+                result.add(x);
+            }
+        }
+        return result;
     }
 
     /**

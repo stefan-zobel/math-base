@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.Spliterator;
 import java.util.function.DoubleConsumer;
+import java.util.function.DoublePredicate;
 import java.util.stream.DoubleStream;
 import java.util.stream.StreamSupport;
 
@@ -467,6 +468,17 @@ public interface DoubleList {
      * @return {@code true} if this list changed as a result of the call
      */
     boolean retainAll(DoubleList c);
+
+    /**
+     * Returns a new list consisting of the elements of this list that match the
+     * given predicate.
+     * 
+     * @param predicate
+     *            a predicate to apply to each element to determine if it should
+     *            be included
+     * @return the new list
+     */
+    DoubleList filter(DoublePredicate predicate);
 
     /**
      * Returns a list iterator over the elements in this list (in proper
