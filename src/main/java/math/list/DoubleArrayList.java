@@ -1287,6 +1287,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return Arrays.copyOfRange(root.elementData, offset, offset + size);
         }
 
+        public void sort() {
+            Arrays.sort(root.elementData, offset, offset + size);
+            checkForComodification();
+        }
+
         public boolean equals(Object o) {
             if (o == this) {
                 return true;
@@ -1843,6 +1848,19 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 }
             }
             return buf.toString();
+        }
+
+        @Override
+        public void forEach(DoubleConsumer action) {
+            Objects.requireNonNull(action);
+            final int expectedModCount = modCount;
+            final double[] es = root.elementData;
+            final int start = offset;
+            final int end = start + size;
+            for (int i = start; modCount == expectedModCount && i < end; ++i) {
+                action.accept(es[i]);
+            }
+            checkForComodification();
         }
     }
 
