@@ -1649,7 +1649,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         public double[] getOutlierFences() {
             double q1 = lowerQuartile();
             double q3 = upperQuartile();
-            double iqr = iqr();
+            double iqr = q3 - q1;
             double lowerF = q1 - 1.5 * iqr;
             double upperF = q3 + 1.5 * iqr;
             lowerF = Math.max(min(), lowerF);
@@ -2376,7 +2376,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     public double[] getOutlierFences() {
         double q1 = lowerQuartile();
         double q3 = upperQuartile();
-        double iqr = iqr();
+        double iqr = q3 - q1;
         double lowerF = q1 - 1.5 * iqr;
         double upperF = q3 + 1.5 * iqr;
         lowerF = Math.max(min(), lowerF);
