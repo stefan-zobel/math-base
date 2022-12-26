@@ -1632,17 +1632,18 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public double iqr() {
             int length = checkLength(size());
+            double[] sorted = DoubleArrayList.sorted(length, offset, root.elementData);
             if (length == 2) {
-                return get(1) - get(0);
+                return sorted[1] - sorted[0];
             }
             int size = length / 2;
             double q3;
             if (length % 2 == 0) {
-                q3 = DoubleArrayList.median(size, offset + size, root.elementData);
+                q3 = DoubleArrayList.medianOnSorted(size, size, sorted);
             } else {
-                q3 = DoubleArrayList.median(size, offset + size + 1, root.elementData);
+                q3 = DoubleArrayList.medianOnSorted(size, size + 1, sorted);
             }
-            return q3 - DoubleArrayList.median(size, offset, root.elementData);
+            return q3 - DoubleArrayList.medianOnSorted(size, 0, sorted);
         }
 
         @Override
@@ -1661,23 +1662,25 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public double lowerQuartile() {
             int length = checkLength(size());
+            double[] sorted = sorted(length, offset, root.elementData);
             if (length == 2) {
-                return get(0);
+                return sorted[0];
             }
-            return DoubleArrayList.median(length / 2, offset, root.elementData);
+            return DoubleArrayList.medianOnSorted(length / 2, 0, sorted);
         }
 
         @Override
         public double upperQuartile() {
             int length = checkLength(size());
+            double[] sorted = sorted(length, offset, root.elementData);
             if (length == 2) {
-                return get(1);
+                return sorted[1];
             }
             int size = length / 2;
             if (length % 2 == 0) {
-                return DoubleArrayList.median(size, offset + size, root.elementData);
+                return DoubleArrayList.medianOnSorted(size, size, sorted);
             } else {
-                return DoubleArrayList.median(size, offset + size + 1, root.elementData);
+                return DoubleArrayList.medianOnSorted(size, size + 1, sorted);
             }
         }
 
@@ -2270,12 +2273,25 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         double[] b = new double[length];
         System.arraycopy(a, aoff, b, 0, length);
         Arrays.sort(b);
-        int len = b.length;
-        int mid = len / 2;
-        if (len % 2 == 0) {
-            return (b[mid - 1] + b[mid]) / 2.0;
+        return medianOnSorted(length, aoff, a);
+    }
+
+    static double medianOnSorted(int length, int aoff, double[] a) {
+        if (length == 1) {
+            return a[aoff];
         }
-        return b[mid];
+        int mid = aoff + length / 2;
+        if (length % 2 == 0) {
+            return (a[mid - 1] + a[mid]) / 2.0;
+        }
+        return a[mid];
+    }
+
+    static double[] sorted(int length, int aoff, double[] a) {
+        double[] b = new double[length];
+        System.arraycopy(a, aoff, b, 0, length);
+        Arrays.sort(b);
+        return b;
     }
 
     static void sanitize(int length, int aoff, double[] a, double nanSurrogate, double posInfSurrogate,
@@ -2368,17 +2384,18 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double iqr() {
         int length = checkLength(size());
+        double[] sorted = sorted(length, 0, elementData);
         if (length == 2) {
-            return get(1) - get(0);
+            return sorted[1] - sorted[0];
         }
         int size = length / 2;
         double q3;
         if (length % 2 == 0) {
-            q3 = median(size, size, elementData);
+            q3 = medianOnSorted(size, size, sorted);
         } else {
-            q3 = median(size, size + 1, elementData);
+            q3 = medianOnSorted(size, size + 1, sorted);
         }
-        return q3 - median(size, 0, elementData);
+        return q3 - medianOnSorted(size, 0, sorted);
     }
 
     /**
@@ -2403,10 +2420,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double lowerQuartile() {
         int length = checkLength(size());
+        double[] sorted = sorted(length, 0, elementData);
         if (length == 2) {
-            return get(0);
+            return sorted[0];
         }
-        return median(length / 2, 0, elementData);
+        return medianOnSorted(length / 2, 0, sorted);
     }
 
     /**
@@ -2415,14 +2433,15 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double upperQuartile() {
         int length = checkLength(size());
+        double[] sorted = sorted(length, 0, elementData);
         if (length == 2) {
-            return get(1);
+            return sorted[1];
         }
         int size = length / 2;
         if (length % 2 == 0) {
-            return median(size, size, elementData);
+            return medianOnSorted(size, size, sorted);
         } else {
-            return median(size, size + 1, elementData);
+            return medianOnSorted(size, size + 1, sorted);
         }
     }
 
