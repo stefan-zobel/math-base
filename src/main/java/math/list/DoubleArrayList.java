@@ -1650,7 +1650,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public double iqr() {
-            int length = checkLength(size());
+            int length = checkLengthGeq2(size());
             double[] sorted = DoubleArrayList.sorted(length, offset, root.elementData);
             if (length == 2) {
                 return sorted[1] - sorted[0];
@@ -1680,7 +1680,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public double lowerQuartile() {
-            int length = checkLength(size());
+            int length = checkLengthGeq2(size());
             double[] sorted = sorted(length, offset, root.elementData);
             if (length == 2) {
                 return sorted[0];
@@ -1690,7 +1690,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public double upperQuartile() {
-            int length = checkLength(size());
+            int length = checkLengthGeq2(size());
             double[] sorted = sorted(length, offset, root.elementData);
             if (length == 2) {
                 return sorted[1];
@@ -2082,7 +2082,8 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return sum;
     }
 
-    static int checkLength(int length) {
+    /* check for list length greater or equal 2 */
+    static int checkLengthGeq2(int length) {
         if (length < 2) {
             throw new IllegalArgumentException("length is : " + length);
         }
@@ -2090,7 +2091,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     }
 
     static double stddev(int length, int aoff, double[] a) {
-        length = checkLength(length);
+        length = checkLengthGeq2(length);
         double sum = 0.0;
         double sumSqr = 0.0;
         for (int i = aoff; i < aoff + length; ++i) {
@@ -2427,7 +2428,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double iqr() {
-        int length = checkLength(size());
+        int length = checkLengthGeq2(size());
         double[] sorted = sorted(length, 0, elementData);
         if (length == 2) {
             return sorted[1] - sorted[0];
@@ -2463,7 +2464,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double lowerQuartile() {
-        int length = checkLength(size());
+        int length = checkLengthGeq2(size());
         double[] sorted = sorted(length, 0, elementData);
         if (length == 2) {
             return sorted[0];
@@ -2476,7 +2477,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double upperQuartile() {
-        int length = checkLength(size());
+        int length = checkLengthGeq2(size());
         double[] sorted = sorted(length, 0, elementData);
         if (length == 2) {
             return sorted[1];
