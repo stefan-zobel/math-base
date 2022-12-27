@@ -2302,10 +2302,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         if (length == 1) {
             return a[aoff];
         }
-        double[] b = new double[length];
-        System.arraycopy(a, aoff, b, 0, length);
-        Arrays.sort(b);
-        return medianOnSorted(length, aoff, a);
+        return medianOnSorted(length, aoff, sorted(length, aoff, a));
     }
 
     static double medianOnSorted(int length, int aoff, double[] a) {
