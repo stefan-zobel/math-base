@@ -1667,8 +1667,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public double[] getOutlierFences() {
-            double q1 = lowerQuartile();
-            double q3 = upperQuartile();
+            double[] sorted = sorted(checkLengthGeq2(size()), offset, root.elementData);
+            double q1 = lowerQuartile(sorted);
+            double q3 = upperQuartile(sorted);
             double iqr = q3 - q1;
             double lowerF = q1 - 1.5 * iqr;
             double upperF = q3 + 1.5 * iqr;
@@ -1680,8 +1681,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public double lowerQuartile() {
-            int length = checkLengthGeq2(size());
-            double[] sorted = sorted(length, offset, root.elementData);
+            return lowerQuartile(sorted(checkLengthGeq2(size()), offset, root.elementData));
+        }
+
+        private double lowerQuartile(double[] sorted) {
+            int length = sorted.length;
             if (length == 2) {
                 return sorted[0];
             }
@@ -1690,8 +1694,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public double upperQuartile() {
-            int length = checkLengthGeq2(size());
-            double[] sorted = sorted(length, offset, root.elementData);
+            return upperQuartile(sorted(checkLengthGeq2(size()), offset, root.elementData));
+        }
+
+        private double upperQuartile(double[] sorted) {
+            int length = sorted.length;
             if (length == 2) {
                 return sorted[1];
             }
@@ -2448,8 +2455,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double[] getOutlierFences() {
-        double q1 = lowerQuartile();
-        double q3 = upperQuartile();
+        double[] sorted = sorted(checkLengthGeq2(size()), 0, elementData);
+        double q1 = lowerQuartile(sorted);
+        double q3 = upperQuartile(sorted);
         double iqr = q3 - q1;
         double lowerF = q1 - 1.5 * iqr;
         double upperF = q3 + 1.5 * iqr;
@@ -2464,8 +2472,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double lowerQuartile() {
-        int length = checkLengthGeq2(size());
-        double[] sorted = sorted(length, 0, elementData);
+        return lowerQuartile(sorted(checkLengthGeq2(size()), 0, elementData));
+    }
+
+    private double lowerQuartile(double[] sorted) {
+        int length = sorted.length;
         if (length == 2) {
             return sorted[0];
         }
@@ -2477,8 +2488,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double upperQuartile() {
-        int length = checkLengthGeq2(size());
-        double[] sorted = sorted(length, 0, elementData);
+        return upperQuartile(sorted(checkLengthGeq2(size()), 0, elementData));
+    }
+
+    private double upperQuartile(double[] sorted) {
+        int length = sorted.length;
         if (length == 2) {
             return sorted[1];
         }
