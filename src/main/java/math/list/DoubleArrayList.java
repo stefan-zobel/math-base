@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2022 Stefan Zobel
+ * Copyright 2021, 2023 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1810,9 +1810,29 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return this;
         }
 
+        @Override
+        public DoubleList minusn(DoubleList list) {
+            int length = Math.min(size, Objects.requireNonNull(list, "list").size());
+            minusn(length, offset, root.elementData, list.offset(), list.getArrayUnsafe());
+            return this;
+        }
+
+        @Override
+        public DoubleList minusn(double[] array) {
+            int length = Math.min(size, Objects.requireNonNull(array, "array").length);
+            minusn(length, offset, root.elementData, 0, array);
+            return this;
+        }
+
         private static void plusn(int length, int aoff, double[] a, int boff, double[] b) {
             for (int i = 0; i < length; ++i) {
                 a[aoff + i] += b[boff + i];
+            }
+        }
+
+        private static void minusn(int length, int aoff, double[] a, int boff, double[] b) {
+            for (int i = 0; i < length; ++i) {
+                a[aoff + i] -= b[boff + i];
             }
         }
 
@@ -2524,9 +2544,35 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList minusn(DoubleList list) {
+        int length = Math.min(size, Objects.requireNonNull(list, "list").size());
+        minusn(length, elementData, list.offset(), list.getArrayUnsafe());
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList minusn(double[] array) {
+        int length = Math.min(size, Objects.requireNonNull(array, "array").length);
+        minusn(length, elementData, 0, array);
+        return this;
+    }
+
     private static void plusn(int length, double[] a, int boff, double[] b) {
         for (int i = 0; i < length; ++i) {
             a[i] += b[boff + i];
+        }
+    }
+
+    private static void minusn(int length, double[] a, int boff, double[] b) {
+        for (int i = 0; i < length; ++i) {
+            a[i] -= b[boff + i];
         }
     }
 

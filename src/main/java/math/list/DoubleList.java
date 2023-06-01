@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2022 Stefan Zobel
+ * Copyright 2021, 2023 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -877,6 +877,30 @@ public interface DoubleList {
      * @return this {@code DoubleList}
      */
     DoubleList plusn(double[] array);
+
+    /**
+     * Subtracts the scalars in the given {@code list} from the elements in this
+     * list. Note that {@code list} doesn't have to have the same
+     * {@link #size()} as this list as the minimum of both list sizes is used to
+     * determine the number of scalars to subtract.
+     * 
+     * @param list
+     *            a DoubleList of scalars to subtract from this list
+     * @return this {@code DoubleList}
+     */
+    DoubleList minusn(DoubleList list);
+
+    /**
+     * Subtracts the scalars in the given {@code array} from the elements in
+     * this list. Note that {@code array} doesn't have to have the same length
+     * as this list as the minimum of both lengths is used to determine the
+     * number of scalars to subtract.
+     * 
+     * @param array
+     *            an array of scalars to subtract from this list
+     * @return this {@code DoubleList}
+     */
+    DoubleList minusn(double[] array);
 
     /**
      * Multiplies the scalars from this list by the scalars from the given
