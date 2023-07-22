@@ -20,5 +20,5 @@ package math.fun;
  * arrays.
  */
 public interface DiffDMultiFunction extends DMultiFunction,
-        Gradient {
+        DGradient {
 }

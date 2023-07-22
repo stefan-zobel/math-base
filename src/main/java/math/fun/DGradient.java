@@ -19,7 +19,7 @@ package math.fun;
  * Interface for the gradient of once-differentiable double-valued functions
  * over double[] arrays.
  */
-public interface Gradient {
+public interface DGradient {
     /**
      * The first-derivative vector (a.k.a. gradient) of a double-valued function
      * over a double[] array evaluated at the input location {@code x} gets
