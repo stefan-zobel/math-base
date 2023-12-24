@@ -41,6 +41,9 @@ public final class MathConsts {
     /** The value of {@code sqrt(PI/2)} */
     public static final double SQRT_PI_HALF = 1.2533141373155001e0;
 
+    /** The value of {@code sqrt(2/PI)} */
+    public static final double SQRT_TWO_BY_PI = 0.7978845608028654;
+
     /** The value of {@code sqrt(2)/2} */
     public static final double SQRT_TWO_HALF = 7.07106781186547524401e-1;
 
