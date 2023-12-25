@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2023 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,9 @@ public class Normal implements ContinuousDistribution {
     /** Mean of this distribution */
     private final double mean;
 
+    /** Standard deviation of this distribution */
+    private final double stdDev;
+
     /** Variance of this distribution */
     private final double variance;
 
@@ -41,6 +44,7 @@ public class Normal implements ContinuousDistribution {
             throw new IllegalArgumentException("Standard deviation must be positive (" + stdDev + ")");
         }
         this.mean = mean;
+        this.stdDev = stdDev;
         this.variance = stdDev * stdDev;
         this.factor = (1.0 / (this.variance * SQRT_TWO_PI));
     }
@@ -64,7 +68,7 @@ public class Normal implements ContinuousDistribution {
         if (probability >= 1.0) {
             return Double.POSITIVE_INFINITY;
         }
-        return findRoot(probability, mean(), -Double.MAX_VALUE, Double.MAX_VALUE);
+        return mean + stdDev * ProbabilityFuncs.normalInverse(probability);
     }
 
     @Override
