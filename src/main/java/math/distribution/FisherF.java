@@ -17,6 +17,9 @@ package math.distribution;
 
 /**
  * Snedecor's F distribution.
+ * <p>
+ * <b>See</b> <a href="https://en.wikipedia.org/wiki/F-distribution">Wikipedia
+ * F-distribution</a>.
  */
 public class FisherF implements ContinuousDistribution {
 

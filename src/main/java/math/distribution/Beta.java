@@ -21,6 +21,10 @@ import static math.cern.FastGamma.logGamma;
 
 /**
  * The Beta distribution.
+ * <p>
+ * <b>See</b>
+ * <a href="https://en.wikipedia.org/wiki/Beta_distribution">Wikipedia Beta
+ * distribution</a>.
  */
 public class Beta implements ContinuousDistribution {
 

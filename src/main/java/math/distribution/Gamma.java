@@ -19,7 +19,25 @@ import math.cern.FastGamma;
 import math.cern.ProbabilityFuncs;
 
 /**
- * The &Gamma;(x; k, &theta;) distribution for x &gt;= 0.
+ * The &Gamma;(x; k, &theta;) distribution for x &gt;= 0 with PDF:
+ * <p>
+ * <tt>f(x; k, &theta;) = (x^(k-1) * e^(-x/&theta;)) / (&theta;^k * &Gamma;(k)) </tt>
+ * where <tt>&Gamma;()</tt> is the Gamma function.
+ * <p>
+ * Valid parameter ranges: <tt>k &gt; 0</tt>, <tt>&theta;  &gt; 0</tt>,
+ * <tt>x &gt;= 0</tt>.
+ * <p>
+ * Note: For a Gamma distribution to have the mean <tt>E(X)</tt> and variance
+ * <tt>Var(X)</tt>, set the parameters as follows:
+ * 
+ * <pre>
+ * k = E(X) * E(X) / Var(X)
+ * &theta; = Var(X) / E(X)
+ * </pre>
+ * <p>
+ * <b>See</b>
+ * <a href="https://en.wikipedia.org/wiki/Gamma_distribution">Wikipedia Gamma
+ * distribution</a>.
  */
 public class Gamma implements ContinuousDistribution {
 
