@@ -20,6 +20,26 @@ import static math.MathConsts.SQRT_TWO_PI;
 
 /**
  * Normal (a.k.a Gaussian) distribution.
+ * 
+ * <pre>
+ *                 1                       2
+ *    pdf(x) = -----------   exp( - (x-mean) / 2v ) 
+ *             sqrt(2pi*v)
+ * 
+ *                            x
+ *                            -
+ *                 1         | |                 2
+ *    cdf(x) = -----------   |    exp( - (t-mean) / 2v ) dt
+ *             sqrt(2pi*v) | |
+ *                          -
+ *                         -inf.
+ * </pre>
+ * 
+ * where <tt>v = variance = standardDeviation^2</tt>.
+ * <p>
+ * <b>See</b>
+ * <a href="https://en.wikipedia.org/wiki/Normal_distribution">Wikipedia Normal
+ * distribution</a>.
  */
 public class Normal implements ContinuousDistribution {
 

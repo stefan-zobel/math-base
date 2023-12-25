@@ -20,6 +20,15 @@ import math.cern.ProbabilityFuncs;
 
 /**
  * StudentT distribution (a.k.a "T distribution").
+ * <p>
+ * <tt>p(x) = const  *  (1 + x^2/&nu;) ^ -(&nu;+1)/2</tt> where
+ * <tt>const = &Gamma;((&nu;+1)/2) / (&radic;(&Pi;*&nu;) * &Gamma;(&nu;/2))</tt>
+ * and <tt>&Gamma;(a)</tt> being the Gamma function and <tt>&nu;</tt> being the
+ * degrees of freedom.
+ * </p>
+ * <b>See</b>
+ * <a href="https://en.wikipedia.org/wiki/Student%27s_t-distribution">Wikipedia
+ * Student's t-distribution</a>.
  */
 public class StudentT implements ContinuousDistribution {
 
