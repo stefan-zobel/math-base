@@ -33,7 +33,7 @@ import math.fun.DMultiFunctionEval;
  * <code>double[] initial = getInitialGuess();</code> <br>
  * <code>DMultiFunctionEval minimum = CGOptimizer.minimize(dmf, initial);</code>
  * 
- * @author <a href="mailto:klein@cs.stanford.edu">Dan Klein</a>
+ * @author <a HREF="mailto:klein@cs.stanford.edu">Dan Klein</a>
  */
 public final class CGOptimizer {
 

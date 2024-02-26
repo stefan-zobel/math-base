@@ -11,7 +11,7 @@ package math.optim;
  * Callback interface that allows optimizer clients to perform some operation
  * after every iteration.
  * 
- * @author <a href="mailto:casutton@cs.umass.edu>casutton@cs.umass.edu</A>
+ * @author <a HREF="mailto:casutton@cs.umass.edu">casutton@cs.umass.edu</A>
  */
 public interface OptimizerEvaluator {
 

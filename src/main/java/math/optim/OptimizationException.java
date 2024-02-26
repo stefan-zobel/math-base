@@ -12,8 +12,7 @@ package math.optim;
  * optimization-specific problem. For example, an exception might be thrown when
  * the gradient is sufficiently large but no step is possible in that direction.
  * 
- * @author Jerod Weinman <a
- *         href="mailto:weinman@cs.umass.edu">weinman@cs.umass.edu</a>
+ * @author Jerod Weinman <a HREF="mailto:weinman@cs.umass.edu">weinman@cs.umass.edu</a>
  */
 public class OptimizationException extends RuntimeException {
 

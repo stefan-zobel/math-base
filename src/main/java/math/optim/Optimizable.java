@@ -9,7 +9,7 @@ package math.optim;
 
 /**
  * @author Andrew McCallum
- *         <a href="mailto:mccallum@cs.umass.edu">mccallum@cs.umass.edu</a>
+ *         <a HREF="mailto:mccallum@cs.umass.edu">mccallum@cs.umass.edu</a>
  */
 public interface Optimizable {
 

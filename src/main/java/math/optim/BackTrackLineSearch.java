@@ -18,7 +18,7 @@ import math.MatrixOps;
  * return a position of higher value.
  * 
  * @author Aron Culotta <a
- *         href="mailto:culotta@cs.umass.edu">culotta@cs.umass.edu</a>
+ *         HREF="mailto:culotta@cs.umass.edu">culotta@cs.umass.edu</a>
  */
 final class BackTrackLineSearch {
     private static final Logger logger = Logger

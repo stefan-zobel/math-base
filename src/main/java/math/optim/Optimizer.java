@@ -9,14 +9,13 @@ package math.optim;
 
 /**
  * @author Andrew McCallum
- *         <a href="mailto:mccallum@cs.umass.edu">mccallum@cs.umass.edu</a>
+ *         <a HREF="mailto:mccallum@cs.umass.edu">mccallum@cs.umass.edu</a>
  */
 public interface Optimizer {
     boolean optimize();
 
     boolean optimize(int numIterations);
 
-    /** Returns true if it has converged */
     boolean isConverged();
 
     Optimizable getOptimizable();

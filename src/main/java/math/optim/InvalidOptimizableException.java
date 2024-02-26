@@ -15,9 +15,8 @@ package math.optim;
  * causes: (a) you are computing the gradients approximately, (b) your value
  * function and gradient do not match (this can be checking using
  * 
- * @link{edu.umass.cs.mallet.base.maximize.tests.TestOptimizable.
  * 
- * @author <A HREF="mailto:casutton@cs.umass.edu>casutton@cs.umass.edu</A>
+ * @author <A HREF="mailto:casutton@cs.umass.edu">casutton@cs.umass.edu</A>
  * @version $Id: InvalidOptimizableException.java,v 1.1 2007/10/22 21:37:39
  *          mccallum Exp $
  */

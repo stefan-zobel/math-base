@@ -18,8 +18,7 @@ import math.MatrixOps;
  * "Representations of Quasi-Newton Matrices and Their Use in Limited Memory
  * Methods"
  * 
- * @author Aron Culotta <a
- *         href="mailto:culotta@cs.umass.edu">culotta@cs.umass.edu</a>
+ * @author Aron Culotta <a HREF="mailto:culotta@cs.umass.edu">culotta@cs.umass.edu</a>
  */
 public final class LimitedMemoryBFGS implements Optimizer {
 
