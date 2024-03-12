@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Stefan Zobel
+ * Copyright 2023, 2024 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,17 @@ public final class GELU {
     }
 
     /**
+     * Computes the value of the GELU function at {@code x}.
+     * 
+     * @param x
+     *            input value
+     * @return GELU value at x
+     */
+    public static float geluF(float x) {
+        return (float) gelu(x);
+    }
+
+    /**
      * Computes the derivative of the GELU function with respect to {@code x}.
      * 
      * @param x
@@ -57,6 +68,17 @@ public final class GELU {
         double x3 = x2 * x;
         double y = MathConsts.SQRT_TWO_BY_PI * (x + 0.044715 * x3);
         return 0.5 * (1.0 + Trig.tanh(y)) + 0.5 * x * Trig.sech2(y) * MathConsts.SQRT_TWO_BY_PI * (1.0 + 0.134145 * x2);
+    }
+
+    /**
+     * Computes the derivative of the GELU function with respect to {@code x}.
+     * 
+     * @param x
+     *            input value
+     * @return GELU derivative at x
+     */
+    public static float dgeluF_dx(float x) {
+        return (float) dgelu_dx(x);
     }
 
     private GELU() {
