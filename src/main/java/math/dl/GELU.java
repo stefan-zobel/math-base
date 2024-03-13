@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package math.imsl;
+package math.dl;
 
 import math.MathConsts;
+import math.imsl.Trig;
 
 /**
  * The GELU activation function in deep learning.
