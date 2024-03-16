@@ -22,7 +22,8 @@ package math.dl;
 public final class ArrayMaxPos {
 
     /**
-     * Finds the index of the largest element in the passed array slice.
+     * Finds the index of the largest element in the passed array slice (similar
+     * to numpy.argmax).
      * 
      * @param length
      *            the size of the array slice to consider
@@ -46,7 +47,8 @@ public final class ArrayMaxPos {
     }
 
     /**
-     * Finds the index of the largest element in the passed array slice.
+     * Finds the index of the largest element in the passed array slice (similar
+     * to numpy.argmax).
      * 
      * @param length
      *            the size of the array slice to consider
