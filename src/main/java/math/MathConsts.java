@@ -20,8 +20,11 @@ package math;
  */
 public final class MathConsts {
 
-    /** The IEEE 754 machine epsilon from Cephes: {@code (2^-53)} */
+    /** The IEEE 754 double precision machine epsilon from Cephes: {@code (2^-53)} */
     public static final double MACH_EPS_DBL = 1.11022302462515654042e-16;
+
+    /** The IEEE 754 single precision machine epsilon: (2^-24) */
+    public static final float MACH_EPS_FLT = 5.9604644775390625e-8f;
 
     /** 7.09782712893383996732e2 */
     public static final double MAX_LOG = 7.09782712893383996732e2;
