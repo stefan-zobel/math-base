@@ -10,7 +10,7 @@ package math;
 /**
  * A class of static utility functions for manipulating arrays of double.
  */
-public final class MatrixOps {
+public final class VectorOps {
     /**
      * Sets every element of a double array to a given value.
      * 

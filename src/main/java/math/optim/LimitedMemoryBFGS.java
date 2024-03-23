@@ -10,7 +10,7 @@ package math.optim;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import math.MatrixOps;
+import math.VectorOps;
 
 
 /**
@@ -122,7 +122,7 @@ public final class LimitedMemoryBFGS implements Optimizer {
             System.arraycopy(g, 0, oldg, 0, g.length);
             System.arraycopy(g, 0, direction, 0, g.length);
 
-            if (MatrixOps.absNormalize(direction) == 0) {
+            if (VectorOps.absNormalize(direction) == 0) {
                 logger.info("L-BFGS initial gradient is zero; saying converged");
                 g = null;
                 converged = true;
@@ -130,18 +130,18 @@ public final class LimitedMemoryBFGS implements Optimizer {
             }
 
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("direction.2norm: " + MatrixOps.twoNorm(direction));
+                logger.fine("direction.2norm: " + VectorOps.twoNorm(direction));
             }
 
-            MatrixOps
-                    .timesEquals(direction, 1.0 / MatrixOps.twoNorm(direction));
+            VectorOps
+                    .timesEquals(direction, 1.0 / VectorOps.twoNorm(direction));
 
             // make initial jump
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("before initial jump: \ndirection.2norm: "
-                        + MatrixOps.twoNorm(direction) + " \ngradient.2norm: "
-                        + MatrixOps.twoNorm(g) + "\nparameters.2norm: "
-                        + MatrixOps.twoNorm(parameters));
+                        + VectorOps.twoNorm(direction) + " \ngradient.2norm: "
+                        + VectorOps.twoNorm(g) + "\nparameters.2norm: "
+                        + VectorOps.twoNorm(parameters));
             }
 
             step = lineMaximizer.optimize(direction, step);
@@ -163,8 +163,8 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("after initial jump: \ndirection.2norm: "
-                        + MatrixOps.twoNorm(direction) + " \ngradient.2norm: "
-                        + MatrixOps.twoNorm(g));
+                        + VectorOps.twoNorm(direction) + " \ngradient.2norm: "
+                        + VectorOps.twoNorm(g));
             }
         }
 
@@ -173,8 +173,8 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("L-BFGS iteration=" + iterationCount + ", value="
-                        + value + " g.twoNorm: " + MatrixOps.twoNorm(g)
-                        + " oldg.twoNorm: " + MatrixOps.twoNorm(oldg));
+                        + value + " g.twoNorm: " + VectorOps.twoNorm(g)
+                        + " oldg.twoNorm: " + VectorOps.twoNorm(oldg));
             }
 
             // get difference between previous 2 gradients and parameters
@@ -230,19 +230,19 @@ public final class LimitedMemoryBFGS implements Optimizer {
             // First work backwards, from the most recent difference vectors
             for (int i = s.size() - 1; i >= 0; i--) {
                 alpha[i] = rho.get(i)
-                        * MatrixOps.dotProduct(s.get(i), direction);
-                MatrixOps.plusEquals(direction, y.get(i), -1.0 * alpha[i]);
+                        * VectorOps.dotProduct(s.get(i), direction);
+                VectorOps.plusEquals(direction, y.get(i), -1.0 * alpha[i]);
             }
 
             // Scale the direction by the ratio of s'y and y'y
-            MatrixOps.timesEquals(direction, gamma);
+            VectorOps.timesEquals(direction, gamma);
 
             // Now work forwards, from the oldest to the newest difference
             // vectors
             for (int i = 0; i < y.size(); i++) {
                 double beta = rho.get(i)
-                        * MatrixOps.dotProduct(y.get(i), direction);
-                MatrixOps.plusEquals(direction, s.get(i), alpha[i] - beta);
+                        * VectorOps.dotProduct(y.get(i), direction);
+                VectorOps.plusEquals(direction, s.get(i), alpha[i] - beta);
             }
 
             // Move the current values to the "last iteration" buffers and
@@ -255,10 +255,10 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("before linesearch: direction.gradient.dotprod: "
-                        + MatrixOps.dotProduct(direction, g)
-                        + "\ndirection.2norm: " + MatrixOps.twoNorm(direction)
+                        + VectorOps.dotProduct(direction, g)
+                        + "\ndirection.2norm: " + VectorOps.twoNorm(direction)
                         + "\nparameters.2norm: "
-                        + MatrixOps.twoNorm(parameters));
+                        + VectorOps.twoNorm(parameters));
             }
 
             // Do a line search in the current direction
@@ -281,7 +281,7 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("after linesearch: direction.2norm: "
-                        + MatrixOps.twoNorm(direction));
+                        + VectorOps.twoNorm(direction));
             }
 
             double newValue = optimizable.getValue();
@@ -294,7 +294,7 @@ public final class LimitedMemoryBFGS implements Optimizer {
                 converged = true;
                 return true;
             }
-            double gg = MatrixOps.twoNorm(g);
+            double gg = VectorOps.twoNorm(g);
             if (gg < gradientTolerance) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Exiting L-BFGS on termination #2: \ngradient="
