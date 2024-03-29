@@ -395,6 +395,12 @@ public final class ProbabilityFuncs {
      * @return v such that x = errorFunction(v)
      */
     public static double errorFunctionInverse(final double x) {
+        if (x < -1.0) {
+            throw new IllegalArgumentException("x < -1.0");
+        }
+        if (x > +1.0) {
+            throw new IllegalArgumentException("x > +1.0");
+        }
         // beware that the logarithm argument must be
         // computed as (1.0 - x) * (1.0 + x),
         // it must NOT be simplified as 1.0 - x * x as this
