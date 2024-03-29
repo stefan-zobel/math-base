@@ -380,7 +380,7 @@ public final class ProbabilityFuncs {
     }
 
     /**
-     * Returns the inverse errorFunction (erf).
+     * Returns the inverse errorFunction (inverse of erf).
      * <p>
      * This implementation is described in the paper: <a
      * href="http://people.maths.ox.ac.uk/gilesm/files/gems_erfinv.pdf">Approximating

@@ -191,7 +191,9 @@ public abstract class AbstractRng64 implements PseudoRandom {
         }
         int capacity = (count < 1073741824) ? (count + count / 3) : Integer.MAX_VALUE - 8;
         IntHashSet mem = new IntHashSet(capacity, sentinel);
-        return ints(min, max).filter(not(mem::containsInt)).peek(mem::addInt).limit(count).toArray();
+        IntPredicate notContainsInt = not(mem::containsInt);
+        // this should be more efficient than using IntStream.distinct()
+        return ints(min, max).filter(notContainsInt).peek(mem::addInt).limit(count).toArray();
     }
 
     private static IntPredicate not(IntPredicate pred) {
