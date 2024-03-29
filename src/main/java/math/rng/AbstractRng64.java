@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2021 Stefan Zobel
+ * Copyright 2013, 2024 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,13 @@ package math.rng;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Spliterator;
+import java.util.function.IntPredicate;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.StreamSupport;
+
+import math.util.IntHashSet;
 
 /**
  * Abstract base class for 64-bit pseudo RNGs.
@@ -168,6 +171,31 @@ public abstract class AbstractRng64 implements PseudoRandom {
     @Override
     public int next(int bits) {
         return (int) (nextLong() >>> (64 - bits));
+    }
+
+    @Override
+    public int[] intsSampledWithoutReplacement(int min, int max, int count) {
+        checkRange(min, max);
+        checkStreamSize(count);
+        if ((long) count > ((long) max - (long) min) + 1L) {
+            throw new IllegalArgumentException("cannot produce " + count + " distinct values for the given range");
+        }
+        if (min == Integer.MIN_VALUE && max == Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("unable to produce distinct values for the whole integer range");
+        }
+        int sentinel;
+        if (min > Integer.MIN_VALUE) {
+            sentinel = Integer.MIN_VALUE;
+        } else {
+            sentinel = Integer.MAX_VALUE;
+        }
+        int capacity = (count < 1073741824) ? (count + count / 3) : Integer.MAX_VALUE - 8;
+        IntHashSet mem = new IntHashSet(capacity, sentinel);
+        return ints(min, max).filter(not(mem::containsInt)).peek(mem::addInt).limit(count).toArray();
+    }
+
+    private static IntPredicate not(IntPredicate pred) {
+        return (value) -> !pred.test(value);
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2021 Stefan Zobel
+ * Copyright 2013, 2024 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,8 @@ public interface PseudoRandom extends PseudoRandomStream {
     void nextLongs(long[] longs);
 
     void nextDoubles(double[] doubles);
+
+    int[] intsSampledWithoutReplacement(int min, int max, int count);
 
     String getAlgorithm();
 
