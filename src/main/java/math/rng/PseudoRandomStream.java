@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Stefan Zobel
+ * Copyright 2021, 2024 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -607,4 +607,38 @@ public interface PseudoRandomStream {
      *             greater than {@code max}
      */
     DoubleStream truncatedStandardNormal(long streamSize, double min, double max);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen LeCun
+     * normal variates with standard deviation {@code sigma} (usually
+     * {@code Math.sqrt(1.0 / fan_in)} in a deep learning setting).
+     * 
+     * @param sigma
+     *            the standard deviation of the LeCun normal variate
+     * @return a stream of pseudorandomly chosen LeCun normal variates with the
+     *         specified standard deviation
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code sigma} is not greater than zero
+     */
+    DoubleStream leCunNormal(double sigma);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen LeCun normal variates with standard deviation
+     * {@code sigma} (usually {@code Math.sqrt(1.0 / fan_in)} in a deep learning
+     * setting).
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param sigma
+     *            the standard deviation of the LeCun normal variate
+     * @return a stream of pseudorandomly chosen LeCun normal variates with the
+     *         specified standard deviation
+     * 
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code sigma} is
+     *             not greater than zero
+     */
+    DoubleStream leCunNormal(long streamSize, double sigma);
 }

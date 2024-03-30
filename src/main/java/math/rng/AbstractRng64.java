@@ -409,6 +409,17 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return doubleStream(new TruncatedNormalSpliterator(this, 0L, streamSize, min, max));
     }
 
+    @Override
+    public DoubleStream leCunNormal(double sigma) {
+        return doubleStream(new LeCunNormalSpliterator(this, 0L, Long.MAX_VALUE, sigma));
+    }
+
+    @Override
+    public DoubleStream leCunNormal(long streamSize, double sigma) {
+        checkStreamSize(streamSize);
+        return doubleStream(new LeCunNormalSpliterator(this, 0L, streamSize, sigma));
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }
