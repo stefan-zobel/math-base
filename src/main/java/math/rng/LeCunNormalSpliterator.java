@@ -22,25 +22,28 @@ import java.util.function.DoubleConsumer;
 import math.MathConsts;
 import math.cern.ProbabilityFuncs;
 
-// https://jax.readthedocs.io/en/latest/_autosummary/jax.random.truncated_normal.html
-final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implements Spliterator.OfDouble {
+// https://github.com/google/jax/blob/8815b236b656f494171131301d1d81e84cf4c67c/jax/_src/nn/initializers.py#L465
+// https://github.com/google/jax/blob/8815b236b656f494171131301d1d81e84cf4c67c/jax/_src/nn/initializers.py#L265
+// https://github.com/google/jax/blob/8815b236b656f494171131301d1d81e84cf4c67c/jax/_src/random.py#L818
+// https://github.com/google/jax/blob/8815b236b656f494171131301d1d81e84cf4c67c/jax/_src/random.py#L861
+final class LeCunNormalSpliterator extends PseudoRandomSpliterator implements Spliterator.OfDouble {
 
-    final double lower;
-    final double upper;
-    final double a;
-    final double b;
+    // ProbabilityFuncs.errorFunction(-2.0 / MathConsts.SQRT_TWO)
+    private static final double A = -0.9544997361036416;
+    private static final double B = -A;
+
+    final double sigma;
+    final double stdDev;
     final PseudoRandom prng;
 
-    TruncatedNormalSpliterator(PseudoRandom prng, long index, long fence, double lower, double upper) {
+    LeCunNormalSpliterator(PseudoRandom prng, long index, long fence, double sigma) {
         super(index, fence);
-        this.lower = lower;
-        this.upper = upper;
-        this.a = ProbabilityFuncs.errorFunction(lower / MathConsts.SQRT_TWO);
-        if (upper == -lower) {
-            this.b = -a;
-        } else {
-            this.b = ProbabilityFuncs.errorFunction(upper / MathConsts.SQRT_TWO);
+        if (sigma <= 0.0) {
+            throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
         }
+        this.sigma = sigma;
+        // constant is stddev of standard normal truncated to (-2.0, 2.0)
+        this.stdDev = sigma / 0.87962566103423978;
         this.prng = prng;
     }
 
@@ -52,7 +55,7 @@ final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implement
             return null;
         }
         index = s;
-        return new TruncatedNormalSpliterator(prng, idx, s, lower, upper);
+        return new LeCunNormalSpliterator(prng, idx, s, sigma);
     }
 
     @Override
@@ -61,7 +64,7 @@ final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implement
         long idx = index;
         long fence_ = fence;
         if (idx < fence_) {
-            consumer.accept(nextTruncatedNormal());
+            consumer.accept(leCun());
             index = idx + 1;
             return true;
         } else {
@@ -77,22 +80,24 @@ final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implement
         if (idx < fence_) {
             index = fence_;
             do {
-                consumer.accept(nextTruncatedNormal());
+                consumer.accept(leCun());
             } while (++idx < fence_);
         }
     }
 
-    private double nextTruncatedNormal() {
-        double u = prng.nextDouble(a, b);
+    private double leCun() {
+        double u = prng.nextDouble(A, B);
         double out = MathConsts.SQRT_TWO * ProbabilityFuncs.errorFunctionInverse(u);
-        // Clamp the value to the open interval (lower, upper) to make sure that
+        // Clamp the value to the open interval (-2.0, 2.0) to make sure that
         // rounding doesn't push us outside of the range
-        if (out == lower) {
-            out = Math.nextUp(lower);
+        if (out <= -2.0) {
+            // Math.nextUp(-2.0)
+            out = -1.9999999999999998;
         }
-        if (out == upper) {
-            out = Math.nextDown(upper);
+        if (out >= 2.0) {
+            // Math.nextDown(2.0)
+            out = 1.9999999999999998;
         }
-        return out;
+        return stdDev * out;
     }
 }
