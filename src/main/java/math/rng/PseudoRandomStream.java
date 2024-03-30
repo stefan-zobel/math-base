@@ -570,4 +570,41 @@ public interface PseudoRandomStream {
      *             {@code shape} are not greater than zero
      */
     DoubleStream weibull(long streamSize, double scale, double shape);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * truncated standard normal random variates on the domain
+     * {@code (min, max)}.
+     * 
+     * @param min
+     *            the lower bound for truncation
+     * @param max
+     *            the upper bound for truncation
+     * @return a stream of pseudorandomly chosen truncated standard normal
+     *         samples on the domain {@code (min, max)}
+     * @throws IllegalArgumentException
+     *             if {@code min} is not finite, or {@code max} is not finite,
+     *             or {@code min} is greater than {@code max}
+     */
+    DoubleStream truncatedStandardNormal(double min, double max);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen truncated standard normal random variates on the
+     * domain {@code (min, max)}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param min
+     *            the lower bound for truncation
+     * @param max
+     *            the upper bound for truncation
+     * @return a stream of pseudorandomly chosen truncated standard normal
+     *         samples on the domain {@code (min, max)}
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code min} is
+     *             not finite, or {@code max} is not finite, or {@code min} is
+     *             greater than {@code max}
+     */
+    DoubleStream truncatedStandardNormal(long streamSize, double min, double max);
 }
