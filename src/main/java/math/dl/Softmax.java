@@ -15,6 +15,8 @@
  */
 package math.dl;
 
+import math.rng.Stc64;
+
 /**
  * The softmax function in deep learning.
  */
@@ -194,6 +196,50 @@ public final class Softmax {
             }
         }
         return b;
+    }
+
+    /**
+     * Samples a class index from the softmax distribution randomly according to
+     * the class probabilities in the {@code softmax} array.
+     * 
+     * @param softmax
+     *            a softmax (discrete probability) distribution
+     * @return class index {@code i} with probability {@code softmax[i]}
+     */
+    public static int sampleClass(double[] softmax) {
+        int classIdx = 0;
+        double p = Stc64.getDefault().nextDouble();
+        // roulette wheel selection
+        for (int i = 0; i < softmax.length; ++i) {
+            p -= softmax[i];
+            if (p <= 0.0) {
+                classIdx = i;
+                break;
+            }
+        }
+        return classIdx;
+    }
+
+    /**
+     * Samples a class index from the softmax distribution randomly according to
+     * the class probabilities in the {@code softmax} array.
+     * 
+     * @param softmax
+     *            a softmax (discrete probability) distribution
+     * @return class index {@code i} with probability {@code softmax[i]}
+     */
+    public static int sampleClassF(float[] softmax) {
+        int classIdx = 0;
+        float p = Stc64.getDefault().nextFloat();
+        // roulette wheel selection
+        for (int i = 0; i < softmax.length; ++i) {
+            p -= softmax[i];
+            if (p <= 0.0f) {
+                classIdx = i;
+                break;
+            }
+        }
+        return classIdx;
     }
 
     static double max(int length, int aoff, double[] a) {
