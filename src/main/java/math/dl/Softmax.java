@@ -86,6 +86,116 @@ public final class Softmax {
         return out;
     }
 
+    /**
+     * Reweighs a softmax distribution by the positive temperature {@code t}. A
+     * temperature of {@code 1.0} does nothing to the distribution. When
+     * {@code t} gets above {@code 1.0} smaller probabilities get pushed up
+     * while higher probabilities get pushed down (approaching a discrete
+     * uniform distribution when {@code t} approaches Double.MAX_VALUE. When
+     * {@code t} is below {@code 1.0} higher probabilities get pushed up and
+     * lower probabilities get pushed down (approaching a one-hot encoded
+     * distribution where the class with the highest probability gets all the
+     * probability when {@code t} approaches {@code 0.0}). The latter extreme
+     * case should be avoided since the computation becomes numerically unstable
+     * when t approaches {@code 0.0} too closely - it is better to avoid values
+     * for {@code t} below {@code 0.05}.
+     * 
+     * @param softmax
+     *            a softmax (discrete probability) distribution
+     * @param t
+     *            temperature coefficient to use (t must be > 0.0)
+     * @return a reweighted distribution (to a different temperature when
+     *         {@code t != 1.0})
+     * @throws IllegalArgumentException
+     *             if t is zero or negative or if one of the probabilities in
+     *             the softmax distribution is negative
+     */
+    public static double[] reweigh(double[] softmax, double t) {
+        if (t == 1.0) {
+            return softmax;
+        }
+        if (t <= 0.0) {
+            throw new IllegalArgumentException("temperature must be strictly positive: " + t);
+        }
+        double[] b = new double[softmax.length];
+        double sum = 0.0;
+        double max = -Double.MAX_VALUE;
+        int maxpos = 0;
+        for (int i = 0; i < softmax.length; ++i) {
+            double p = Math.log(clamp(softmax[i])) / t;
+            if (p > max) {
+                max = p;
+                maxpos = i;
+            }
+            p = Math.exp(p);
+            sum += p;
+            b[i] = p;
+        }
+        if (sum == 0.0) {
+            b[maxpos] = 1.0;
+        } else {
+            for (int i = 0; i < b.length; ++i) {
+                b[i] /= sum;
+            }
+        }
+        return b;
+    }
+
+    /**
+     * Reweighs a softmax distribution by the positive temperature {@code t}. A
+     * temperature of {@code 1.0} does nothing to the distribution. When
+     * {@code t} gets above {@code 1.0} smaller probabilities get pushed up
+     * while higher probabilities get pushed down (approaching a discrete
+     * uniform distribution when {@code t} approaches Float.MAX_VALUE. When
+     * {@code t} is below {@code 1.0} higher probabilities get pushed up and
+     * lower probabilities get pushed down (approaching a one-hot encoded
+     * distribution where the class with the highest probability gets all the
+     * probability when {@code t} approaches {@code 0.0}). The latter extreme
+     * case should be avoided since the computation becomes numerically unstable
+     * when t approaches {@code 0.0} too closely - it is better to avoid values
+     * for {@code t} below {@code 0.05}.
+     * 
+     * @param softmax
+     *            a softmax (discrete probability) distribution
+     * @param t
+     *            temperature coefficient to use (t must be > 0.0)
+     * @return a reweighted distribution (to a different temperature when
+     *         {@code t != 1.0})
+     * @throws IllegalArgumentException
+     *             if t is zero or negative or if one of the probabilities in
+     *             the softmax distribution is negative
+     */
+    public static float[] reweighF(float[] softmax, float t) {
+        if (t == 1.0f) {
+            return softmax;
+        }
+        if (t <= 0.0f) {
+            throw new IllegalArgumentException("temperature must be strictly positive: " + t);
+        }
+        float[] b = new float[softmax.length];
+        float sum = 0.0f;
+        float max = -Float.MAX_VALUE;
+        int maxpos = 0;
+        for (int i = 0; i < softmax.length; ++i) {
+            float p = (float) Math.log(clampF(softmax[i])) / t;
+            if (p > max) {
+                max = p;
+                maxpos = i;
+            }
+            p = (float) Math.exp(p);
+            sum += p;
+            b[i] = p;
+        }
+        if (sum == 0.0) {
+            b[maxpos] = 1.0f;
+        } else {
+            for (int i = 0; i < b.length; ++i) {
+                b[i] /= sum;
+            }
+        }
+        return b;
+    }
+
     static double max(int length, int aoff, double[] a) {
         double max = a[aoff];
         for (int i = aoff + 1; i < aoff + length; ++i) {
@@ -100,6 +210,28 @@ public final class Softmax {
             max = Math.max(max, a[i]);
         }
         return max;
+    }
+
+    static double clamp(double p) {
+        if (p > 0.0) {
+            return p;
+        }
+        // p should never be <= 0
+        if (p == 0.0) {
+            return Double.MIN_NORMAL;
+        }
+        throw new IllegalArgumentException("negative probability: " + p);
+    }
+
+    static float clampF(float p) {
+        if (p > 0.0f) {
+            return p;
+        }
+        // p should never be <= 0
+        if (p == 0.0f) {
+            return Float.MIN_NORMAL;
+        }
+        throw new IllegalArgumentException("negative probability: " + p);
     }
 
     private Softmax() {
