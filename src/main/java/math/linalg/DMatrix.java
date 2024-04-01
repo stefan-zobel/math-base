@@ -38,6 +38,10 @@ public class DMatrix {
         return I;
     }
 
+    public static DMatrix diag(int dim, double value) {
+        return identity(dim).scaleInplace(value);
+    }
+
     public DMatrix(int rows, int cols) {
         this.rows = rows;
         this.cols = cols;
