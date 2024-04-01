@@ -5,7 +5,7 @@
  * This software is licensed under the terms of the Apache License, Version 2.0
  * or (at your option) any subsequent version.
  */
-package math;
+package math.linalg;
 
 /**
  * A class of static utility functions for manipulating arrays of double.

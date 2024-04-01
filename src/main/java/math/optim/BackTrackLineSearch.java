@@ -9,7 +9,7 @@ package math.optim;
 
 import java.util.logging.*;
 
-import math.VectorOps;
+import math.linalg.VectorOps;
 
 
 /**
