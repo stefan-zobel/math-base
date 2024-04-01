@@ -119,26 +119,42 @@ public class DMatrix {
 
     public DMatrix add(DMatrix B) {
         checkEqualDimension(this, B);
-        DMatrix C = new DMatrix(rows, cols);
+        return add(B, new DMatrix(rows, cols));
+    }
+
+    public DMatrix addInplace(DMatrix B) {
+        checkEqualDimension(this, B);
+        return add(B, this);
+    }
+
+    private DMatrix add(DMatrix B, DMatrix target) {
         double[] _a = a;
         double[] _b = B.a;
-        double[] _c = C.a;
+        double[] _c = target.a;
         for (int i = 0; i < _a.length; ++i) {
             _c[i] = _a[i] + _b[i];
         }
-        return C;
+        return target;
     }
 
     public DMatrix addBroadcastedVector(DMatrix B) {
         checkSameRows(this, B);
+        return addBroadcastedVector(B, new DMatrix(rows, cols));
+    }
+
+    public DMatrix addBroadcastedVectorInplace(DMatrix B) {
+        checkSameRows(this, B);
+        return addBroadcastedVector(B, this);
+    }
+
+    private DMatrix addBroadcastedVector(DMatrix B, DMatrix target) {
         if (this.cols == B.cols) {
-            return add(B);
+            return add(B, target);
         }
         if (B.numColumns() == 1) {
-            DMatrix C = new DMatrix(rows, cols);
             double[] _a = a;
             double[] _b = B.a;
-            double[] _c = C.a;
+            double[] _c = target.a;
             int cols_ = cols;
             int rows_ = rows;
             for (int col = 0; col < cols_; ++col) {
@@ -146,7 +162,7 @@ public class DMatrix {
                     _c[idx(row, col)] = _a[idx(row, col)] + _b[row];
                 }
             }
-            return C;
+            return target;
         }
         // incompatible dimensions
         throw getSameColsException(this, B);
