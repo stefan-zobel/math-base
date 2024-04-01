@@ -30,6 +30,14 @@ public class DMatrix {
     protected final int cols;
     protected final double[] a;
 
+    public static DMatrix identity(int dim) {
+        DMatrix I = new DMatrix(dim, dim);
+        for (int i = 0; i < dim; ++i) {
+            I.setUnsafe(i, i, 1.0);
+        }
+        return I;
+    }
+
     public DMatrix(int rows, int cols) {
         this.rows = rows;
         this.cols = cols;
