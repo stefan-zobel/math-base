@@ -90,16 +90,23 @@ public class DMatrix {
     }
 
     public DMatrix scale(double alpha) {
-        DMatrix B = new DMatrix(rows, cols);
+        return scale(alpha, new DMatrix(rows, cols));
+    }
+
+    public DMatrix scaleInplace(double alpha) {
+        return scale(alpha, this);
+    }
+
+    private DMatrix scale(double alpha, DMatrix target) {
         if (alpha == 0.0) {
-            return B;
+            return target;
         }
         double[] _a = a;
-        double[] _b = B.a;
+        double[] _b = target.a;
         for (int i = 0; i < _b.length; ++i) {
             _b[i] = alpha * _a[i];
         }
-        return B;
+        return target;
     }
 
     public DMatrix transpose() {
