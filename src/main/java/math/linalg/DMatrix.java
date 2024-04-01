@@ -129,6 +129,29 @@ public class DMatrix {
         return C;
     }
 
+    public DMatrix addBroadcastedVector(DMatrix B) {
+        checkSameRows(this, B);
+        if (this.cols == B.cols) {
+            return add(B);
+        }
+        if (B.numColumns() == 1) {
+            DMatrix C = new DMatrix(rows, cols);
+            double[] _a = a;
+            double[] _b = B.a;
+            double[] _c = C.a;
+            int cols_ = cols;
+            int rows_ = rows;
+            for (int col = 0; col < cols_; ++col) {
+                for (int row = 0; row < rows_; ++row) {
+                    _c[idx(row, col)] = _a[idx(row, col)] + _b[row];
+                }
+            }
+            return C;
+        }
+        // incompatible dimensions
+        throw getSameColsException(this, B);
+    }
+
     public DMatrix minus(DMatrix B) {
         checkEqualDimension(this, B);
         DMatrix C = new DMatrix(rows, cols);
@@ -172,8 +195,7 @@ public class DMatrix {
 
     protected static void checkSameCols(DMatrix A, DMatrix B) {
         if (A.numColumns() != B.numColumns()) {
-            throw new IndexOutOfBoundsException(
-                    "A.numColumns() != B.numColumns() (" + A.numColumns() + " != " + B.numColumns() + ")");
+            throw getSameColsException(A, B);
         }
     }
 
@@ -214,6 +236,11 @@ public class DMatrix {
             throw new IndexOutOfBoundsException(
                     "B.numColumns() != C.numColumns() (" + B.numColumns() + " != " + C.numColumns() + ")");
         }
+    }
+
+    protected static IndexOutOfBoundsException getSameColsException(DMatrix A, DMatrix B) {
+        return new IndexOutOfBoundsException(
+                "A.numColumns() != B.numColumns() (" + A.numColumns() + " != " + B.numColumns() + ")");
     }
 
     protected static int checkArrayLength(int rows, int cols) {
