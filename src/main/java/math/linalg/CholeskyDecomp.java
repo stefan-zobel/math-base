@@ -64,8 +64,7 @@ public final class CholeskyDecomp {
                     L.setUnsafe(i, j, (A.getUnsafe(i, j) - sum) * (1.0 / L.getUnsafe(j, j)));
                 }
             }
-            double ii = L.getUnsafe(i, i);
-            if (ii <= 0.0 || Double.isNaN(ii)) {
+            if (Double.isNaN(L.getUnsafe(i, i))) {
                 throw new RuntimeException("(covariance) matrix is not positive semidefinite");
             }
         }
