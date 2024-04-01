@@ -113,6 +113,23 @@ public class DMatrix {
         return target;
     }
 
+    public DMatrix abs() {
+        return abs(new DMatrix(rows, cols));
+    }
+
+    public DMatrix absInplace() {
+        return abs(this);
+    }
+
+    private DMatrix abs(DMatrix target) {
+        double[] _a = a;
+        double[] _b = target.a;
+        for (int i = 0; i < _b.length; ++i) {
+            _b[i] = Math.abs(_a[i]);
+        }
+        return target;
+    }
+
     public DMatrix transpose() {
         if (rows == 1 || cols == 1) {
             return new DMatrix(cols, rows, Arrays.copyOf(a, a.length));
