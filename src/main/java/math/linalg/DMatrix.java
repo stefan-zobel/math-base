@@ -102,9 +102,6 @@ public class DMatrix {
     }
 
     private DMatrix scale(double alpha, DMatrix target) {
-        if (alpha == 0.0) {
-            return target;
-        }
         double[] _a = a;
         double[] _b = target.a;
         for (int i = 0; i < _b.length; ++i) {
