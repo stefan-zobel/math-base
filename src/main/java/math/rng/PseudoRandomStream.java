@@ -641,4 +641,43 @@ public interface PseudoRandomStream {
      *             not greater than zero
      */
     DoubleStream leCunNormal(long streamSize, double sigma);
+
+    /**
+     * Returns an effectively unlimited stream of pseudorandomly chosen
+     * Inverse-gamma distributed variates with shape parameter {@code alpha} and
+     * scale parameter {@code beta}.
+     * 
+     * @param alpha
+     *            the shape parameter of the Inverse-gamma distribution
+     * @param beta
+     *            the scale parameter of the Inverse-gamma distribution
+     * @return a stream of pseudorandomly chosen Inverse-gamma distributed
+     *         variates with with shape parameter {@code alpha} and scale
+     *         parameter {@code beta}
+     * @throws IllegalArgumentException
+     *             if {@code alpha} is not greater than zero, or {@code beta} is
+     *             not greater than zero
+     */
+    DoubleStream inverseGamma(double alpha, double beta);
+
+    /**
+     * Returns a stream producing the given {@code streamSize} number of
+     * pseudorandomly chosen Inverse-gamma distributed variates with shape
+     * parameter {@code alpha} and scale parameter {@code beta}.
+     * 
+     * @param streamSize
+     *            the number of values to generate
+     * @param alpha
+     *            the shape parameter of the Inverse-gamma distribution
+     * @param beta
+     *            the scale parameter of the Inverse-gamma distribution
+     * @return a stream of pseudorandomly chosen Inverse-gamma distributed
+     *         variates with with shape parameter {@code alpha} and scale
+     *         parameter {@code beta}
+     * @throws IllegalArgumentException
+     *             if {@code streamSize} is less than zero, or {@code alpha} is
+     *             not greater than zero, or {@code beta} is not greater than
+     *             zero
+     */
+    DoubleStream inverseGamma(long streamSize, double alpha, double beta);
 }
