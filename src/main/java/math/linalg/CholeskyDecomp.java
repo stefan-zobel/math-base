@@ -21,6 +21,8 @@ package math.linalg;
  */
 public final class CholeskyDecomp {
 
+    private static final double TOL = 1.0e-10;
+
     private static boolean isSquareMatrix(DMatrix A) {
         return A.numRows() == A.numColumns();
     }
@@ -28,7 +30,7 @@ public final class CholeskyDecomp {
     private static boolean isSymmetricMatrix(DMatrix A) {
         for (int col_ = 0; col_ < A.numColumns(); ++col_) {
             for (int row_ = 0; row_ < A.numRows(); ++row_) {
-                if (A.getUnsafe(col_, row_) != A.getUnsafe(row_, col_)) {
+                if (Math.abs(A.getUnsafe(col_, row_) - A.getUnsafe(row_, col_)) > TOL) {
                     return false;
                 }
             }
