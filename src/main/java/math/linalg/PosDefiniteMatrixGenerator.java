@@ -15,6 +15,7 @@
  */
 package math.linalg;
 
+import math.MathConsts;
 import math.rng.PseudoRandom;
 import math.rng.Stc64;
 
@@ -40,7 +41,7 @@ public final class PosDefiniteMatrixGenerator {
                 Q.setUnsafe(r, c, rng.nextGaussian());
             }
         }
-        double d = rng.nextDouble(0.0, 10.0);
+        double d = rng.nextDouble(0.0, MathConsts.TWO_PI);
         DMatrix D = DMatrix.diag(dim, d);
         for (int i = 0; i < dim; ++i) {
             double v = D.get(i, i);
