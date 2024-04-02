@@ -9,7 +9,7 @@ package math.optim;
 
 import java.util.logging.Logger;
 
-import math.MatrixOps;
+import math.linalg.VectorOps;
 
 
 /**
@@ -70,7 +70,7 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
         y = new SupersedingDoubleArrayQueue(m);
         rhos = new SupersedingDoubleQueue(m);
         alphas = new double[m];
-        MatrixOps.setAll(alphas, 0.0);
+        VectorOps.setAll(alphas, 0.0);
         yDotY = 0;
 
         int numParameters = optimizable.getNumParameters();
@@ -190,7 +190,7 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
     private void evalGradient() {
         optimizable.getValueGradient(grad);
         adjustGradForInfiniteParams(grad);
-        MatrixOps.timesEquals(grad, -1.0);
+        VectorOps.timesEquals(grad, -1.0);
     }
 
     /**
@@ -241,19 +241,19 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
         int count = s.size();
         for (int i = count - 1; i >= 0; i--) {
-            alphas[i] = -MatrixOps.dotProduct(s.get(i), direction)
+            alphas[i] = -VectorOps.dotProduct(s.get(i), direction)
                     / rhos.get(i);
-            MatrixOps.plusEquals(direction, y.get(i), alphas[i]);
+            VectorOps.plusEquals(direction, y.get(i), alphas[i]);
         }
 
         double scalar = rhos.get(count - 1) / yDotY;
         logger.fine("Direction multiplier = " + scalar);
-        MatrixOps.timesEquals(direction, scalar);
+        VectorOps.timesEquals(direction, scalar);
 
         for (int i = 0; i < count; i++) {
-            double beta = MatrixOps.dotProduct(y.get(i), direction)
+            double beta = VectorOps.dotProduct(y.get(i), direction)
                     / rhos.get(i);
-            MatrixOps.plusEquals(direction, s.get(i), -alphas[i] - beta);
+            VectorOps.plusEquals(direction, s.get(i), -alphas[i] - beta);
         }
     }
 
@@ -269,7 +269,7 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
     private double dirDeriv() {
         if (l1Weight == 0) {
-            return MatrixOps.dotProduct(direction, grad);
+            return VectorOps.dotProduct(direction, grad);
         } else {
             double val = 0.0;
             for (int i = 0; i < direction.length; i++) {
@@ -356,7 +356,7 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
         double alpha = 1.0;
         double backoff = 0.5;
         if (iterations == 0) {
-            double normDir = Math.sqrt(MatrixOps.dotProduct(direction,
+            double normDir = Math.sqrt(VectorOps.dotProduct(direction,
                     direction));
             alpha = 1.0 / normDir;
             backoff = 0.1;
@@ -379,8 +379,8 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
             logger.fine("iter[" + iterations + "] Using alpha = " + alpha
                     + " new value = " + value + " |grad|="
-                    + MatrixOps.twoNorm(grad) + " |x|="
-                    + MatrixOps.twoNorm(parameters));
+                    + VectorOps.twoNorm(grad) + " |x|="
+                    + VectorOps.twoNorm(parameters));
 
             if (value <= oldValue + c1 * origDirDeriv * alpha)
                 break;
@@ -411,6 +411,6 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
     }
 
     private boolean checkGradientTerminationCondition() {
-        return MatrixOps.twoNorm(grad) < gradientTolerance;
+        return VectorOps.twoNorm(grad) < gradientTolerance;
     }
 }

@@ -9,7 +9,7 @@ package math.optim;
 
 import java.util.logging.*;
 
-import math.MatrixOps;
+import math.linalg.VectorOps;
 
 
 /**
@@ -80,18 +80,18 @@ final class BackTrackLineSearch {
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("ENTERING BACKTRACK\n");
             logger.fine("Entering BackTrackLnSrch, value=" + fold
-                    + ",\ndirection.oneNorm:" + MatrixOps.oneNorm(line)
-                    + "  direction.infNorm:" + MatrixOps.infinityNorm(line));
+                    + ",\ndirection.oneNorm:" + VectorOps.oneNorm(line)
+                    + "  direction.infNorm:" + VectorOps.infinityNorm(line));
         }
-        assert (!MatrixOps.isNaN(g));
-        double sum = MatrixOps.twoNorm(line);
+        assert (!VectorOps.isNaN(g));
+        double sum = VectorOps.twoNorm(line);
         if (sum > stpmax) {
             logger.warning("attempted step too big. scaling: sum=" + sum
                     + ", stpmax=" + stpmax);
-            MatrixOps.timesEquals(line, stpmax / sum);
+            VectorOps.timesEquals(line, stpmax / sum);
         }
 
-        slope = MatrixOps.dotProduct(g, line);
+        slope = VectorOps.dotProduct(g, line);
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("slope=" + slope);
         }
@@ -128,13 +128,13 @@ final class BackTrackLineSearch {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("BackTrack loop iteration " + iteration + ": alam="
                         + alam + " oldAlam=" + oldAlam);
-                logger.fine("before step, x.1norm: " + MatrixOps.oneNorm(x)
+                logger.fine("before step, x.1norm: " + VectorOps.oneNorm(x)
                         + "\nalam: " + alam + "\noldAlam: " + oldAlam);
             }
             assert (alam != oldAlam) : "alam == oldAlam";
-            MatrixOps.plusEquals(x, line, alam - oldAlam); // step
+            VectorOps.plusEquals(x, line, alam - oldAlam); // step
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("after step, x.1norm: " + MatrixOps.oneNorm(x));
+                logger.fine("after step, x.1norm: " + VectorOps.oneNorm(x));
             }
 
             // check for convergence
