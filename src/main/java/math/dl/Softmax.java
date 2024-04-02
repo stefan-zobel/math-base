@@ -105,7 +105,7 @@ public final class Softmax {
      * @param softmax
      *            a softmax (discrete probability) distribution
      * @param t
-     *            temperature coefficient to use (t must be > 0.0)
+     *            temperature coefficient to use (t must be &gt; 0.0)
      * @return a reweighted distribution (to a different temperature when
      *         {@code t != 1.0})
      * @throws IllegalArgumentException
@@ -160,7 +160,7 @@ public final class Softmax {
      * @param softmax
      *            a softmax (discrete probability) distribution
      * @param t
-     *            temperature coefficient to use (t must be > 0.0)
+     *            temperature coefficient to use (t must be &gt; 0.0)
      * @return a reweighted distribution (to a different temperature when
      *         {@code t != 1.0})
      * @throws IllegalArgumentException
