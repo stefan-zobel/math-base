@@ -219,4 +219,8 @@ public final class Dgemm {
             Objects.requireNonNull(arg);
         }
     }
+
+    private Dgemm() {
+        throw new AssertionError();
+    }
 }
