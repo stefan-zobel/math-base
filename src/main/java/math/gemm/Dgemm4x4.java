@@ -85,7 +85,7 @@ final class Dgemm4x4 {
     static void pack_A(int mc, int kc, int A_start, double[] A, int incRowA, int incColA, double[] work) {
 
         final int mp = mc / MR_Height;
-        final int _mr = mc % MR_Height;
+        final int _mr = (mc & (MR_Height - 1));
 
         int work_start = 0;
         int i;
@@ -115,7 +115,7 @@ final class Dgemm4x4 {
     static void pack_B(int kc, int nc, int B_start, double[] B, int incRowB, int incColB, double[] work) {
 
         final int np = nc / NR_Width;
-        final int _nr = nc % NR_Width;
+        final int _nr = (nc & (NR_Width - 1));
 
         int work_start = 0;
         int j;
@@ -261,8 +261,8 @@ final class Dgemm4x4 {
         final int mp = (mc + MR_Height - 1) / MR_Height;
         final int np = (nc + NR_Width - 1) / NR_Width;
 
-        final int _mr = mc % MR_Height;
-        final int _nr = nc % NR_Width;
+        final int _mr = (mc & (MR_Height - 1));
+        final int _nr = (nc & (NR_Width - 1));
 
         int nr, mr;
         int i, j;
@@ -359,7 +359,7 @@ final class Dgemm4x4 {
         final int kb = (colsA + KC - 1) / KC;
 
         final int _mc = rowsA % MC;
-        final int _nc = colsB % NC;
+        final int _nc = (colsB & (NC - 1));
         final int _kc = colsA % KC;
 
         // check whether we can parallelize the computation
