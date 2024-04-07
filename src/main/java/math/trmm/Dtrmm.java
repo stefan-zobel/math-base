@@ -20,10 +20,11 @@ import java.util.Objects;
 import math.gemm.Trans;
 
 /**
- * DTRMM performs one of the matrix-matrix operations B := alpha*op( A )*B, or B
- * := alpha*B*op( A ), where alpha is a scalar, B is an m by n matrix, A is a
- * unit, or non-unit, upper or lower triangular matrix and op( A ) is one of op(
- * A ) = A or op( A ) = A**T.
+ * {@code DTRMM} performs one of the matrix-matrix operations
+ * {@code B := alpha*op( A )*B}, or {@code B := alpha*B*op( A )}, where alpha is
+ * a scalar, B is an m by n matrix, A is a unit, or non-unit, upper or lower
+ * triangular matrix and {@code op( A )} is one of {@code op( A ) = A} or
+ * {@code op( A ) = A**T}.
  */
 public final class Dtrmm {
     /**
