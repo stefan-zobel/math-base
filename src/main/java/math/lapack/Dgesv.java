@@ -31,7 +31,7 @@ import java.util.Objects;
  * DGESV computes the solution to a real system of linear equations
  * {@code A * X = B}, where A is an N-by-N matrix and X and B are N-by-NRHS
  * matrices.
- *
+ * <p>
  * The LU decomposition with partial pivoting and row interchanges is used to
  * factor A as {@code A = P * L * U}, where P is a permutation matrix, L is unit
  * lower triangular, and U is upper triangular. The factored form of A is then
