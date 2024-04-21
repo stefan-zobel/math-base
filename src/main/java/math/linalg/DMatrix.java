@@ -70,6 +70,10 @@ public class DMatrix {
         return rows;
     }
 
+    public boolean isSquareMatrix() {
+        return rows == cols;
+    }
+
     public double get(int row, int col) {
         checkIndex(row, col);
         return a[idx(row, col)];
