@@ -36,17 +36,17 @@ import math.gemm.Trans;
  * <p>
  * The following options are provided:
  * <p>
- * 1. If TRANS = 'N' and m &ge; n: find the least squares solution of an
- * overdetermined system, i.e., solve the least squares problem
+ * 1. If trans = Trans.NO_TRANS and m &ge; n: find the least squares solution of
+ * an overdetermined system, i.e., solve the least squares problem
  * {@code minimize || B - A*X ||}.
  * <p>
- * 2. If TRANS = 'N' and m &lt; n: find the minimum norm solution of an
- * underdetermined system {@code A * X = B}.
+ * 2. If trans = Trans.NO_TRANS and m &lt; n: find the minimum norm solution of
+ * an underdetermined system {@code A * X = B}.
  * <p>
- * 3. If TRANS = 'T' and m &ge; n: find the minimum norm solution of an
+ * 3. If trans = Trans.TRANS and m &ge; n: find the minimum norm solution of an
  * underdetermined system {@code A**T * X = B}.
  * <p>
- * 4. If TRANS = 'T' and m &lt; n: find the least squares solution of an
+ * 4. If trans = Trans.TRANS and m &lt; n: find the least squares solution of an
  * overdetermined system, i.e., solve the least squares problem
  * {@code minimize || B - A**T * X ||}.
  * <p>
