@@ -20,7 +20,26 @@ import math.lapack.Dgels;
 import math.lapack.Dgesv;
 import math.linalg.DMatrix;
 
+/**
+ * TODO
+ */
 public final class LinearEquationsSolver {
+
+    /**
+     * TODO
+     * 
+     * @param A
+     * @param B
+     * @param X
+     * @return
+     */
+    public static DMatrix solve(DMatrix A, DMatrix B, DMatrix X) {
+        checkSolve(A, B, X);
+        if (A.isSquareMatrix()) {
+            return lusolve(A, B, X);
+        }
+        return qrsolve(A, B, X);
+    }
 
     private static DMatrix lusolve(DMatrix A, DMatrix B, DMatrix X) {
         // copy B into X
@@ -72,6 +91,25 @@ public final class LinearEquationsSolver {
         }
 
         return X;
+    }
+
+    private static void checkSolve(DMatrix A, DMatrix B, DMatrix X) {
+        checkSameRows(A, B);
+        if (A.numColumns() != X.numRows()) {
+            throw new IndexOutOfBoundsException(
+                    "A.numColumns() != X.numRows() (" + A.numColumns() + " != " + X.numRows() + ")");
+        }
+        if (X.numColumns() != B.numColumns()) {
+            throw new IndexOutOfBoundsException(
+                    "X.numColumns() != B.numColumns() (" + X.numColumns() + " != " + B.numColumns() + ")");
+        }
+    }
+
+    private static void checkSameRows(DMatrix A, DMatrix B) {
+        if (A.numRows() != B.numRows()) {
+            throw new IndexOutOfBoundsException(
+                    "A.numRows() != B.numRows() (" + A.numRows() + " != " + B.numRows() + ")");
+        }
     }
 
     private LinearEquationsSolver() {
