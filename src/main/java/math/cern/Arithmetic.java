@@ -27,6 +27,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.concurrent.ThreadLocalRandom;
 
+import math.list.DoubleArrayList;
+import math.list.DoubleList;
+
 /**
  * Arithmetic functions.
  */
@@ -581,6 +584,50 @@ public final class Arithmetic {
         } else {
             return stirlingCorrection[k];
         }
+    }
+
+    /**
+     * Returns up to {@code maxCoefficients} coefficients for fractional
+     * differencing for degrees of differencing {@code 0 <= d <= 1} where
+     * coefficients less than {@code 1.0e-2} are omitted.
+     * 
+     * @param degree
+     *            the degree of differencing {@code 0 <= d <= 1}
+     * @param maxCoefficients
+     *            maximum number of coefficients to produce
+     * @return the coefficients for fractional differencing
+     */
+    public static double[] getFractionalDifferencesCoefficients(double degree, int maxCoefficients) {
+        if (degree < 0.0 || degree > 1.0 || isBadNum(degree)) {
+            throw new IllegalArgumentException("degree: " + degree);
+        }
+        if (maxCoefficients < 0) {
+            throw new IllegalArgumentException("maxCoefficients: " + maxCoefficients);
+        }
+        DoubleList coeffs = createFractionalDifferencesCoefficients(degree, 1.0e-2);
+        if (coeffs.size() > maxCoefficients) {
+            coeffs = coeffs.subList(0, maxCoefficients);
+        }
+        return coeffs.toArray();
+    }
+
+    private static DoubleArrayList createFractionalDifferencesCoefficients(double degree, double cutoff) {
+        DoubleArrayList coeffs = new DoubleArrayList();
+        if (degree >= -0.5) {
+            coeffs.add(1.0);
+            int lag = 1;
+            while (true) {
+                double w = coeffs.get(coeffs.size() - 1);
+                w *= (degree - lag + 1) / lag;
+                if (Math.abs(w) >= cutoff) {
+                    coeffs.add(-w);
+                    ++lag;
+                } else {
+                    break;
+                }
+            }
+        }
+        return coeffs;
     }
 
     /**
