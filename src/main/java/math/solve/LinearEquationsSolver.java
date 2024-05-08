@@ -21,17 +21,32 @@ import math.lapack.Dgesv;
 import math.linalg.DMatrix;
 
 /**
- * TODO
+ * Computes the solution {@code X} to a real system of linear equations
+ * {@code A * X = B}.
  */
 public final class LinearEquationsSolver {
 
     /**
-     * TODO
+     * Computes the solution ({@code X}) to a real system of linear equations
+     * {@code A * X = B}, where {@code A} is either a {@code n x n} matrix and
+     * {@code X} and {@code B} are {@code n x r} matrices, or where {@code A} is
+     * a {@code n x m} and matrix {@code X} is a {@code m x r} matrix and
+     * {@code B} is a {@code n x r} matrix.
      * 
      * @param A
+     *            either a {@code n x n} matrix or a {@code n x m} matrix
      * @param B
+     *            matrix with the same number of rows as matrix {@code A}, and
+     *            the same number of columns as {@code X}
      * @param X
-     * @return
+     *            matrix with number of rows equal to the number of columns of
+     *            matrix {@code A}, and the same number of columns as {@code B}
+     * @return {@code X}, the solution of dimension either {@code n x r} (in the
+     *         {@code n x n} case) or {@code m x r} (in the {@code m x n} case)
+     * @throws RuntimeException
+     *             for exactly singular factors in the LU decomposition of a
+     *             quadratic matrix or for a non-quadratic matrix that doesn't
+     *             have full rank
      */
     public static DMatrix solve(DMatrix A, DMatrix B, DMatrix X) {
         checkSolve(A, B, X);
