@@ -282,8 +282,7 @@ public class DMatrix {
 
     protected static String toString(DMatrix mat) {
         StringBuilder buf = new StringBuilder();
-        buf.append(new StringBuilder("(").append(mat.rows).append(" x ").append(mat.cols).append(")").toString())
-                .append(System.lineSeparator());
+        buf.append("(").append(mat.rows).append(" x ").append(mat.cols).append(")").append(System.lineSeparator());
         int _cols = mat.numColumns() <= 6 ? mat.numColumns() : 5;
         int _rows = mat.numRows() <= 6 ? mat.numRows() : 5;
         int row;
