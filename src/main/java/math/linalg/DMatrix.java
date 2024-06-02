@@ -232,6 +232,11 @@ public class DMatrix {
         return C;
     }
 
+    @Override
+    public String toString() {
+        return toString(this);
+    }
+
     public static boolean approximatelyEquals(DMatrix A, DMatrix B, double absTol) {
         return approximatelyEquals(A, B, 1.0e-8, absTol);
     }
@@ -273,6 +278,46 @@ public class DMatrix {
             throw new IllegalArgumentException(
                     "Illegal column index " + col + " in (" + rows + " x " + cols + ") matrix");
         }
+    }
+
+    protected static String toString(DMatrix mat) {
+        StringBuilder buf = new StringBuilder();
+        buf.append(new StringBuilder("(").append(mat.rows).append(" x ").append(mat.cols).append(")").toString())
+                .append(System.lineSeparator());
+        int _cols = mat.numColumns() <= 6 ? mat.numColumns() : 5;
+        int _rows = mat.numRows() <= 6 ? mat.numRows() : 5;
+        int row;
+        for (row = 0; row < _rows; ++row) {
+            printRowD(row, _cols, mat, buf);
+        }
+        if (row == 5 && _rows < mat.numRows()) {
+            int empty = _cols < mat.numColumns() ? 6 : mat.numColumns();
+            for (int i = 0; i < empty; ++i) {
+                buf.append("......");
+                if (i != empty - 1) {
+                    buf.append(", ");
+                }
+            }
+            buf.append(System.lineSeparator());
+            printRowD(mat.numRows() - 1, _cols, mat, buf);
+        }
+        return buf.toString();
+    }
+
+    private static void printRowD(int row, int _cols, DMatrix m, StringBuilder buf) {
+        String format = "%.12E";
+        int col;
+        for (col = 0; col < _cols; ++col) {
+            buf.append(String.format(format, m.getUnsafe(row, col)));
+            if (col < _cols - 1) {
+                buf.append(", ");
+            }
+        }
+        if (col == 5 && _cols < m.numColumns()) {
+            buf.append(", ......, ");
+            buf.append(String.format(format, m.getUnsafe(row, m.numColumns() - 1)));
+        }
+        buf.append(System.lineSeparator());
     }
 
     protected static void checkSameRows(DMatrix A, DMatrix B) {
