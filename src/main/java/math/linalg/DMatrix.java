@@ -17,6 +17,7 @@ package math.linalg;
 
 import java.util.Arrays;
 
+import math.MathConsts;
 import math.gemm.Dgemm;
 import math.gemm.Trans;
 import math.solve.LinearEquationsSolver;
@@ -151,8 +152,13 @@ public class DMatrix {
         if (!isSquareMatrix()) {
             throw new IllegalArgumentException("The inverse is only defined for square matrices");
         }
-        return LinearEquationsSolver.solve(this, identity(this.numRows()),
-                new DMatrix(this.numRows(), this.numColumns()));
+        DMatrix identity = identity(this.numRows());
+        DMatrix inv = LinearEquationsSolver.solve(this, identity, new DMatrix(this.numRows(), this.numColumns()));
+        // double check: Dgesv doesn't reliably detect singularity
+        if (!approximatelyEquals(this.mul(inv), identity, 1.5 * Math.sqrt(MathConsts.MACH_EPS_DBL))) {
+            throw new RuntimeException("Matrix A may be (close to) singular.");
+        }
+        return inv;
     }
 
     public DMatrix add(DMatrix B) {
@@ -226,13 +232,16 @@ public class DMatrix {
         return C;
     }
 
-    public static boolean approximatelyEquals(DMatrix A, DMatrix B) {
-        return approximatelyEquals(A, B, 1.0e-8, 0.0);
+    public static boolean approximatelyEquals(DMatrix A, DMatrix B, double absTol) {
+        return approximatelyEquals(A, B, 1.0e-8, absTol);
     }
 
     private static boolean approximatelyEquals(DMatrix A, DMatrix B, double relTol, double absTol) {
         if (A.numRows() != B.numRows() || A.numColumns() != B.numColumns()) {
             return false;
+        }
+        if (absTol < 0.0 || Double.isNaN(absTol) || Double.isInfinite(absTol)) {
+            throw new IllegalArgumentException("illegal absTol : " + absTol);
         }
         if (A == B) {
             return true;
