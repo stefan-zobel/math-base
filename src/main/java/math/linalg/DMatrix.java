@@ -226,6 +226,32 @@ public class DMatrix {
         return C;
     }
 
+    public static boolean approximatelyEquals(DMatrix A, DMatrix B) {
+        return approximatelyEquals(A, B, 1.0e-8, 0.0);
+    }
+
+    private static boolean approximatelyEquals(DMatrix A, DMatrix B, double relTol, double absTol) {
+        if (A.numRows() != B.numRows() || A.numColumns() != B.numColumns()) {
+            return false;
+        }
+        if (A == B) {
+            return true;
+        }
+        double[] _a = A.getArrayUnsafe();
+        double[] _b = B.getArrayUnsafe();
+        for (int i = 0; i < _a.length; ++i) {
+            double a = _a[i];
+            double b = _b[i];
+            if (a != b) {
+                double diff = Math.abs(a - b);
+                if (!((diff <= relTol * Math.max(Math.abs(a), Math.abs(b))) || (diff <= absTol))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     protected final int idx(int row, int col) {
         return col * rows + row;
     }
