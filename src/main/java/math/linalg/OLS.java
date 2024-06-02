@@ -24,7 +24,7 @@ import math.list.DoubleList;
 /**
  * Poor man's naive ordinary least squares regression.
  */
-public class OLS {
+public final class OLS {
 
     public static LSSummary estimate(double alpha, DMatrix X, DMatrix y) {
         if (X.numRows() != y.numRows()) {
@@ -102,5 +102,9 @@ public class OLS {
         smmry.setPValues(pValues);
         smmry.setConfidenceIntervals(confIntervals);
         return smmry;
+    }
+
+    private OLS() {
+        // no instances
     }
 }
