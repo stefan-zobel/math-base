@@ -41,8 +41,9 @@ public class OLS {
         }
         LSSummary smmry = new LSSummary(alpha, X, y);
         DMatrix Xtrans = X.transpose();
+        DMatrix XtransTimesXInverse = Xtrans.mul(X).inverse();
         // Note: this may be numerically unstable!
-        DMatrix beta = Xtrans.mul(X).inverse().mul(Xtrans).mul(y);
+        DMatrix beta = XtransTimesXInverse.mul(Xtrans).mul(y);
         smmry.setBeta(beta);
         DMatrix yHat = X.mul(beta);
         smmry.setYHat(yHat);
@@ -69,7 +70,7 @@ public class OLS {
         smmry.setDegreesOfFreedom(df);
         double sigmaHatSquared = epsHat.transpose().mul(epsHat).scaleInplace(1.0 / (df)).get(0, 0);
         smmry.setSigmaHatSquared(sigmaHatSquared);
-        DMatrix varCov = X.transpose().mul(X).inverse().scaleInplace(sigmaHatSquared);
+        DMatrix varCov = XtransTimesXInverse.scaleInplace(sigmaHatSquared);
         smmry.setVarianceCovarianceMatrix(varCov);
         DoubleList standardErrors = new DoubleArrayList(varCov.numRows());
         for (int i = 0; i < varCov.numRows(); ++i) {
