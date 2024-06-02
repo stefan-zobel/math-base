@@ -19,6 +19,7 @@ import java.util.Arrays;
 
 import math.gemm.Dgemm;
 import math.gemm.Trans;
+import math.solve.LinearEquationsSolver;
 
 /**
  * A minimal matrix of doubles that can't do much more than addition,
@@ -144,6 +145,14 @@ public class DMatrix {
             }
         }
         return AT;
+    }
+
+    public DMatrix inverse() {
+        if (!isSquareMatrix()) {
+            throw new IllegalArgumentException("The inverse is only defined for square matrices");
+        }
+        return LinearEquationsSolver.solve(this, identity(this.numRows()),
+                new DMatrix(this.numRows(), this.numColumns()));
     }
 
     public DMatrix add(DMatrix B) {
