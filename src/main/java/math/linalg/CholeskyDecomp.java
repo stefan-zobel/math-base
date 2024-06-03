@@ -23,10 +23,6 @@ public final class CholeskyDecomp {
 
     private static final double TOL = 1.0e-10;
 
-    private static boolean isSquareMatrix(DMatrix A) {
-        return A.numRows() == A.numColumns();
-    }
-
     private static boolean isSymmetricMatrix(DMatrix A) {
         for (int col_ = 0; col_ < A.numColumns(); ++col_) {
             for (int row_ = 0; row_ < A.numRows(); ++row_) {
@@ -47,7 +43,7 @@ public final class CholeskyDecomp {
      * @return the Cholesky factor {@code L}
      */
     public static DMatrix cholesky(DMatrix A) {
-        if (!isSquareMatrix(A)) {
+        if (!A.isSquareMatrix()) {
             throw new IllegalArgumentException("matrix is not square");
         }
         if (!isSymmetricMatrix(A)) {

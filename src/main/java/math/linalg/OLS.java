@@ -41,8 +41,8 @@ public final class OLS {
         }
         LSSummary smmry = new LSSummary(alpha, X, y);
         DMatrix Xtrans = X.transpose();
-        DMatrix XtransTimesXInverse = Xtrans.mul(X).inverse();
         // Note: this may be numerically unstable!
+        DMatrix XtransTimesXInverse = Xtrans.mul(X).inverse();
         DMatrix beta = XtransTimesXInverse.mul(Xtrans).mul(y);
         smmry.setBeta(beta);
         DMatrix yHat = X.mul(beta);
