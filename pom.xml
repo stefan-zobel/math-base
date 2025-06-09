@@ -4,7 +4,7 @@
     <groupId>net.sourceforge.streamsupport</groupId>
     <artifactId>math-base</artifactId>
     <packaging>jar</packaging>
-    <version>1.4.0</version>
+    <version>1.4.1-SNAPSHOT-1</version>
     <name>math-base</name>
     <description>Elementary math utilities with a focus on random number generation, non-linear optimization, interpolation and solvers</description>
     <url>https://github.com/stefan-zobel/math-base/</url>

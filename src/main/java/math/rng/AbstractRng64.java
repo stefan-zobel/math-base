@@ -62,7 +62,17 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public double nextDouble(double min, double max) {
-        return min + (max - min) * nextDouble();
+        if ((max - min) < Double.POSITIVE_INFINITY) {
+            return min + (max - min) * nextDouble();
+        } else {
+            double half = 0.5 * min;
+            double r = nextDouble();
+            r = (r * (0.5 * max - half) + half) * 2.0;
+            if (r > max) {
+                r = Math.nextDown(max);
+            }
+            return r;
+        }
     }
 
     @Override
@@ -98,7 +108,17 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public float nextFloat(float min, float max) {
-        return min + (max - min) * nextFloat();
+        if ((max - min) < Float.POSITIVE_INFINITY) {
+            return min + (max - min) * nextFloat();
+        } else {
+            float half = 0.5f * min;
+            float r = nextFloat();
+            r = (r * (0.5f * max - half) + half) * 2.0f;
+            if (r > max) {
+                r = Math.nextDown(max);
+            }
+            return r;
+        }
     }
 
     @Override
