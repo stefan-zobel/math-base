@@ -21,6 +21,17 @@ import org.junit.Test;
 public final class ACFTest {
 
     @Test
+    public void testBasics() {
+        Assert.assertNull(ACF.acf(null));
+        Assert.assertArrayEquals(new double[] {}, ACF.acf(new double[] {}), 1e-9);
+        Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 99.0 }), 1e-9);
+        Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 99.0 }, 1), 1e-9);
+        Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 99.0 }, 2), 1e-9);
+        Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 99.0 }, 3), 1e-9);
+        Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 1, 2, 3 }, 0), 1e-9);
+    }
+
+    @Test
     public void testBoxJenkins() {
         double[] boxJenkins = new double[] { 47, 64, 23, 71, 38, 64, 55, 41, 59, 48, 71, 35, 57, 40, 58, 44, 80, 55, 37,
                 74, 51, 57, 50, 60, 45, 57, 50, 45, 25, 59, 50, 71, 56, 74, 50, 58, 45, 54, 36, 54, 48, 55, 45, 57, 50,
