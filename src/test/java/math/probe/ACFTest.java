@@ -18,6 +18,9 @@ package math.probe;
 import org.junit.Assert;
 import org.junit.Test;
 
+import math.rng.DefaultRng;
+import math.rng.PseudoRandom;
+
 public final class ACFTest {
 
     @Test
@@ -29,6 +32,29 @@ public final class ACFTest {
         Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 99.0 }, 2), 1e-9);
         Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 99.0 }, 3), 1e-9);
         Assert.assertArrayEquals(new double[] { 1.0 }, ACF.acf(new double[] { 1, 2, 3 }, 0), 1e-9);
+
+        double[] data = new double[] { 5, -5, 5, -5, 5, -5, 5, -5, 5, -5 };
+        Assert.assertArrayEquals(new double[] { 1.0, -0.9, 0.8, -0.7, 0.6, -0.5, 0.4, -0.3, 0.2, -0.1 }, ACF.acf(data),
+                1e-3);
+    }
+
+    @Test
+    public void testIncreasingSeq() {
+        double[] data = new double[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+        double[] expected = new double[] { 1.0, 0.7, 0.41212121, 0.14848485, -0.07878788, -0.25757576, -0.37575758,
+                -0.42121212, -0.38181818, -0.24545455 };
+        Assert.assertArrayEquals(expected, ACF.acf(data), 1e-9);
+    }
+
+    @Test
+    public void testUniformRandom() {
+        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        double[] uniform = rng.doubles(3000, -1000.0, 1000.0).toArray();
+        double[] acf = ACF.acf(uniform);
+
+        for (int i = 1; i <= 11; ++i) {
+            Assert.assertTrue(Math.abs(acf[i]) < 0.1);
+        }
     }
 
     @Test
