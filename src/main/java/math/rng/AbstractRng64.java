@@ -283,14 +283,14 @@ public abstract class AbstractRng64 implements PseudoRandom {
     @Override
     public DoubleStream doubles() {
         return doubleStream(
-                new PseudoRandomDoubleSpliterator(this, 0L, Long.MAX_VALUE, -Double.MAX_VALUE, Double.MAX_VALUE));
+                new PseudoRandomDoubleSpliterator(this, 0L, Long.MAX_VALUE, 0.0, 1.0));
     }
 
     @Override
     public DoubleStream doubles(long streamSize) {
         checkStreamSize(streamSize);
         return doubleStream(
-                new PseudoRandomDoubleSpliterator(this, 0L, streamSize, -Double.MAX_VALUE, Double.MAX_VALUE));
+                new PseudoRandomDoubleSpliterator(this, 0L, streamSize, 0.0, 1.0));
     }
 
     @Override
