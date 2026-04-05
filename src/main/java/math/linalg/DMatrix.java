@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Stefan Zobel
+ * Copyright 2024 - 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -232,6 +232,14 @@ public class DMatrix {
         return C;
     }
 
+    public DMatrix mulBTrans(DMatrix B) {
+        checkMulBTrans(this, B);
+        DMatrix C = new DMatrix(this.rows, B.rows);
+        Dgemm.dgemm(Trans.NO_TRANS, Trans.TRANS, C.rows, C.cols, cols, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
+                C.rows);
+        return C;
+    }
+
     @Override
     public String toString() {
         return toString(this);
@@ -342,6 +350,10 @@ public class DMatrix {
             throw new IndexOutOfBoundsException(
                     "A.numColumns() != B.numRows() (" + A.numColumns() + " != " + B.numRows() + ")");
         }
+    }
+
+    protected static void checkMulBTrans(DMatrix A, DMatrix B) {
+        checkSameCols(A, B);
     }
 
     protected static void checkMul(DMatrix A, DMatrix B, DMatrix C) {
