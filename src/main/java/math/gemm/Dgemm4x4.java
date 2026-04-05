@@ -24,19 +24,19 @@ import java.util.Arrays;
  * A straightforward Java translation of Michael Lehn's pure ANSI C variant of a
  * cache-friendly dgemm routine.
  * <p>
- * https://apfel.mathematik.uni-ulm.de/~lehn/sghpc/day08/page06.html
+ * https://www.mathematik.uni-ulm.de/~lehn/apfel/sghpc/day08/page06.html
  * <p>
- * http://apfel.mathematik.uni-ulm.de/~lehn/sghpc/gemm/page02/index.html
+ * https://www.mathematik.uni-ulm.de/~lehn/apfel/sghpc/gemm/page02/index.html
  * <p>
- * https://apfel.mathematik.uni-ulm.de/~lehn/sghpc/day08/page02.html
+ * https://www.mathematik.uni-ulm.de/~lehn/apfel/sghpc/day08/page02.html
  * <p>
- * https://apfel.mathematik.uni-ulm.de/~lehn/sghpc/day08/page03.html
+ * https://www.mathematik.uni-ulm.de/~lehn/apfel/sghpc/day08/page03.html
  * <p>
- * https://apfel.mathematik.uni-ulm.de/~lehn/sghpc/day08/page04.html
+ * https://www.mathematik.uni-ulm.de/~lehn/apfel/sghpc/day08/page04.html
  * <p>
  * https://stackoverflow.com/questions/1303182/how-does-blas-get-such-extreme-performance/11421344#11421344
  * <p>
- * http://apfel.mathematik.uni-ulm.de/~lehn/sghpc/gemm/
+ * https://www.mathematik.uni-ulm.de/~lehn/apfel/sghpc/gemm/
  * <p>
  * https://stackoverflow.com/questions/35620853/how-to-write-a-matrix-matrix-product-that-can-compete-with-eigen/35637007#35637007
  */
