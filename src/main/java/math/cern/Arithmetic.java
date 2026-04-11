@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.concurrent.ThreadLocalRandom;
 
+import math.MathConsts;
 import math.list.DoubleArrayList;
 import math.list.DoubleList;
 
@@ -587,6 +588,39 @@ public final class Arithmetic {
     }
 
     /**
+     * Finds the x value for a given ytarget on the line through (x0, y0) and
+     * (x1, y1). This supports both interpolation and extrapolation.
+     */
+    public static double interpolateX(double x0, double x1, double y0, double y1, double ytarget) {
+        requireValidNum(x0, x1, y0, y1, ytarget);
+        if (x0 > x1) {
+            throw new IllegalArgumentException("x0 > x1: " + x0 + " > " + x1);
+        }
+        double dy = y1 - y0;
+        if (dy == 0.0) {
+            dy = MathConsts.MACH_EPS_DBL; // Avoid division by zero
+        }
+        // This single formula covers interpolation AND extrapolation
+        return x0 + (ytarget - y0) * (x1 - x0) / dy;
+    }
+
+    /**
+     * Finds the y value for a given xtarget on the line through (x0, y0) and
+     * (x1, y1). This supports both interpolation and extrapolation.
+     */
+    public static double interpolateY(double x0, double x1, double y0, double y1, double xtarget) {
+        requireValidNum(x0, x1, y0, y1, xtarget);
+        if (x0 > x1) {
+            throw new IllegalArgumentException("x0 > x1: " + x0 + " > " + x1);
+        }
+        double dx = x1 - x0;
+        if (dx == 0.0) {
+            dx = MathConsts.MACH_EPS_DBL; // Avoid division by zero
+        }
+        return (y0 * (x1 - xtarget) + y1 * (xtarget - x0)) / dx;
+    }
+
+    /**
      * Returns up to {@code maxCoefficients} coefficients for fractional
      * differencing for degrees of differencing {@code 0 <= d <= 1} where
      * coefficients less than {@code 1.0e-2} are omitted.
@@ -646,6 +680,14 @@ public final class Arithmetic {
             return true;
         }
         return false;
+    }
+
+    public static void requireValidNum(double... args) {
+        for (double arg : args) {
+            if (isBadNum(arg)) {
+                throw new IllegalArgumentException("At least one of the arguments is either NaN or Inf");
+            }
+        }
     }
 
     /**
