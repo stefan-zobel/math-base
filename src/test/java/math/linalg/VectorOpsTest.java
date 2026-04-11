@@ -54,9 +54,9 @@ public class VectorOpsTest {
         VectorOps.plusEquals(m1, m2);
         
         assertEquals(15.5, m1[0], EPSILON);
-        assertEquals("Inf + -Inf muss 0.0 sein", 0.0, m1[1], EPSILON);
-        assertEquals("-Inf + Inf muss 0.0 sein", 0.0, m1[2], EPSILON);
-        assertEquals("Inf + Inf bleibt Inf", Double.POSITIVE_INFINITY, m1[3], 0.0);
+        assertEquals("Inf + -Inf must be 0.0", 0.0, m1[1], EPSILON);
+        assertEquals("-Inf + Inf must be 0.0", 0.0, m1[2], EPSILON);
+        assertEquals("Inf + Inf must stay Inf", Double.POSITIVE_INFINITY, m1[3], 0.0);
     }
 
     @Test
@@ -69,7 +69,7 @@ public class VectorOpsTest {
         VectorOps.plusEquals(m1, m2, factor);
         
         assertEquals(1.0 + (3.0 * 2.0), m1[0], EPSILON); // 7.0
-        assertEquals("Spezialfall Infinites mit Faktor", 0.0, m1[1], EPSILON);
+        assertEquals("Special case Infinity with a factor", 0.0, m1[1], EPSILON);
         assertEquals(2.0 + (4.0 * 2.0), m1[2], EPSILON); // 10.0
     }
 
