@@ -17,6 +17,8 @@ public class VectorOpsBenchmark {
 
     private double[] arrayA;
     private double[] arrayB;
+    private double[] arrayC;
+    private double[] arrayD;
 
     @Setup
     public void setup() {
@@ -37,5 +39,38 @@ public class VectorOpsBenchmark {
     @Benchmark
     public void benchmarkTimesEquals() {
         VectorOps.timesEquals(arrayA, 1.0001);
+    }
+    
+    @Setup
+    public void setupPlusEquals() {
+        arrayC = new double[size];
+        arrayD = new double[size];
+        java.util.Random rand = new java.util.Random();
+        
+        for (int i = 0; i < size; i++) {
+            arrayC[i] = rand.nextDouble();
+            arrayD[i] = rand.nextDouble();
+            
+            if (i % 20 == 0) {
+                arrayC[i] = Double.POSITIVE_INFINITY;
+                arrayD[i] = Double.NEGATIVE_INFINITY;
+            }
+        }
+    }
+
+    /**
+     * Benchmark für plusEquals(double[] m1, double[] m2)
+     */
+    @Benchmark
+    public void benchmarkPlusEquals() {
+        VectorOps.plusEquals(arrayC, arrayD);
+    }
+
+    /**
+     * Benchmark für plusEquals(double[] m1, double[] m2, double factor)
+     */
+    @Benchmark
+    public void benchmarkPlusEqualsWithFactor() {
+        VectorOps.plusEquals(arrayC, arrayD, 2.0);
     }
 }

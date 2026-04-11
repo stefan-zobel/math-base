@@ -11,6 +11,11 @@ package math.linalg;
  * A class of static utility functions for manipulating arrays of double.
  */
 public final class VectorOps {
+
+    public static boolean isVectorized() {
+        return false;
+    }
+
     /**
      * Sets every element of a double array to a given value.
      * 

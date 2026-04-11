@@ -8,6 +8,7 @@
 package math.linalg;
 
 import jdk.incubator.vector.DoubleVector;
+import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorSpecies;
 import jdk.incubator.vector.VectorOperators;
 
@@ -17,6 +18,10 @@ import jdk.incubator.vector.VectorOperators;
 public final class VectorOps {
 
     private static final VectorSpecies<Double> SPECIES = DoubleVector.SPECIES_PREFERRED;
+
+    public static boolean isVectorized() {
+        return true;
+    }
 
     /**
      * Sets every element of a double array to a given value.
@@ -55,7 +60,29 @@ public final class VectorOps {
     }
 
     public static void plusEquals(double[] m1, double[] m2) {
-        for (int i = 0; i < m1.length; i++) {
+        int i = 0;
+        int upperBound = SPECIES.loopBound(m1.length);
+
+        for (; i < upperBound; i += SPECIES.length()) {
+            var v1 = DoubleVector.fromArray(SPECIES, m1, i);
+            var v2 = DoubleVector.fromArray(SPECIES, m2, i);
+
+            VectorMask<Double> m1Inf = v1.test(VectorOperators.IS_INFINITE);
+            VectorMask<Double> m2Inf = v2.test(VectorOperators.IS_INFINITE);
+            VectorMask<Double> bothInf = m1Inf.and(m2Inf);
+
+            VectorMask<Double> diffSign = v1.mul(v2).compare(VectorOperators.LT, 0.0);
+
+            VectorMask<Double> specialCase = bothInf.and(diffSign);
+
+            var res = v1.add(v2);
+
+            res = res.blend(0.0, specialCase);
+
+            res.intoArray(m1, i);
+        }
+
+        for (; i < m1.length; i++) {
             if (Double.isInfinite(m1[i]) && Double.isInfinite(m2[i]) && (m1[i] * m2[i] < 0.0)) {
                 m1[i] = 0.0;
             } else {
@@ -65,10 +92,28 @@ public final class VectorOps {
     }
 
     public static void plusEquals(double[] m1, double[] m2, double factor) {
-        for (int i = 0; i < m1.length; i++) {
-            double m1i = m1[i];
-            double m2i = m2[i];
-            if (Double.isInfinite(m1i) && Double.isInfinite(m2i) && (m1[i] * m2[i] < 0.0)) {
+        int i = 0;
+        int upperBound = SPECIES.loopBound(m1.length);
+
+        var vFactor = DoubleVector.broadcast(SPECIES, factor);
+
+        for (; i < upperBound; i += SPECIES.length()) {
+            var v1 = DoubleVector.fromArray(SPECIES, m1, i);
+            var v2 = DoubleVector.fromArray(SPECIES, m2, i);
+
+            var specialCase = v1.test(VectorOperators.IS_INFINITE)
+                                .and(v2.test(VectorOperators.IS_INFINITE))
+                                .and(v1.mul(v2).compare(VectorOperators.LT, 0.0));
+
+            var res = v2.fma(vFactor, v1);
+
+            res = res.blend(0.0, specialCase);
+
+            res.intoArray(m1, i);
+        }
+
+        for (; i < m1.length; i++) {
+            if (Double.isInfinite(m1[i]) && Double.isInfinite(m2[i]) && (m1[i] * m2[i] < 0.0)) {
                 m1[i] = 0.0;
             } else {
                 m1[i] += m2[i] * factor;
