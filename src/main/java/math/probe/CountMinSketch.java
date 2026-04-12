@@ -15,6 +15,12 @@
  */
 package math.probe;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.PriorityQueue;
+
 import math.rng.BitMix;
 import math.rng.Seed;
 import math.rng.SplitMix64Seed;
@@ -35,6 +41,10 @@ public final class CountMinSketch<T> {
     private final long table[];
     private final long[] hashSeeds;
 
+    private final int k; // how many top-k elements do we want to track?
+    private final HashMap<T, Long> topKMap = new HashMap<>();
+    private final PriorityQueue<T> minHeap;
+
     /**
      * @param depth
      *            Number of hash functions (rows)
@@ -42,23 +52,65 @@ public final class CountMinSketch<T> {
      *            Size of the counter arrays (columns)
      */
     public CountMinSketch(int depth, int width) {
+        this(depth, width, 5);
+    }
+
+    /**
+     * @param depth
+     *            Number of hash functions (rows)
+     * @param width
+     *            Size of the counter arrays (columns)
+     * @param topK
+     *            the number of top elements to keep statistics for
+     */
+    public CountMinSketch(int depth, int width, int topK) {
         this.rows = depth;
         this.cols = width;
+        this.k = topK;
         this.table = new long[checkArrayLength(depth, width)];
         this.hashSeeds = new long[depth];
         for (int i = 0; i < depth; ++i) {
             hashSeeds[i] = SplitMix64Seed.seed();
         }
+        // the heap stores the keys ordered by their estimated frequency
+        this.minHeap = new PriorityQueue<>(Comparator.comparingLong(this::estimateCount));
     }
 
     /**
      * Increments the frequency of a T element.
      */
     public void add(T item) {
+        updateTable(item);
+        updateTopK(item);
+    }
+
+    private void updateTable(T item) {
         totalCount++;
         for (int row = 0; row < rows; ++row) {
             int col = hash(item, row);
             table[idx(row, col)]++;
+        }
+    }
+
+    private void updateTopK(T item) {
+        long count = estimateCount(item);
+
+        if (topKMap.containsKey(item)) {
+            topKMap.put(item, count);
+            // Update heap (must be sorted again)
+            minHeap.remove(item);
+            minHeap.add(item);
+        } else if (topKMap.size() < k) {
+            topKMap.put(item, count);
+            minHeap.add(item);
+        } else if (count > estimateCount(minHeap.peek())) {
+            // the new element is more frequent than the
+            // rarest in the top-K until now
+            T smallest = minHeap.poll();
+            topKMap.remove(smallest);
+
+            topKMap.put(item, count);
+            minHeap.add(item);
         }
     }
 
@@ -72,6 +124,12 @@ public final class CountMinSketch<T> {
             min = Math.min(min, table[idx(row, col)]);
         }
         return min;
+    }
+
+    public List<T> getTopK() {
+        List<T> result = new ArrayList<>(topKMap.keySet());
+        result.sort((a, b) -> Long.compare(estimateCount(b), estimateCount(a)));
+        return result;
     }
 
     public long getTotalCount() {
