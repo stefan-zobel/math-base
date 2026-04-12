@@ -3,7 +3,7 @@ package math.cern;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class InterpolationTest {
+public final class InterpolationTest {
 
     private static final double EPS = 1e-12;
 
