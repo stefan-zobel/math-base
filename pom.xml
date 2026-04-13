@@ -162,6 +162,7 @@
                 <configuration>
                     <disableNoFonts>true</disableNoFonts>
                     <sourcepath>${project.basedir}/src/main/java</sourcepath>
+                    <doclint>none</doclint>
                 </configuration>
             </plugin>
             <plugin>
