@@ -27,6 +27,10 @@ package math.fft;
  */
 public final class Fourier {
 
+    public static boolean isVectorized() {
+        return false;
+    }
+
     public static ComplexArray forwardDFT(double[] data) {
         final int N = data.length;
         if (N == 0) {
@@ -74,6 +78,9 @@ public final class Fourier {
             dataI[0] = srcI0 + dataI[1];
             dataI[1] = srcI0 - dataI[1];
             return new ComplexArray(dataR, dataI, false);
+        }
+        if (!isPowerOfTwo(N)) {
+            return Bluestein.forwardDFT(real, imag);
         }
         double[] dataR = real.clone();
         double[] dataI = imag.clone();
