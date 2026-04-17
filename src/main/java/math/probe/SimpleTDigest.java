@@ -56,6 +56,7 @@ public final class SimpleTDigest {
 
     /**
      * Adds a new sample to the digest.
+     * @param x an additional sample
      */
     public void accept(double x) {
         if (centroids.isEmpty()) {
@@ -107,6 +108,7 @@ public final class SimpleTDigest {
 
     /**
      * Estimates the median using linear interpolation between centroids.
+     * @return the estimated median
      */
     public double getMedian() {
         return getQuantile(0.5);
@@ -114,6 +116,8 @@ public final class SimpleTDigest {
 
     /**
      * Estimates any quantile between 0.0 and 1.0.
+     * @param q proportion between 0.0 and 1.0
+     * @return the estimated quantile value
      */
     public double getQuantile(double q) {
         if (centroids.isEmpty()) {
@@ -209,6 +213,7 @@ public final class SimpleTDigest {
 
     /**
      * P99/P50 Ratio
+     * @return the tail-ratio
      */
     public double getTailRatio() {
         double p99 = getQuantile(0.99);
@@ -250,6 +255,7 @@ public final class SimpleTDigest {
 
     /**
      * Returns the total number of samples processed.
+     * @return total number of samples processed
      */
     public long getTotalWeight() {
         return totalWeight;
@@ -258,6 +264,7 @@ public final class SimpleTDigest {
     /**
      * Returns the current number of centroids in the digest.
      * This represents the memory footprint of the sketch.
+     * @return the current number of centroids
      */
     public int getCentroidCount() {
         return centroids.size();

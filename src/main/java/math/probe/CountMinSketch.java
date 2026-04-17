@@ -78,6 +78,7 @@ public final class CountMinSketch<T> {
 
     /**
      * Increments the frequency of a T element.
+     * @param item an additional item
      */
     public void add(T item) {
         updateTable(item);
@@ -115,7 +116,9 @@ public final class CountMinSketch<T> {
     }
 
     /**
-     * Estimates the frequency of an item. Guaranteed to be >= actual frequency.
+     * Estimates the frequency of an item. Guaranteed to be &ge; actual frequency.
+     * @param item the item
+     * @return the estimated frequency
      */
     public long estimateCount(T item) {
         long min = Long.MAX_VALUE;
