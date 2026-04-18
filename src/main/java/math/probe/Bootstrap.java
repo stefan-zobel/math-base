@@ -266,8 +266,8 @@ public final class Bootstrap {
         // --- Warning for the case of instability ---
         if (Math.abs(ciBCa[0] - ciBCa[1]) < 1e-12) {
             sb.append("\nWARNING: BCa interval has collapsed (lower == upper).\n");
-            sb.append("The sample size (N=").append(originalSample.length).append(") might be too small\n");
-            sb.append("or (less likely) the statistic is extremely biased for this data.\n");
+            sb.append("The sample size (N=").append(originalSample.length).append(") might be too small or\n");
+            sb.append("the data is non-smooth or (less likely) the statistic is extremely biased for this data.\n");
         }
         sb.append("--------------------------------------------------\n");
 
