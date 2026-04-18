@@ -588,8 +588,34 @@ public final class Arithmetic {
     }
 
     /**
-     * Finds the x value for a given ytarget on the line through (x0, y0) and
-     * (x1, y1). This supports both interpolation and extrapolation.
+     * Finds the x value corresponding to a given target y value on the line passing
+     * through the two points {@code (x0, y0)} and {@code (x1, y1)}.
+     * <p>
+     * The result is computed using linear interpolation or extrapolation:
+     * 
+     * <pre>
+     * x = x0 + (ytarget - y0) * (x1 - x0) / (y1 - y0)
+     * </pre>
+     * 
+     * If {@code y0 == y1} (horizontal line), a small epsilon value is used as the
+     * denominator to avoid division by zero.
+     *
+     * @param x0      the x coordinate of the first point; must be a valid (finite,
+     *                non-NaN) number and satisfy {@code x0 <= x1}
+     * @param x1      the x coordinate of the second point; must be a valid (finite,
+     *                non-NaN) number and satisfy {@code x1 >= x0}
+     * @param y0      the y coordinate of the first point; must be a valid (finite,
+     *                non-NaN) number
+     * @param y1      the y coordinate of the second point; must be a valid (finite,
+     *                non-NaN) number
+     * @param ytarget the target y value for which the corresponding x value is to
+     *                be determined; must be a valid (finite, non-NaN) number
+     * @return the x value on the line through {@code (x0, y0)} and {@code (x1, y1)}
+     *         at which the y value equals {@code ytarget}; may lie outside the
+     *         interval {@code [x0, x1]} if {@code ytarget} is outside the range
+     *         {@code [y0, y1]} (extrapolation)
+     * @throws IllegalArgumentException if any argument is invalid (NaN or
+     *                                  infinite), or if {@code x0 > x1}
      */
     public static double interpolateX(double x0, double x1, double y0, double y1, double ytarget) {
         requireValidNum(x0, x1, y0, y1, ytarget);
@@ -605,8 +631,34 @@ public final class Arithmetic {
     }
 
     /**
-     * Finds the y value for a given xtarget on the line through (x0, y0) and
-     * (x1, y1). This supports both interpolation and extrapolation.
+     * Finds the y value corresponding to a given target x value on the line passing
+     * through the two points {@code (x0, y0)} and {@code (x1, y1)}.
+     * <p>
+     * The result is computed using linear interpolation or extrapolation:
+     * 
+     * <pre>
+     * y = (y0 * (x1 - xtarget) + y1 * (xtarget - x0)) / (x1 - x0)
+     * </pre>
+     * 
+     * If {@code x0 == x1} (vertical line), a small epsilon value is used as the
+     * denominator to avoid division by zero.
+     *
+     * @param x0      the x coordinate of the first point; must be a valid (finite,
+     *                non-NaN) number and satisfy {@code x0 <= x1}
+     * @param x1      the x coordinate of the second point; must be a valid (finite,
+     *                non-NaN) number and satisfy {@code x1 >= x0}
+     * @param y0      the y coordinate of the first point; must be a valid (finite,
+     *                non-NaN) number
+     * @param y1      the y coordinate of the second point; must be a valid (finite,
+     *                non-NaN) number
+     * @param xtarget the target x value for which the corresponding y value is to
+     *                be determined; must be a valid (finite, non-NaN) number
+     * @return the y value on the line through {@code (x0, y0)} and {@code (x1, y1)}
+     *         at which the x value equals {@code xtarget}; may lie outside the
+     *         range {@code [y0, y1]} if {@code xtarget} is outside the interval
+     *         {@code [x0, x1]} (extrapolation)
+     * @throws IllegalArgumentException if any argument is invalid (NaN or
+     *                                  infinite), or if {@code x0 > x1}
      */
     public static double interpolateY(double x0, double x1, double y0, double y1, double xtarget) {
         requireValidNum(x0, x1, y0, y1, xtarget);
