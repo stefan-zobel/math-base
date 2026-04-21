@@ -240,6 +240,22 @@ public class DMatrix {
         return C;
     }
 
+    public DMatrix transMulB(DMatrix B) {
+        checkTransMulB(this, B);
+        DMatrix C = new DMatrix(this.cols, this.cols);
+        Dgemm.dgemm(Trans.TRANS, Trans.NO_TRANS, C.rows, C.cols, rows, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
+                C.rows);
+        return C;
+    }
+
+    public DMatrix transMulBTrans(DMatrix B) {
+        checkTransMulBTrans(this, B);
+        DMatrix C = new DMatrix(this.cols, B.rows);
+        Dgemm.dgemm(Trans.TRANS, Trans.TRANS, C.rows, C.cols, rows, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
+                C.rows);
+        return C;
+    }
+
     @Override
     public String toString() {
         return toString(this);
@@ -356,18 +372,14 @@ public class DMatrix {
         checkSameCols(A, B);
     }
 
-    protected static void checkMul(DMatrix A, DMatrix B, DMatrix C) {
-        if (A.numRows() != C.numRows()) {
+    protected static void checkTransMulB(DMatrix A, DMatrix B) {
+        checkSameRows(A, B);
+    }
+
+    protected static void checkTransMulBTrans(DMatrix A, DMatrix B) {
+        if (A.numRows() != B.numColumns()) {
             throw new IndexOutOfBoundsException(
-                    "A.numRows() != C.numRows() (" + A.numRows() + " != " + C.numRows() + ")");
-        }
-        if (A.numColumns() != B.numRows()) {
-            throw new IndexOutOfBoundsException(
-                    "A.numColumns() != B.numRows() (" + A.numColumns() + " != " + B.numRows() + ")");
-        }
-        if (B.numColumns() != C.numColumns()) {
-            throw new IndexOutOfBoundsException(
-                    "B.numColumns() != C.numColumns() (" + B.numColumns() + " != " + C.numColumns() + ")");
+                    "A.numRows() != B.numColumns() (" + A.numRows() + " != " + B.numColumns() + ")");
         }
     }
 
