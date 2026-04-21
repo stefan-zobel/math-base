@@ -17,7 +17,8 @@ package math.linalg;
 
 import java.util.Arrays;
 
-import math.gemm.SgemmBaseline;
+import math.gemm.Sgemm;
+import math.gemm.Trans;
 
 /**
  * A minimal matrix of floats that can't do much more than addition,
@@ -211,7 +212,7 @@ public class FMatrix {
     public FMatrix mul(FMatrix B) {
         checkMul(this, B);
         FMatrix C = new FMatrix(this.rows, B.cols);
-        SgemmBaseline.sgemm(true, true, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
+        Sgemm.sgemm(Trans.NO_TRANS, Trans.NO_TRANS, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
@@ -219,7 +220,7 @@ public class FMatrix {
     public FMatrix mulBTrans(FMatrix B) {
         checkMulBTrans(this, B);
         FMatrix C = new FMatrix(this.rows, B.rows);
-        SgemmBaseline.sgemm(true, false, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
+        Sgemm.sgemm(Trans.NO_TRANS, Trans.TRANS, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
@@ -227,7 +228,7 @@ public class FMatrix {
     public FMatrix transMulB(FMatrix B) {
         checkTransMulB(this, B);
         FMatrix C = new FMatrix(this.cols, this.cols);
-        SgemmBaseline.sgemm(false, true, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
+        Sgemm.sgemm(Trans.TRANS, Trans.NO_TRANS, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
@@ -235,7 +236,7 @@ public class FMatrix {
     public FMatrix transMulBTrans(FMatrix B) {
         checkTransMulBTrans(this, B);
         FMatrix C = new FMatrix(this.cols, B.rows);
-        SgemmBaseline.sgemm(false, false, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
+        Sgemm.sgemm(Trans.TRANS, Trans.TRANS, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
