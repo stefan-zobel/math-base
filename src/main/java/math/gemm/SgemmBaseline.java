@@ -1,5 +1,9 @@
 package math.gemm;
 
+import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
 /**
  * Single-precision dense matrix multiplication implementation for primitive
  * column-major {@code float[]} storage.
@@ -11,22 +15,112 @@ package math.gemm;
 public final class SgemmBaseline {
 
     private static final int UNROLL = 8;
+    private static final int NC = 2048;
+    private static final long PARALLEL_WORK_THRESHOLD = 22_500_000L;
 
     /**
+     * Performs the single-precision matrix-matrix operation
+     * {@code C := alpha * op(A) * op(B) + beta * C} using the baseline
+     * implementation.
+     * 
+     * @param notATransposed
+     *            {@code true} if {@code A} is used as-is, {@code false} if
+     *            {@code A} is treated as transposed
+     * @param notBTransposed
+     *            {@code true} if {@code B} is used as-is, {@code false} if
+     *            {@code B} is treated as transposed
      * @param m
-     *            the number of rows of the matrix op(A) and of the matrix C
+     *            the number of rows of op(A) and of the matrix {@code C}
      * @param n
-     *            the number of columns of the matrix op(B) and the number of
-     *            columns of the matrix C
+     *            the number of columns of op(B) and the number of columns of
+     *            the matrix {@code C}
      * @param k
-     *            the number of columns of the matrix op(A) and the number of
-     *            rows of the matrix op(B)
+     *            the number of columns of op(A) and the number of rows of
+     *            op(B)
+     * @param alpha
+     *            scalar factor applied to {@code op(A) * op(B)}
+     * @param a
+     *            array containing matrix {@code A} in column-major storage
+     * @param _a_offset
+     *            offset into {@code a} where matrix {@code A} starts
+     * @param lda
+     *            leading dimension of matrix {@code A}
+     * @param b
+     *            array containing matrix {@code B} in column-major storage
+     * @param _b_offset
+     *            offset into {@code b} where matrix {@code B} starts
+     * @param ldb
+     *            leading dimension of matrix {@code B}
+     * @param beta
+     *            scalar factor applied to the existing contents of {@code C}
+     * @param c
+     *            array containing matrix {@code C} in column-major storage
+     * @param _c_offset
+     *            offset into {@code c} where matrix {@code C} starts
+     * @param ldc
+     *            leading dimension of matrix {@code C}
      */
     public static void sgemm(boolean notATransposed, boolean notBTransposed, int m, int n, int k, float alpha, float[] a, int _a_offset, int lda,
             float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
 
-        // Quick return if alpha == 0
-        if (alpha == 0.0f) {
+        sgemm(notATransposed, notBTransposed, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc, null);
+    }
+
+    /**
+     * Variant of
+     * {@link #sgemm(boolean, boolean, int, int, int, float, float[], int, int, float[], int, int, float, float[], int, int)}
+     * that optionally parallelizes the computation over column ranges of
+     * {@code C} using the supplied {@link ExecutorService}.
+     * <p>
+     * If {@code executor} is {@code null}, shut down, or the internal workload
+     * heuristic decides against parallel execution, the computation falls back
+     * to the sequential path.
+     * 
+     * @param notATransposed
+     *            {@code true} if {@code A} is used as-is, {@code false} if
+     *            {@code A} is treated as transposed
+     * @param notBTransposed
+     *            {@code true} if {@code B} is used as-is, {@code false} if
+     *            {@code B} is treated as transposed
+     * @param m
+     *            the number of rows of op(A) and of the matrix {@code C}
+     * @param n
+     *            the number of columns of op(B) and the number of columns of
+     *            the matrix {@code C}
+     * @param k
+     *            the number of columns of op(A) and the number of rows of
+     *            op(B)
+     * @param alpha
+     *            scalar factor applied to {@code op(A) * op(B)}
+     * @param a
+     *            array containing matrix {@code A} in column-major storage
+     * @param _a_offset
+     *            offset into {@code a} where matrix {@code A} starts
+     * @param lda
+     *            leading dimension of matrix {@code A}
+     * @param b
+     *            array containing matrix {@code B} in column-major storage
+     * @param _b_offset
+     *            offset into {@code b} where matrix {@code B} starts
+     * @param ldb
+     *            leading dimension of matrix {@code B}
+     * @param beta
+     *            scalar factor applied to the existing contents of {@code C}
+     * @param c
+     *            array containing matrix {@code C} in column-major storage
+     * @param _c_offset
+     *            offset into {@code c} where matrix {@code C} starts
+     * @param ldc
+     *            leading dimension of matrix {@code C}
+     * @param executor
+     *            executor used for optional parallel execution over the
+     *            {@code N} dimension; may be {@code null}
+     */
+    public static void sgemm(boolean notATransposed, boolean notBTransposed, int m, int n, int k, float alpha, float[] a, int _a_offset, int lda,
+            float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc, ExecutorService executor) {
+
+        // Quick return if alpha == 0 or if op(A)*op(B) is empty
+        if (alpha == 0.0f || k == 0) {
             if (beta == 0.0f) {
                 int v = 1;
                 for (int o = n; o > 0; o--) {
@@ -51,30 +145,68 @@ public final class SgemmBaseline {
 
         // Start the operations
 
+        long work = (long) m * (long) n * (long) k;
+        if (shouldParallelize(executor, n, work)) {
+            parallelizeOverN(executor, notATransposed, notBTransposed, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c,
+                    _c_offset, ldc);
+            return;
+        }
+
+        sgemmRange(notATransposed, notBTransposed, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+    }
+
+    private static boolean shouldParallelize(ExecutorService executor, int n, long work) {
+        return executor != null && !executor.isShutdown() && work >= PARALLEL_WORK_THRESHOLD
+                && GemmParallelSupport.taskCount(n, NC) >= 3;
+    }
+
+    private static void parallelizeOverN(ExecutorService executor, boolean notATransposed, boolean notBTransposed, int m, int n, int k,
+            float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset,
+            int ldc) {
+
+        int taskCount = GemmParallelSupport.taskCount(n, NC);
+        if (taskCount <= 1) {
+            sgemmRange(notATransposed, notBTransposed, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset,
+                    ldc);
+            return;
+        }
+
+        ArrayList<Future<?>> futures = new ArrayList<>(taskCount);
+        for (int taskIndex = 0; taskIndex < taskCount; taskIndex++) {
+            int jFrom = GemmParallelSupport.blockStart(taskIndex, taskCount, n, NC);
+            int jTo = GemmParallelSupport.blockEnd(taskIndex, taskCount, n, NC);
+            futures.add(executor.submit(new ColumnRangeTask(notATransposed, notBTransposed, m, jFrom, jTo, k, alpha, a, _a_offset, lda,
+                    b, _b_offset, ldb, beta, c, _c_offset, ldc)));
+        }
+        GemmParallelSupport.awaitAll(futures);
+    }
+
+    private static void sgemmRange(boolean notATransposed, boolean notBTransposed, int m, int jFrom, int jTo, int k, float alpha,
+            float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
+
         if (notBTransposed) {
             if (notATransposed) {
                 // Form C := alpha*A*B + beta*C
-                aTimesB(m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+                aTimesBRange(m, jFrom, jTo, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
             } else {
                 // Form C := alpha*A**T*B + beta*C
-                aTransTimesB(m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+                aTransTimesBRange(m, jFrom, jTo, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
             }
         } else if (notATransposed) {
             // Form C := alpha*A*B**T + beta*C
-            aTimesBTrans(m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+            aTimesBTransRange(m, jFrom, jTo, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
         } else {
             // Form C := alpha*A**T*B**T + beta*C
-            aTransTimesBTrans(m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+            aTransTimesBTransRange(m, jFrom, jTo, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
         }
     }
 
     // Form C := alpha*A*B + beta*C
     private static void aTimesB(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        aTimesBRange(m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+        sgemmRange(true, true, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
     }
 
     private static void aTimesBRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        final int NC = 2048;
         final int KC = 256;
         final int MC = 128;
 
@@ -213,7 +345,7 @@ public final class SgemmBaseline {
 
     // Form C := alpha*A**T*B + beta*C
     private static void aTransTimesB(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        aTransTimesBRange(m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+        sgemmRange(false, true, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
     }
 
     private static void aTransTimesBRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
@@ -305,14 +437,13 @@ public final class SgemmBaseline {
 
     // Form C := alpha*A*B**T + beta*C
     private static void aTimesBTrans(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        aTimesBTransRange(m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+        sgemmRange(true, false, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
     }
 
     private static void aTimesBTransRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        final int NC = 2048;
         final int KC = 256;
         final int MC = 128;
-        
+
         for (int j = jFrom; j < jTo; j += NC) {
             int jb = Math.min(jTo - j, NC);
             for (int p = 0; p < k; p += KC) {
@@ -446,7 +577,7 @@ public final class SgemmBaseline {
 
     // Form C := alpha*A**T*B**T + beta*C
     private static void aTransTimesBTrans(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        aTransTimesBTransRange(m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+        sgemmRange(false, false, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
     }
 
     private static void aTransTimesBTransRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
@@ -533,6 +664,54 @@ public final class SgemmBaseline {
                     c[w + cOffset] = alpha * tmp + beta * c[w + cOffset];
                 }
             }
+        }
+    }
+
+    private static final class ColumnRangeTask implements Runnable {
+
+        private final boolean notATransposed;
+        private final boolean notBTransposed;
+        private final int m;
+        private final int jFrom;
+        private final int jTo;
+        private final int k;
+        private final float alpha;
+        private final float[] a;
+        private final int aOffset;
+        private final int lda;
+        private final float[] b;
+        private final int bOffset;
+        private final int ldb;
+        private final float beta;
+        private final float[] c;
+        private final int cOffset;
+        private final int ldc;
+
+        private ColumnRangeTask(boolean notATransposed, boolean notBTransposed, int m, int jFrom, int jTo, int k, float alpha, float[] a,
+                int aOffset, int lda, float[] b, int bOffset, int ldb, float beta, float[] c, int cOffset, int ldc) {
+            this.notATransposed = notATransposed;
+            this.notBTransposed = notBTransposed;
+            this.m = m;
+            this.jFrom = jFrom;
+            this.jTo = jTo;
+            this.k = k;
+            this.alpha = alpha;
+            this.a = a;
+            this.aOffset = aOffset;
+            this.lda = lda;
+            this.b = b;
+            this.bOffset = bOffset;
+            this.ldb = ldb;
+            this.beta = beta;
+            this.c = c;
+            this.cOffset = cOffset;
+            this.ldc = ldc;
+        }
+
+        @Override
+        public void run() {
+            sgemmRange(notATransposed, notBTransposed, m, jFrom, jTo, k, alpha, a, aOffset, lda, b, bOffset, ldb, beta, c, cOffset,
+                    ldc);
         }
     }
 }

@@ -16,6 +16,7 @@
 package math.gemm;
 
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Java implementation of BLAS generalized matrix multiplication (gemm) for
@@ -161,6 +162,59 @@ public final class Sgemm {
     public static void sgemm(Trans transa, Trans transb, int m, int n, int k, float alpha, float[] a, int _a_offset,
             int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
 
+        sgemm(transa, transb, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc, null);
+    }
+
+    /**
+     * Variant of {@link #sgemm(Trans, Trans, int, int, int, float, float[], int, int, float[], int, int, float, float[], int, int)}
+     * that optionally uses the supplied {@link ExecutorService} to parallelize
+     * the baseline implementation over column ranges of {@code C}.
+     * <p>
+     * If {@code executor} is {@code null}, shut down, or the internal workload
+     * heuristic does not warrant parallel execution, the computation falls back
+     * to the sequential path.
+     * 
+     * @param transa
+     *            transpose matrix {@code A} or not
+     * @param transb
+     *            transpose matrix {@code B} or not
+     * @param m
+     *            the number of rows of the matrix op(A) and of the matrix C
+     * @param n
+     *            the number of columns of the matrix op(B) and the number of
+     *            columns of the matrix C
+     * @param k
+     *            the number of columns of the matrix op(A) and the number of
+     *            rows of the matrix op(B)
+     * @param alpha
+     *            specifies the scalar alpha
+     * @param a
+     *            array containing matrix A
+     * @param _a_offset
+     *            offset into the array {@code a}
+     * @param lda
+     *            the first dimension of A
+     * @param b
+     *            array containing matrix B
+     * @param _b_offset
+     *            offset into the array {@code b}
+     * @param ldb
+     *            the first dimension of B
+     * @param beta
+     *            specifies the scalar beta
+     * @param c
+     *            array containing matrix C
+     * @param _c_offset
+     *            offset into the array {@code c}
+     * @param ldc
+     *            the first dimension of C
+     * @param executor
+     *            executor used for optional parallel execution of the baseline
+     *            implementation over {@code N}; may be {@code null}
+     */
+    public static void sgemm(Trans transa, Trans transb, int m, int n, int k, float alpha, float[] a, int _a_offset,
+            int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc, ExecutorService executor) {
+
         requireNonNull(transa, transb, a, b, c);
 
         int nRowA = 0;
@@ -208,7 +262,7 @@ public final class Sgemm {
          */
 //        if (Math.round(Math.sqrt(m * n)) <= 220L) {
             SgemmBaseline.sgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset,
-                    ldc);
+                    ldc, executor);
 //        } else {
 //            SgemmLehn.sgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc); // TODO
 //        }
