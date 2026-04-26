@@ -201,11 +201,6 @@ public final class SgemmBaseline {
         }
     }
 
-    // Form C := alpha*A*B + beta*C
-    private static void aTimesB(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        sgemmRange(true, true, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
-    }
-
     private static void aTimesBRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
         final int KC = 256;
         final int MC = 128;
@@ -343,11 +338,6 @@ public final class SgemmBaseline {
         }
     }
 
-    // Form C := alpha*A**T*B + beta*C
-    private static void aTransTimesB(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        sgemmRange(false, true, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
-    }
-
     private static void aTransTimesBRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
         // Form C := alpha*A**T*B + beta*C
         final int kLimit = k - UNROLL + 1;
@@ -433,11 +423,6 @@ public final class SgemmBaseline {
                 }
             }
         }
-    }
-
-    // Form C := alpha*A*B**T + beta*C
-    private static void aTimesBTrans(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        sgemmRange(true, false, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
     }
 
     private static void aTimesBTransRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
@@ -573,11 +558,6 @@ public final class SgemmBaseline {
             }
             u++;
         }
-    }
-
-    // Form C := alpha*A**T*B**T + beta*C
-    private static void aTransTimesBTrans(int m, int n, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
-        sgemmRange(false, false, m, 0, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
     }
 
     private static void aTransTimesBTransRange(int m, int jFrom, int jTo, int k, float alpha, float[] a, int _a_offset, int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
