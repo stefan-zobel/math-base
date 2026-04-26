@@ -18,7 +18,10 @@
  */
 package math.gemm;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorSpecies;
@@ -418,29 +421,104 @@ public final class SgemmMRxNR {
     }
 
     //
-    // Compute C <- beta*C + alpha*A*B
+    // Compute C <- beta*C + alpha*A*B (sequential, full column range)
     //
     public static int sgemm(int rowsA, int colsB, int colsA, float alpha, int offA, float[] A, int incRowA, int incColA,
             int offB, float[] B, int incRowB, int incColB, float beta, int offC, float[] C, int incRowC,
             int incColC) {
 
-        int micro_kernel_calls = 0;
+        if (alpha == 0.0f || colsA == 0) {
+            sgescal(rowsA, colsB, beta, offC, C, incRowC, incColC);
+            return 0;
+        }
+        return sgemmRange(rowsA, 0, colsB, colsA, alpha, offA, A, incRowA, incColA,
+                offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC);
+    }
+
+    //
+    // Compute C <- beta*C + alpha*A*B, optionally parallelized over the N dimension.
+    // Falls back to the sequential path when executor is null, shut down, or the
+    // workload heuristic decides against parallel execution.
+    //
+    public static int sgemm(int rowsA, int colsB, int colsA, float alpha, int offA, float[] A, int incRowA, int incColA,
+            int offB, float[] B, int incRowB, int incColB, float beta, int offC, float[] C, int incRowC,
+            int incColC, ExecutorService executor) {
 
         if (alpha == 0.0f || colsA == 0) {
             sgescal(rowsA, colsB, beta, offC, C, incRowC, incColC);
-            return micro_kernel_calls;
+            return 0;
+        }
+        long work = (long) rowsA * (long) colsB * (long) colsA;
+        if (shouldParallelize(executor, colsB, work)) {
+            parallelizeOverN(executor, rowsA, colsB, colsA, alpha, offA, A, incRowA, incColA,
+                    offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC);
+            return 0;
+        }
+        return sgemmRange(rowsA, 0, colsB, colsA, alpha, offA, A, incRowA, incColA,
+                offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC);
+    }
+
+    // The Vector API micro-kernel is faster than the Java-8 scalar kernel, so
+    // parallelism pays off at a lower work volume.
+    private static final long PARALLEL_WORK_THRESHOLD = 25_000_000L;
+
+    static long getParallelWorkThreshold() {
+        return PARALLEL_WORK_THRESHOLD;
+    }
+
+    private static boolean shouldParallelize(ExecutorService executor, int colsB, long work) {
+        return executor != null
+                && !executor.isShutdown()
+                && work >= PARALLEL_WORK_THRESHOLD
+                && GemmParallelSupport.taskCountUncapped(colsB, NC) >= 3;
+    }
+
+    private static void parallelizeOverN(ExecutorService executor, int rowsA, int colsB, int colsA,
+            float alpha, int offA, float[] A, int incRowA, int incColA,
+            int offB, float[] B, int incRowB, int incColB,
+            float beta, int offC, float[] C, int incRowC, int incColC) {
+
+        int taskCount = GemmParallelSupport.taskCountUncapped(colsB, NC);
+        if (taskCount <= 1) {
+            sgemmRange(rowsA, 0, colsB, colsA, alpha, offA, A, incRowA, incColA,
+                    offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC);
+            return;
         }
 
+        ArrayList<Future<?>> futures = new ArrayList<>(taskCount);
+        for (int taskIndex = 0; taskIndex < taskCount; taskIndex++) {
+            int jFrom = GemmParallelSupport.blockStart(taskIndex, taskCount, colsB, NC);
+            int jTo   = GemmParallelSupport.blockEnd(taskIndex, taskCount, colsB, NC);
+            futures.add(executor.submit(new ColumnRangeTask(
+                    rowsA, jFrom, jTo, colsA, alpha, offA, A, incRowA, incColA,
+                    offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC)));
+        }
+        GemmParallelSupport.awaitAll(futures);
+    }
+
+    //
+    // Processes only columns [colsB_from, colsB_to) of C and B.
+    // All panel buffers are allocated locally so this method is safe to call
+    // from multiple threads with disjoint column ranges.
+    //
+    private static int sgemmRange(int rowsA, int colsB_from, int colsB_to, int colsA,
+            float alpha, int offA, float[] A, int incRowA, int incColA,
+            int offB, float[] B, int incRowB, int incColB,
+            float beta, int offC, float[] C, int incRowC, int incColC) {
+
+        int micro_kernel_calls = 0;
+
+        final int rangeN = colsB_to - colsB_from;
         final int mb = (rowsA + MC - 1) / MC;
-        final int nb = (colsB + NC - 1) / NC;
+        final int nb = (rangeN + NC - 1) / NC;
         final int kb = (colsA + KC - 1) / KC;
 
         final int _mc = rowsA % MC;
-        final int _nc = colsB % NC;
+        final int _nc = rangeN % NC;
         final int _kc = colsA % KC;
 
         //
-        // Local buffers for storing panels from A, B and C
+        // Local buffers for storing panels from A, B and C - one set per thread
         //
         final float[] _A = new float[MC * KC];
         final float[] _B = new float[KC * NC];
@@ -449,12 +527,13 @@ public final class SgemmMRxNR {
 
         for (int j = 0; j < nb; ++j) {
             int nc = (j != nb - 1 || _nc == 0) ? NC : _nc;
+            int globalColOffset = colsB_from + j * NC;
 
             for (int l = 0; l < kb; ++l) {
                 int kc = (l != kb - 1 || _kc == 0) ? KC : _kc;
                 float _beta = (l == 0) ? beta : 1.0f;
 
-                pack_B(kc, nc, (offB + l * KC * incRowB + j * NC * incColB), B, incRowB, incColB, _B);
+                pack_B(kc, nc, (offB + l * KC * incRowB + globalColOffset * incColB), B, incRowB, incColB, _B);
 
                 for (int i = 0; i < mb; ++i) {
                     int mc = (i != mb - 1 || _mc == 0) ? MC : _mc;
@@ -462,10 +541,62 @@ public final class SgemmMRxNR {
                     pack_A(mc, kc, (offA + i * MC * incRowA + l * KC * incColA), A, incRowA, incColA, _A);
 
                     micro_kernel_calls += sgemm_macro_kernel(mc, nc, kc, alpha, _beta,
-                            (offC + i * MC * incRowC + j * NC * incColC), C, incRowC, incColC, _A, _B, AB, _C);
+                            (offC + i * MC * incRowC + globalColOffset * incColC), C, incRowC, incColC, _A, _B, AB, _C);
                 }
             }
         }
         return micro_kernel_calls;
+    }
+
+    private static final class ColumnRangeTask implements Runnable {
+
+        private final int rowsA;
+        private final int jFrom;
+        private final int jTo;
+        private final int colsA;
+        private final float alpha;
+        private final int offA;
+        private final float[] A;
+        private final int incRowA;
+        private final int incColA;
+        private final int offB;
+        private final float[] B;
+        private final int incRowB;
+        private final int incColB;
+        private final float beta;
+        private final int offC;
+        private final float[] C;
+        private final int incRowC;
+        private final int incColC;
+
+        private ColumnRangeTask(int rowsA, int jFrom, int jTo, int colsA,
+                float alpha, int offA, float[] A, int incRowA, int incColA,
+                int offB, float[] B, int incRowB, int incColB,
+                float beta, int offC, float[] C, int incRowC, int incColC) {
+            this.rowsA   = rowsA;
+            this.jFrom   = jFrom;
+            this.jTo     = jTo;
+            this.colsA   = colsA;
+            this.alpha   = alpha;
+            this.offA    = offA;
+            this.A       = A;
+            this.incRowA = incRowA;
+            this.incColA = incColA;
+            this.offB    = offB;
+            this.B       = B;
+            this.incRowB = incRowB;
+            this.incColB = incColB;
+            this.beta    = beta;
+            this.offC    = offC;
+            this.C       = C;
+            this.incRowC = incRowC;
+            this.incColC = incColC;
+        }
+
+        @Override
+        public void run() {
+            sgemmRange(rowsA, jFrom, jTo, colsA, alpha, offA, A, incRowA, incColA,
+                    offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC);
+        }
     }
 }

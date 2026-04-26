@@ -32,6 +32,15 @@ final class GemmParallelSupport {
         return Math.max(1, Math.min(available, blocks));
     }
 
+    static int taskCountUncapped(int columns, int blockSize) {
+        if (columns <= 0) {
+            return 1;
+        }
+        int available = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int blocks = ceilDiv(columns, blockSize);
+        return Math.max(1, Math.min(available, blocks));
+    }
+
     static int blockStart(int taskIndex, int taskCount, int columns, int blockSize) {
         int blocks = ceilDiv(columns, blockSize);
         int blockFrom = (taskIndex * blocks) / taskCount;
