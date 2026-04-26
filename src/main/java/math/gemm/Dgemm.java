@@ -260,11 +260,11 @@ public final class Dgemm {
          * @param k the number of columns of the matrix op(A) and the number of
          * rows of the matrix op(B)
          */
-        if (Math.round(Math.sqrt(m * n)) <= 220L) {
+        if (Math.round(Math.sqrt(n * m)) >= 295L && Math.max(n, m) >= 850) {
+            DgemmLehn.dgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+        } else {
             DgemmBaseline.dgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset,
                     ldc, executor);
-        } else {
-            DgemmLehn.dgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
         }
     }
 
