@@ -1,6 +1,7 @@
 package math.fft;
 
 import org.openjdk.jmh.annotations.*;
+
 import java.util.concurrent.TimeUnit;
 import java.util.Random;
 
@@ -18,8 +19,17 @@ public class FourierBenchmark {
     private double[] arrayReal;
     private double[] arrayImag;
 
+    private static void checkVersion() {
+        String jvmVersion = System.getProperty("java.vm.version");
+        String location = Fourier.class.getClassLoader().getResource(Fourier.class.getName().replace('.', '/') + ".class").toString();
+        System.err.println("\nJVM version: " + jvmVersion);
+        System.err.println("Fourier location: " + location);
+        System.err.flush();
+    }
+
     @Setup
     public void setup() {
+        checkVersion();
         arrayReal = new double[size];
         arrayImag = new double[size];
         Random rand = new Random(42);
