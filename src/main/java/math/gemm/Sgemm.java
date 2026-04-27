@@ -260,8 +260,9 @@ public final class Sgemm {
          * @param k the number of columns of the matrix op(A) and the number of
          * rows of the matrix op(B)
          */
-        if (Math.round(Math.sqrt(n * m)) >= 275L && Math.max(n, m) >= 650) {
-            SgemmLehn.sgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc);
+        if (GemmSwitch.useMrxNrAtRuntime(true, notA, notB, m, n, k)) {
+            SgemmLehn.sgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc,
+                    executor);
         } else {
             SgemmBaseline.sgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset,
                     ldc, executor);

@@ -15,9 +15,11 @@
  */
 package math.gemm;
 
+import java.util.concurrent.ExecutorService;
+
 /**
- * Trampoline into Michael Lehn's cache-friendly dgemm routine (called DgemmMRxNR
- * here).
+ * Trampoline into Michael Lehn's cache-friendly BLIS dgemm routine
+ * (called DgemmMRxNR here).
  */
 final class DgemmLehn {
     /**
@@ -33,21 +35,32 @@ final class DgemmLehn {
     static void dgemm(boolean notA, boolean notB, int m, int n, int k, double alpha, double[] A, int _a_offset, int ldA,
             double[] B, int _b_offset, int ldB, double beta, double[] C, int _c_offset, int ldC) {
 
+        dgemm(notA, notB, m, n, k, alpha, A, _a_offset, ldA, B, _b_offset, ldB, beta, C, _c_offset, ldC, null);
+    }
+
+    static void dgemm(boolean notA, boolean notB, int m, int n, int k, double alpha, double[] A, int _a_offset, int ldA,
+            double[] B, int _b_offset, int ldB, double beta, double[] C, int _c_offset, int ldC,
+            ExecutorService executor) {
+
         if (notB) {
             if (notA) {
                 // Form C := alpha*A*B + beta*C.
-                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, 1, ldA, _b_offset, B, 1, ldB, beta, _c_offset, C, 1, ldC);
+                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, 1, ldA, _b_offset, B, 1, ldB, beta, _c_offset, C, 1, ldC,
+                        executor);
             } else {
                 // Form C := alpha*A**T*B + beta*C
-                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, ldA, 1, _b_offset, B, 1, ldB, beta, _c_offset, C, 1, ldC);
+                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, ldA, 1, _b_offset, B, 1, ldB, beta, _c_offset, C, 1, ldC,
+                        executor);
             }
         } else {
             if (notA) {
                 // Form C := alpha*A*B**T + beta*C
-                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, 1, ldA, _b_offset, B, ldB, 1, beta, _c_offset, C, 1, ldC);
+                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, 1, ldA, _b_offset, B, ldB, 1, beta, _c_offset, C, 1, ldC,
+                        executor);
             } else {
                 // Form C := alpha*A**T*B**T + beta*C
-                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, ldA, 1, _b_offset, B, ldB, 1, beta, _c_offset, C, 1, ldC);
+                DgemmMRxNR.dgemm(m, n, k, alpha, _a_offset, A, ldA, 1, _b_offset, B, ldB, 1, beta, _c_offset, C, 1, ldC,
+                        executor);
             }
         }
     }
