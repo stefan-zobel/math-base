@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, 2026 Stefan Zobel
+ * Copyright 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,16 @@ import java.util.concurrent.ExecutorService;
 
 /**
  * Java implementation of BLAS generalized matrix multiplication (gemm) for
- * double-precision Fortran-style matrices (i.e., column-major storage layout
- * matrices holding doubles).
+ * single-precision Fortran-style matrices (i.e., column-major storage layout
+ * matrices holding floats).
  */
-public final class Dgemm {
+public final class Sgemm {
     /**
      * <pre>
      * <code>
      * Purpose =======
      *
-     * DGEMM performs one of the matrix-matrix operations
+     * SGEMM performs one of the matrix-matrix operations
      *
      * C := alpha*op( A )*op( B ) + beta*C,
      *
@@ -75,10 +75,10 @@ public final class Dgemm {
      * op( A ) and the number of rows of the matrix op( B ). K must be at least
      * zero. Unchanged on exit.
      *
-     * ALPHA - DOUBLE PRECISION. On entry, ALPHA specifies the scalar alpha.
+     * ALPHA - SINGLE PRECISION. On entry, ALPHA specifies the scalar alpha.
      * Unchanged on exit.
      *
-     * A - DOUBLE PRECISION array of DIMENSION ( LDA, ka ), where ka is k when
+     * A - SINGLE PRECISION array of DIMENSION ( LDA, ka ), where ka is k when
      * TRANSA = 'N' or 'n', and is m otherwise. Before entry with TRANSA = 'N'
      * or 'n', the leading m by k part of the array A must contain the matrix A,
      * otherwise the leading k by m part of the array A must contain the matrix
@@ -89,7 +89,7 @@ public final class Dgemm {
      * must be at least max( 1, m ), otherwise LDA must be at least max( 1, k ).
      * Unchanged on exit.
      *
-     * B - DOUBLE PRECISION array of DIMENSION ( LDB, kb ), where kb is n when
+     * B - SINGLE PRECISION array of DIMENSION ( LDB, kb ), where kb is n when
      * TRANSB = 'N' or 'n', and is k otherwise. Before entry with TRANSB = 'N'
      * or 'n', the leading k by n part of the array B must contain the matrix B,
      * otherwise the leading n by k part of the array B must contain the matrix
@@ -100,11 +100,11 @@ public final class Dgemm {
      * must be at least max( 1, k ), otherwise LDB must be at least max( 1, n ).
      * Unchanged on exit.
      *
-     * BETA - DOUBLE PRECISION. On entry, BETA specifies the scalar beta. When
+     * BETA - SINGLE PRECISION. On entry, BETA specifies the scalar beta. When
      * BETA is supplied as zero then C need not be set on input. Unchanged on
      * exit.
      *
-     * C - DOUBLE PRECISION array of DIMENSION ( LDC, n ). Before entry, the
+     * C - SINGLE PRECISION array of DIMENSION ( LDC, n ). Before entry, the
      * leading m by n part of the array C must contain the matrix C, except when
      * beta is zero, in which case C need not be set on entry. On exit, the
      * array C is overwritten by the m by n matrix ( alpha*op( A )*op( B ) +
@@ -159,20 +159,20 @@ public final class Dgemm {
      * @param ldc
      *            the first dimension of C
      */
-    public static void dgemm(Trans transa, Trans transb, int m, int n, int k, double alpha, double[] a, int _a_offset,
-            int lda, double[] b, int _b_offset, int ldb, double beta, double[] c, int _c_offset, int ldc) {
+    public static void sgemm(Trans transa, Trans transb, int m, int n, int k, float alpha, float[] a, int _a_offset,
+            int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc) {
 
-        dgemm(transa, transb, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc, null);
+        sgemm(transa, transb, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc, null);
     }
 
     /**
-     * Variant of {@link #dgemm(Trans, Trans, int, int, int, double, double[], int, int, double[], int, int, double, double[], int, int)}
+     * Variant of {@link #sgemm(Trans, Trans, int, int, int, float, float[], int, int, float[], int, int, float, float[], int, int)}
      * that optionally uses the supplied {@link ExecutorService} to parallelize
      * the baseline implementation over column ranges of {@code C}.
      * <p>
-     * If {@code executor} is {@code null}, shut down, or the internal dispatch
-     * selects the non-baseline implementation, the computation proceeds without
-     * using the supplied executor.
+     * If {@code executor} is {@code null}, shut down, or the internal workload
+     * heuristic does not warrant parallel execution, the computation falls back
+     * to the sequential path.
      * 
      * @param transa
      *            transpose matrix {@code A} or not
@@ -212,8 +212,8 @@ public final class Dgemm {
      *            executor used for optional parallel execution of the baseline
      *            implementation over {@code N}; may be {@code null}
      */
-    public static void dgemm(Trans transa, Trans transb, int m, int n, int k, double alpha, double[] a, int _a_offset,
-            int lda, double[] b, int _b_offset, int ldb, double beta, double[] c, int _c_offset, int ldc, ExecutorService executor) {
+    public static void sgemm(Trans transa, Trans transb, int m, int n, int k, float alpha, float[] a, int _a_offset,
+            int lda, float[] b, int _b_offset, int ldb, float beta, float[] c, int _c_offset, int ldc, ExecutorService executor) {
 
         requireNonNull(transa, transb, a, b, c);
 
@@ -247,7 +247,7 @@ public final class Dgemm {
         }
 
         // Quick return if possible
-        if ((m == 0 || n == 0) || ((alpha == 0.0 || k == 0) && beta == 1.0)) {
+        if ((m == 0 || n == 0) || ((alpha == 0.0f || k == 0) && beta == 1.0f)) {
             return;
         }
 
@@ -260,11 +260,11 @@ public final class Dgemm {
          * @param k the number of columns of the matrix op(A) and the number of
          * rows of the matrix op(B)
          */
-        if (GemmSwitch.useMrxNrAtRuntime(false, notA, notB, m, n, k)) {
-            DgemmLehn.dgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc,
+        if (GemmSwitch.useMrxNrAtRuntime(true, notA, notB, m, n, k)) {
+            SgemmLehn.sgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset, ldc,
                     executor);
         } else {
-            DgemmBaseline.dgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset,
+            SgemmBaseline.sgemm(notA, notB, m, n, k, alpha, a, _a_offset, lda, b, _b_offset, ldb, beta, c, _c_offset,
                     ldc, executor);
         }
     }
@@ -275,7 +275,7 @@ public final class Dgemm {
         }
     }
 
-    private Dgemm() {
+    private Sgemm() {
         throw new AssertionError();
     }
 }

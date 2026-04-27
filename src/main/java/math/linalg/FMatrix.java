@@ -1,5 +1,5 @@
 /*
- * Copyright 2024, 2026 Stefan Zobel
+ * Copyright 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,51 +17,49 @@ package math.linalg;
 
 import java.util.Arrays;
 
-import math.MathConsts;
-import math.gemm.Dgemm;
+import math.gemm.Sgemm;
 import math.gemm.Trans;
-import math.solve.LinearEquationsSolver;
 
 /**
- * A minimal matrix of doubles that can't do much more than addition,
+ * A minimal matrix of floats that can't do much more than addition,
  * subtraction and multiplication.
  */
-public class DMatrix {
+public class FMatrix {
 
     protected final int rows;
     protected final int cols;
-    protected final double[] a;
+    protected final float[] a;
 
-    public static DMatrix identity(int dim) {
-        DMatrix I = new DMatrix(dim, dim);
+    public static FMatrix identity(int dim) {
+        FMatrix I = new FMatrix(dim, dim);
         for (int i = 0; i < dim; ++i) {
-            I.setUnsafe(i, i, 1.0);
+            I.setUnsafe(i, i, 1.0f);
         }
         return I;
     }
 
-    public static DMatrix diag(int dim, double value) {
+    public static FMatrix diag(int dim, float value) {
         return identity(dim).scaleInplace(value);
     }
 
-    public DMatrix(int rows, int cols) {
+    public FMatrix(int rows, int cols) {
         this.rows = rows;
         this.cols = cols;
-        this.a = new double[checkArrayLength(rows, cols)];
+        this.a = new float[checkArrayLength(rows, cols)];
     }
 
-    public DMatrix(DMatrix other) {
+    public FMatrix(FMatrix other) {
         this(other.rows, other.cols, Arrays.copyOf(other.a, other.a.length));
     }
 
-    protected DMatrix(int rows, int cols, double[] a) {
+    protected FMatrix(int rows, int cols, float[] a) {
         this.rows = rows;
         this.cols = cols;
         this.a = a;
     }
 
-    public DMatrix copy() {
-        return new DMatrix(this);
+    public FMatrix copy() {
+        return new FMatrix(this);
     }
 
     public int numColumns() {
@@ -76,68 +74,68 @@ public class DMatrix {
         return rows == cols;
     }
 
-    public double get(int row, int col) {
+    public float get(int row, int col) {
         checkIndex(row, col);
         return a[idx(row, col)];
     }
 
-    public double getUnsafe(int row, int col) {
+    public float getUnsafe(int row, int col) {
         return a[idx(row, col)];
     }
 
-    public DMatrix set(int row, int col, double val) {
+    public FMatrix set(int row, int col, float val) {
         checkIndex(row, col);
         a[idx(row, col)] = val;
         return this;
     }
 
-    public void setUnsafe(int row, int col, double val) {
+    public void setUnsafe(int row, int col, float val) {
         a[idx(row, col)] = val;
     }
 
-    public double[] getArrayUnsafe() {
+    public float[] getArrayUnsafe() {
         return a;
     }
 
-    public DMatrix scale(double alpha) {
-        return scale(alpha, new DMatrix(rows, cols));
+    public FMatrix scale(float alpha) {
+        return scale(alpha, new FMatrix(rows, cols));
     }
 
-    public DMatrix scaleInplace(double alpha) {
+    public FMatrix scaleInplace(float alpha) {
         return scale(alpha, this);
     }
 
-    private DMatrix scale(double alpha, DMatrix target) {
-        double[] _a = a;
-        double[] _b = target.a;
+    private FMatrix scale(float alpha, FMatrix target) {
+        float[] _a = a;
+        float[] _b = target.a;
         for (int i = 0; i < _b.length; ++i) {
             _b[i] = alpha * _a[i];
         }
         return target;
     }
 
-    public DMatrix abs() {
-        return abs(new DMatrix(rows, cols));
+    public FMatrix abs() {
+        return abs(new FMatrix(rows, cols));
     }
 
-    public DMatrix absInplace() {
+    public FMatrix absInplace() {
         return abs(this);
     }
 
-    private DMatrix abs(DMatrix target) {
-        double[] _a = a;
-        double[] _b = target.a;
+    private FMatrix abs(FMatrix target) {
+        float[] _a = a;
+        float[] _b = target.a;
         for (int i = 0; i < _b.length; ++i) {
             _b[i] = Math.abs(_a[i]);
         }
         return target;
     }
 
-    public DMatrix transpose() {
+    public FMatrix transpose() {
         if (rows == 1 || cols == 1) {
-            return new DMatrix(cols, rows, Arrays.copyOf(a, a.length));
+            return new FMatrix(cols, rows, Arrays.copyOf(a, a.length));
         }
-        DMatrix AT = new DMatrix(cols, rows);
+        FMatrix AT = new FMatrix(cols, rows);
         int cols_ = cols;
         int rows_ = rows;
         for (int col = 0; col < cols_; ++col) {
@@ -148,57 +146,44 @@ public class DMatrix {
         return AT;
     }
 
-    public DMatrix inverse() {
-        if (!isSquareMatrix()) {
-            throw new IllegalArgumentException("The inverse is only defined for square matrices");
-        }
-        DMatrix identity = identity(this.numRows());
-        DMatrix inv = LinearEquationsSolver.solve(this, identity, new DMatrix(this.numRows(), this.numColumns()));
-        // double check: Dgesv doesn't reliably detect singularity
-        if (!approximatelyEquals(this.mul(inv), identity, 1.5 * Math.sqrt(MathConsts.MACH_EPS_DBL))) {
-            throw new RuntimeException("Matrix A may be (close to) singular.");
-        }
-        return inv;
-    }
-
-    public DMatrix add(DMatrix B) {
+    public FMatrix add(FMatrix B) {
         checkEqualDimension(this, B);
-        return add(B, new DMatrix(rows, cols));
+        return add(B, new FMatrix(rows, cols));
     }
 
-    public DMatrix addInplace(DMatrix B) {
+    public FMatrix addInplace(FMatrix B) {
         checkEqualDimension(this, B);
         return add(B, this);
     }
 
-    private DMatrix add(DMatrix B, DMatrix target) {
-        double[] _a = a;
-        double[] _b = B.a;
-        double[] _c = target.a;
+    private FMatrix add(FMatrix B, FMatrix target) {
+        float[] _a = a;
+        float[] _b = B.a;
+        float[] _c = target.a;
         for (int i = 0; i < _a.length; ++i) {
             _c[i] = _a[i] + _b[i];
         }
         return target;
     }
 
-    public DMatrix addBroadcastedVector(DMatrix B) {
+    public FMatrix addBroadcastedVector(FMatrix B) {
         checkSameRows(this, B);
-        return addBroadcastedVector(B, new DMatrix(rows, cols));
+        return addBroadcastedVector(B, new FMatrix(rows, cols));
     }
 
-    public DMatrix addBroadcastedVectorInplace(DMatrix B) {
+    public FMatrix addBroadcastedVectorInplace(FMatrix B) {
         checkSameRows(this, B);
         return addBroadcastedVector(B, this);
     }
 
-    private DMatrix addBroadcastedVector(DMatrix B, DMatrix target) {
+    private FMatrix addBroadcastedVector(FMatrix B, FMatrix target) {
         if (this.cols == B.cols) {
             return add(B, target);
         }
         if (B.numColumns() == 1) {
-            double[] _a = a;
-            double[] _b = B.a;
-            double[] _c = target.a;
+            float[] _a = a;
+            float[] _b = B.a;
+            float[] _c = target.a;
             int cols_ = cols;
             int rows_ = rows;
             for (int col = 0; col < cols_; ++col) {
@@ -212,46 +197,46 @@ public class DMatrix {
         throw getSameColsException(this, B);
     }
 
-    public DMatrix minus(DMatrix B) {
+    public FMatrix minus(FMatrix B) {
         checkEqualDimension(this, B);
-        DMatrix C = new DMatrix(rows, cols);
-        double[] _a = a;
-        double[] _b = B.a;
-        double[] _c = C.a;
+        FMatrix C = new FMatrix(rows, cols);
+        float[] _a = a;
+        float[] _b = B.a;
+        float[] _c = C.a;
         for (int i = 0; i < _a.length; ++i) {
             _c[i] = _a[i] - _b[i];
         }
         return C;
     }
 
-    public DMatrix mul(DMatrix B) {
+    public FMatrix mul(FMatrix B) {
         checkMul(this, B);
-        DMatrix C = new DMatrix(this.rows, B.cols);
-        Dgemm.dgemm(Trans.NO_TRANS, Trans.NO_TRANS, C.rows, C.cols, cols, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
+        FMatrix C = new FMatrix(this.rows, B.cols);
+        Sgemm.sgemm(Trans.NO_TRANS, Trans.NO_TRANS, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
 
-    public DMatrix mulBTrans(DMatrix B) {
+    public FMatrix mulBTrans(FMatrix B) {
         checkMulBTrans(this, B);
-        DMatrix C = new DMatrix(this.rows, B.rows);
-        Dgemm.dgemm(Trans.NO_TRANS, Trans.TRANS, C.rows, C.cols, cols, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
+        FMatrix C = new FMatrix(this.rows, B.rows);
+        Sgemm.sgemm(Trans.NO_TRANS, Trans.TRANS, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
 
-    public DMatrix transMulB(DMatrix B) {
+    public FMatrix transMulB(FMatrix B) {
         checkTransMulB(this, B);
-        DMatrix C = new DMatrix(this.cols, this.cols);
-        Dgemm.dgemm(Trans.TRANS, Trans.NO_TRANS, C.rows, C.cols, rows, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
+        FMatrix C = new FMatrix(this.cols, this.cols);
+        Sgemm.sgemm(Trans.TRANS, Trans.NO_TRANS, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
 
-    public DMatrix transMulBTrans(DMatrix B) {
+    public FMatrix transMulBTrans(FMatrix B) {
         checkTransMulBTrans(this, B);
-        DMatrix C = new DMatrix(this.cols, B.rows);
-        Dgemm.dgemm(Trans.TRANS, Trans.TRANS, C.rows, C.cols, rows, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
+        FMatrix C = new FMatrix(this.cols, B.rows);
+        Sgemm.sgemm(Trans.TRANS, Trans.TRANS, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
                 C.rows);
         return C;
     }
@@ -261,27 +246,27 @@ public class DMatrix {
         return toString(this);
     }
 
-    public static boolean approximatelyEquals(DMatrix A, DMatrix B, double absTol) {
-        return approximatelyEquals(A, B, 1.0e-8, absTol);
+    public static boolean approximatelyEquals(FMatrix A, FMatrix B, float absTol) {
+        return approximatelyEquals(A, B, 1.0e-4f, absTol);
     }
 
-    private static boolean approximatelyEquals(DMatrix A, DMatrix B, double relTol, double absTol) {
+    private static boolean approximatelyEquals(FMatrix A, FMatrix B, float relTol, float absTol) {
         if (A.numRows() != B.numRows() || A.numColumns() != B.numColumns()) {
             return false;
         }
-        if (absTol < 0.0 || Double.isNaN(absTol) || Double.isInfinite(absTol)) {
+        if (absTol < 0.0f || Float.isNaN(absTol) || Float.isInfinite(absTol)) {
             throw new IllegalArgumentException("illegal absTol : " + absTol);
         }
         if (A == B) {
             return true;
         }
-        double[] _a = A.getArrayUnsafe();
-        double[] _b = B.getArrayUnsafe();
+        float[] _a = A.getArrayUnsafe();
+        float[] _b = B.getArrayUnsafe();
         for (int i = 0; i < _a.length; ++i) {
-            double a = _a[i];
-            double b = _b[i];
+            float a = _a[i];
+            float b = _b[i];
             if (a != b) {
-                double diff = Math.abs(a - b);
+                float diff = Math.abs(a - b);
                 if (!((diff <= relTol * Math.max(Math.abs(a), Math.abs(b))) || (diff <= absTol))) {
                     return false;
                 }
@@ -304,7 +289,7 @@ public class DMatrix {
         }
     }
 
-    protected static String toString(DMatrix mat) {
+    protected static String toString(FMatrix mat) {
         StringBuilder buf = new StringBuilder();
         buf.append("(").append(mat.rows).append(" x ").append(mat.cols).append(")").append(System.lineSeparator());
         int _cols = mat.numColumns() <= 6 ? mat.numColumns() : 5;
@@ -327,7 +312,7 @@ public class DMatrix {
         return buf.toString();
     }
 
-    private static void printRowD(int row, int _cols, DMatrix m, StringBuilder buf) {
+    private static void printRowD(int row, int _cols, FMatrix m, StringBuilder buf) {
         String format = "%.12E";
         int col;
         for (col = 0; col < _cols; ++col) {
@@ -343,47 +328,47 @@ public class DMatrix {
         buf.append(System.lineSeparator());
     }
 
-    protected static void checkSameRows(DMatrix A, DMatrix B) {
+    protected static void checkSameRows(FMatrix A, FMatrix B) {
         if (A.numRows() != B.numRows()) {
             throw new IndexOutOfBoundsException(
                     "A.numRows() != B.numRows() (" + A.numRows() + " != " + B.numRows() + ")");
         }
     }
 
-    protected static void checkSameCols(DMatrix A, DMatrix B) {
+    protected static void checkSameCols(FMatrix A, FMatrix B) {
         if (A.numColumns() != B.numColumns()) {
             throw getSameColsException(A, B);
         }
     }
 
-    protected static void checkEqualDimension(DMatrix A, DMatrix B) {
+    protected static void checkEqualDimension(FMatrix A, FMatrix B) {
         checkSameRows(A, B);
         checkSameCols(A, B);
     }
 
-    protected static void checkMul(DMatrix A, DMatrix B) {
+    protected static void checkMul(FMatrix A, FMatrix B) {
         if (A.numColumns() != B.numRows()) {
             throw new IndexOutOfBoundsException(
                     "A.numColumns() != B.numRows() (" + A.numColumns() + " != " + B.numRows() + ")");
         }
     }
 
-    protected static void checkMulBTrans(DMatrix A, DMatrix B) {
+    protected static void checkMulBTrans(FMatrix A, FMatrix B) {
         checkSameCols(A, B);
     }
 
-    protected static void checkTransMulB(DMatrix A, DMatrix B) {
+    protected static void checkTransMulB(FMatrix A, FMatrix B) {
         checkSameRows(A, B);
     }
 
-    protected static void checkTransMulBTrans(DMatrix A, DMatrix B) {
+    protected static void checkTransMulBTrans(FMatrix A, FMatrix B) {
         if (A.numRows() != B.numColumns()) {
             throw new IndexOutOfBoundsException(
                     "A.numRows() != B.numColumns() (" + A.numRows() + " != " + B.numColumns() + ")");
         }
     }
 
-    protected static void checkAdd(DMatrix A, DMatrix B, DMatrix C) {
+    protected static void checkAdd(FMatrix A, FMatrix B, FMatrix C) {
         checkEqualDimension(A, B);
         if (B.numRows() != C.numRows()) {
             throw new IndexOutOfBoundsException(
@@ -395,7 +380,7 @@ public class DMatrix {
         }
     }
 
-    protected static IndexOutOfBoundsException getSameColsException(DMatrix A, DMatrix B) {
+    protected static IndexOutOfBoundsException getSameColsException(FMatrix A, FMatrix B) {
         return new IndexOutOfBoundsException(
                 "A.numColumns() != B.numColumns() (" + A.numColumns() + " != " + B.numColumns() + ")");
     }
