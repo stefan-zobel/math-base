@@ -4,7 +4,7 @@
     <groupId>net.sourceforge.streamsupport</groupId>
     <artifactId>math-base</artifactId>
     <packaging>jar</packaging>
-    <version>1.5.0-SNAPSHOT-1</version>
+    <version>1.5.0-SNAPSHOT-2</version>
     <name>math-base</name>
     <description>Elementary math utilities with a focus on random number generation, non-linear optimization, interpolation and solvers</description>
     <url>https://github.com/stefan-zobel/math-base/</url>
@@ -40,13 +40,13 @@
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-core</artifactId>
             <version>1.37</version>
-            <scope>test</scope>
+            <!--scope>test<scope-->
         </dependency>
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-generator-annprocess</artifactId>
             <version>1.37</version>
-            <scope>test</scope>
+            <!--scope>test<scope-->
         </dependency>
     </dependencies>
 
@@ -183,9 +183,9 @@
     <profiles>
         <profile>
             <id>run-benchmarks-j25</id>
-                <properties>
-                    <benchmark.class>.*</benchmark.class> 
-                </properties>
+            <properties>
+                <benchmark.class>.*</benchmark.class>
+            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -217,7 +217,7 @@
                                 <argument>--add-modules</argument>
                                 <argument>jdk.incubator.vector</argument>
                                 <argument>-classpath</argument>
-                                <classpath/>
+                                <classpath />
                                 <argument>org.openjdk.jmh.Main</argument>
                                 <argument>${benchmark.class}</argument>
                             </arguments>
