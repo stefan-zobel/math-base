@@ -434,6 +434,14 @@ public final class DgemmMRxNR {
                 offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC);
     }
 
+    public static boolean isVectorized() {
+        return true;
+    }
+
+    public static boolean isVectorApiPresent() {
+        return ModuleLayer.boot().findModule("jdk.incubator.vector").isPresent();
+    }
+
     // The Vector API micro-kernel is faster than the Java-8 scalar kernel, so
     // parallelism pays off at a lower work volume.
     private static final long PARALLEL_WORK_THRESHOLD = 25_000_000L;

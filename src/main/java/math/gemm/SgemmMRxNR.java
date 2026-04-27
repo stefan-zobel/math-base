@@ -433,6 +433,10 @@ public final class SgemmMRxNR {
                 offB, B, incRowB, incColB, beta, offC, C, incRowC, incColC);
     }
 
+    public static boolean isVectorized() {
+        return false;
+    }
+
     private static final long PARALLEL_WORK_THRESHOLD = 45_000_000L;
 
     static long getParallelWorkThreshold() {
