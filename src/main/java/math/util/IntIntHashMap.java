@@ -107,10 +107,12 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return h & (length - 1);
     }
 
+    @Override
     public int size() {
         return size;
     }
 
+    @Override
     public boolean isEmpty() {
         return size == 0;
     }
@@ -120,6 +122,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return null == item ? valIfNoKey : item.getValueInt();
     }
 
+    @Override
     public Integer get(Object key) {
         if (key == null)
             throw new NullPointerException();
@@ -132,6 +135,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return getEntryInt(key) != null;
     }
 
+    @Override
     public boolean containsKey(Object key) {
         if (key == null)
             throw new NullPointerException();
@@ -183,6 +187,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return valIfNoKey;
     }
 
+    @Override
     public Integer put(Integer key, Integer value) {
         if (key == null || value == null)
             throw new NullPointerException();
@@ -253,6 +258,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         }
     }
 
+    @Override
     public void putAll(Map<? extends Integer, ? extends Integer> m) {
         int numKeysToBeAdded = m.size();
         if (numKeysToBeAdded == 0)
@@ -282,6 +288,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return (e == null ? valIfNoKey : e.value);
     }
 
+    @Override
     public Integer remove(Object key) {
         Item e = removeEntryForKey(key);
         return (e == null ? null : e.value);
@@ -371,6 +378,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return e;
     }
 
+    @Override
     public void clear() {
         Arrays.fill(table, null);
         size = 0;
@@ -385,6 +393,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return false;
     }
 
+    @Override
     public boolean containsValue(Object value) {
         if (value == null)
             throw new NullPointerException();
@@ -397,6 +406,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return false;
     }
 
+    @Override
     public Object clone() {
         IntIntHashMap result = null;
         try {
@@ -433,6 +443,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
             return key;
         }
 
+        @Override
         public final Integer getKey() {
             return key;
         }
@@ -441,14 +452,17 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
             return value;
         }
 
+        @Override
         public final Integer getValue() {
             return value;
         }
 
+        @Override
         public final Integer setValue(Integer newValue) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public final boolean equals(Object o) {
             if (!(o instanceof Map.Entry))
                 return false;
@@ -465,10 +479,12 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
             return false;
         }
 
+        @Override
         public final int hashCode() {
             return key ^ value;
         }
 
+        @Override
         public final String toString() {
             return key + "=" + value;
         }
@@ -519,6 +535,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
             }
         }
 
+        @Override
         public final boolean hasNext() {
             return next != null;
         }
@@ -537,6 +554,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
             return e;
         }
 
+        @Override
         public void remove() {
             if (current == null)
                 throw new IllegalStateException();
@@ -547,18 +565,21 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
     }
 
     /* package */ final class ValueIterator extends HashIterator<Integer> {
+        @Override
         public Integer next() {
             return nextEntry().getValue();
         }
     }
 
     /* package */ final class KeyIterator extends HashIterator<Integer> {
+        @Override
         public Integer next() {
             return nextEntry().getKey();
         }
     }
 
     /* package */ final class EntryIterator extends HashIterator<Map.Entry<Integer, Integer>> {
+        @Override
         public Map.Entry<Integer, Integer> next() {
             return nextEntry();
         }
@@ -580,6 +601,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
 
     private transient Set<Map.Entry<Integer, Integer>> entrySet = null;
 
+    @Override
     public Set<Map.Entry<Integer, Integer>> entrySet() {
         return entrySet0();
     }
@@ -590,10 +612,12 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
     }
 
     /* package */ final class EntrySet extends AbstractSet<Map.Entry<Integer, Integer>> {
+        @Override
         public Iterator<Map.Entry<Integer, Integer>> iterator() {
             return newEntryIterator();
         }
 
+        @Override
         public boolean contains(Object o) {
             if (!(o instanceof Map.Entry))
                 return false;
@@ -603,14 +627,17 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
             return candidate != null && candidate.equals(e);
         }
 
+        @Override
         public boolean remove(Object o) {
             return removeMapping(o) != null;
         }
 
+        @Override
         public int size() {
             return size;
         }
 
+        @Override
         public void clear() {
             IntIntHashMap.this.clear();
         }
@@ -619,56 +646,68 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
     private Set<Integer> keySet = null;
     private Collection<Integer> values = null;
 
+    @Override
     public Collection<Integer> values() {
         Collection<Integer> vs = values;
         return (vs != null ? vs : (values = new Values()));
     }
 
+    @Override
     public Set<Integer> keySet() {
         Set<Integer> ks = keySet;
         return (ks != null ? ks : (keySet = new KeySet()));
     }
 
     /* package */ final class KeySet extends AbstractSet<Integer> {
+        @Override
         public Iterator<Integer> iterator() {
             return newKeyIterator();
         }
 
+        @Override
         public int size() {
             return size;
         }
 
+        @Override
         public boolean contains(Object o) {
             return containsKey(o);
         }
 
+        @Override
         public boolean remove(Object o) {
             return IntIntHashMap.this.removeEntryForKey(o) != null;
         }
 
+        @Override
         public void clear() {
             IntIntHashMap.this.clear();
         }
     }
 
     /* package */ final class Values extends AbstractCollection<Integer> {
+        @Override
         public Iterator<Integer> iterator() {
             return newValueIterator();
         }
 
+        @Override
         public int size() {
             return size;
         }
 
+        @Override
         public boolean contains(Object o) {
             return containsValue(o);
         }
 
+        @Override
         public void clear() {
             IntIntHashMap.this.clear();
         }
     }
 
+    @Override
     public boolean equals(Object o) {
         if (o == this)
             return true;
@@ -701,6 +740,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return true;
     }
 
+    @Override
     public int hashCode() {
         int h = 0;
         Iterator<Entry<Integer, Integer>> i = entrySet().iterator();
@@ -709,6 +749,7 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
         return h;
     }
 
+    @Override
     public String toString() {
         Iterator<Entry<Integer, Integer>> i = entrySet().iterator();
         if (!i.hasNext())

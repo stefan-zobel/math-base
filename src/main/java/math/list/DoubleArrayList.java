@@ -1199,6 +1199,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             this.modCount = parent.modCount;
         }
 
+        @Override
         public double set(int index, double element) {
             checkIndex(index, size);
             checkForComodification();
@@ -1207,17 +1208,20 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return oldValue;
         }
 
+        @Override
         public double get(int index) {
             checkIndex(index, size);
             checkForComodification();
             return root.elementData(offset + index);
         }
 
+        @Override
         public int size() {
             checkForComodification();
             return size;
         }
 
+        @Override
         public void add(int index, double element) {
             rangeCheckForAdd(index);
             checkForComodification();
@@ -1233,6 +1237,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return result;
         }
 
+        @Override
         protected void removeRange(int fromIndex, int toIndex) {
             checkForComodification();
             root.removeRange(offset + fromIndex, offset + toIndex);
@@ -1292,6 +1297,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             checkForComodification();
         }
 
+        @Override
         public boolean equals(Object o) {
             if (o == this) {
                 return true;
@@ -1304,6 +1310,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return equal;
         }
 
+        @Override
         public int hashCode() {
             int hash = root.hashCodeRange(offset, offset + size);
             checkForComodification();
@@ -1322,14 +1329,17 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return index >= 0 ? index - offset : -1;
         }
 
+        @Override
         public boolean contains(double o) {
             return indexOf(o) >= 0;
         }
 
+        @Override
         public DForEachIterator iterator() {
             return listIterator();
         }
 
+        @Override
         public DListIterator listIterator(int index) {
             checkForComodification();
             rangeCheckForAdd(index);
@@ -1500,6 +1510,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     return hi;
                 }
 
+                @Override
                 public Spliterator.OfDouble trySplit() {
                     int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
                     // ArrayListSpliterator can be used here as the source is
@@ -1508,6 +1519,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     root.new ArrayListSpliterator(lo, index = mid, expectedModCount);
                 }
 
+                @Override
                 public boolean tryAdvance(DoubleConsumer action) {
                     Objects.requireNonNull(action);
                     int hi = getFence(), i = index;
@@ -1522,6 +1534,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     return false;
                 }
 
+                @Override
                 public void forEachRemaining(DoubleConsumer action) {
                     Objects.requireNonNull(action);
                     int i, hi, mc; // hoist accesses and checks from loop
@@ -1546,10 +1559,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     throw new ConcurrentModificationException();
                 }
 
+                @Override
                 public long estimateSize() {
                     return getFence() - index;
                 }
 
+                @Override
                 public int characteristics() {
                     return Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED;
                 }
@@ -1939,12 +1954,14 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return hi;
         }
 
+        @Override
         public ArrayListSpliterator trySplit() {
             int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
             return (lo >= mid) ? null : // divide range in half unless too small
                     new ArrayListSpliterator(lo, index = mid, expectedModCount);
         }
 
+        @Override
         public boolean tryAdvance(DoubleConsumer action) {
             if (action == null) {
                 throw new NullPointerException();
@@ -1961,6 +1978,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return false;
         }
 
+        @Override
         public void forEachRemaining(DoubleConsumer action) {
             int i, hi, mc; // hoist accesses and checks from loop
             double[] a;
@@ -1986,10 +2004,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             throw new ConcurrentModificationException();
         }
 
+        @Override
         public long estimateSize() {
             return getFence() - index;
         }
 
+        @Override
         public int characteristics() {
             return Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED;
         }

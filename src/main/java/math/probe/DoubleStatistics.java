@@ -160,5 +160,6 @@ public interface DoubleStatistics {
      * 
      * @return a string representation of this object
      */
+    @Override
     String toString();
 }
