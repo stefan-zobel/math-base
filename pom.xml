@@ -83,7 +83,7 @@
                 <configuration>
                     <toolchains>
                         <jdk>
-                            <version>temurin_8</version>
+                            <id>temurin_8</id>
                         </jdk>
                     </toolchains>
                 </configuration>
@@ -117,7 +117,7 @@
                         <configuration>
                             <release>25</release>
                             <jdkToolchain>
-                                <version>temurin_25</version>
+                                <id>temurin_25</id>
                             </jdkToolchain>
                             <compilerArgs>
                                 <arg>--add-modules</arg>
@@ -201,7 +201,7 @@
                         <configuration>
                             <toolchains>
                                 <jdk>
-                                    <version>temurin_25</version>
+                                    <id>temurin_25</id>
                                 </jdk>
                             </toolchains>
                         </configuration>
