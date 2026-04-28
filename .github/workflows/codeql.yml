@@ -54,6 +54,7 @@ jobs:
         languages: 'java'
         build-mode: manual
 #        build-mode: none
+        queries: security-and-quality
         config: |
           paths:
             - src/main/java
@@ -65,7 +66,7 @@ jobs:
       run: |
         export JAVA_HOME=$JAVA_HOME_25_X64
         export PATH=$JAVA_HOME/bin:$PATH
-        export CODEQL_EXTRACTOR_JAVA_AGENT_DISABLE_AUTO_DETECTION=true
+#        export CODEQL_EXTRACTOR_JAVA_AGENT_DISABLE_AUTO_DETECTION=true
 
         mvn clean package --batch-mode \
           -Dmaven.compiler.fork=false \
@@ -74,16 +75,6 @@ jobs:
       env:
         JAVA_HOME: ${{ env.JAVA_HOME_25_X64 }}
         CODEQL_EXTRACTOR_JAVA_RUN_ANNOTATION_PROCESSORS: true
-
-    # Initializes the CodeQL tools for scanning.
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
-      with:
-        languages: ${{ matrix.language }}
-
-        # Details on CodeQL's query packs refer to : https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
-        queries: security-and-quality
-
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
