@@ -368,6 +368,7 @@ public interface DoubleList {
      *            the object to be compared for equality with this DoubleList
      * @return {@code true} if the specified object is equal to this DoubleList
      */
+    @Override
     boolean equals(Object o);
 
     /**
@@ -389,6 +390,7 @@ public interface DoubleList {
      *
      * @return the hash code value for this DoubleList
      */
+    @Override
     int hashCode();
 
     /**

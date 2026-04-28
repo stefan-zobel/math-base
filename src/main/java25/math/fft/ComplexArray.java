@@ -326,6 +326,7 @@ public final class ComplexArray {
         return re.length;
     }
 
+    @Override
     public String toString() {
         int max = length() - 1;
         if (max == -1) {
