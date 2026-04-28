@@ -60,6 +60,7 @@ jobs:
     - name: Build with Maven
       run: |
         mvn clean package --batch-mode \
+          -Dmaven.compiler.fork=false \
           -Dtoolchains.xml.path=$HOME/.m2/toolchains.xml \
           -DskipTests
       env:
