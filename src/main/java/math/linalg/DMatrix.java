@@ -228,7 +228,7 @@ public class DMatrix {
         checkMul(this, B);
         DMatrix C = new DMatrix(this.rows, B.cols);
         Dgemm.dgemm(Trans.NO_TRANS, Trans.NO_TRANS, C.rows, C.cols, cols, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 
@@ -236,7 +236,7 @@ public class DMatrix {
         checkMulBTrans(this, B);
         DMatrix C = new DMatrix(this.rows, B.rows);
         Dgemm.dgemm(Trans.NO_TRANS, Trans.TRANS, C.rows, C.cols, cols, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 
@@ -244,7 +244,7 @@ public class DMatrix {
         checkTransMulB(this, B);
         DMatrix C = new DMatrix(this.cols, this.cols);
         Dgemm.dgemm(Trans.TRANS, Trans.NO_TRANS, C.rows, C.cols, rows, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 
@@ -252,7 +252,7 @@ public class DMatrix {
         checkTransMulBTrans(this, B);
         DMatrix C = new DMatrix(this.cols, B.rows);
         Dgemm.dgemm(Trans.TRANS, Trans.TRANS, C.rows, C.cols, rows, 1.0, a, 0, rows, B.a, 0, B.rows, 0.0, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 

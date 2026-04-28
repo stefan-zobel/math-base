@@ -213,7 +213,7 @@ public class FMatrix {
         checkMul(this, B);
         FMatrix C = new FMatrix(this.rows, B.cols);
         Sgemm.sgemm(Trans.NO_TRANS, Trans.NO_TRANS, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 
@@ -221,7 +221,7 @@ public class FMatrix {
         checkMulBTrans(this, B);
         FMatrix C = new FMatrix(this.rows, B.rows);
         Sgemm.sgemm(Trans.NO_TRANS, Trans.TRANS, C.rows, C.cols, cols, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 
@@ -229,7 +229,7 @@ public class FMatrix {
         checkTransMulB(this, B);
         FMatrix C = new FMatrix(this.cols, this.cols);
         Sgemm.sgemm(Trans.TRANS, Trans.NO_TRANS, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 
@@ -237,7 +237,7 @@ public class FMatrix {
         checkTransMulBTrans(this, B);
         FMatrix C = new FMatrix(this.cols, B.rows);
         Sgemm.sgemm(Trans.TRANS, Trans.TRANS, C.rows, C.cols, rows, 1.0f, a, 0, rows, B.a, 0, B.rows, 0.0f, C.a, 0,
-                C.rows);
+                C.rows, GemmExecutor.get());
         return C;
     }
 
