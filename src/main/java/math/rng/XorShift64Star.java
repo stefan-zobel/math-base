@@ -47,6 +47,7 @@ public class XorShift64Star extends Marsaglia64 {
         super(seed);
     }
 
+    @Override
     public final long nextLong() {
         long x = seed;
         x ^= (x >>> 12);

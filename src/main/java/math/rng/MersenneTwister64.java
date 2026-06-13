@@ -153,6 +153,7 @@ public class MersenneTwister64 extends AbstractRng64 {
         mt[0] = 1L << 63; /* MSB is 1; assuring non-zero initial array */
     }
 
+    @Override
     public final long nextLong() {
         long x;
         if (mti >= NN) { /* generate NN words at one time */

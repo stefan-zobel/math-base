@@ -69,6 +69,7 @@ public class ChiSquare implements ContinuousDistribution {
      *            a given probability
      * @return the value X for which P(x&lt;=X).
      */
+    @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
             return 0.0;

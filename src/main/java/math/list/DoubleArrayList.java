@@ -827,10 +827,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         Itr() {
         }
 
+        @Override
         public boolean hasNext() {
             return cursor != size;
         }
 
+        @Override
         public double next() {
             checkForComodification();
             int i = cursor;
@@ -845,6 +847,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return elementData[lastRet = i];
         }
 
+        @Override
         public void remove() {
             if (lastRet < 0) {
                 throw new IllegalStateException();
@@ -897,18 +900,22 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             cursor = index;
         }
 
+        @Override
         public boolean hasPrevious() {
             return cursor != 0;
         }
 
+        @Override
         public int nextIndex() {
             return cursor;
         }
 
+        @Override
         public int previousIndex() {
             return cursor - 1;
         }
 
+        @Override
         public double previous() {
             checkForComodification();
             int i = cursor - 1;
@@ -923,6 +930,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return elementData[lastRet = i];
         }
 
+        @Override
         public void set(double e) {
             if (lastRet < 0) {
                 throw new IllegalStateException();
@@ -936,6 +944,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             }
         }
 
+        @Override
         public void add(double e) {
             checkForComodification();
 
@@ -999,10 +1008,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             Itr() {
             }
 
+            @Override
             public boolean hasNext() {
                 return cursor != size();
             }
 
+            @Override
             public double next() {
                 checkForComodification();
                 try {
@@ -1017,6 +1028,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 }
             }
 
+            @Override
             public void remove() {
                 if (lastRet < 0) {
                     throw new IllegalStateException();
@@ -1047,10 +1059,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 cursor = index;
             }
 
+            @Override
             public boolean hasPrevious() {
                 return cursor != 0;
             }
 
+            @Override
             public double previous() {
                 checkForComodification();
                 try {
@@ -1064,14 +1078,17 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 }
             }
 
+            @Override
             public int nextIndex() {
                 return cursor;
             }
 
+            @Override
             public int previousIndex() {
                 return cursor - 1;
             }
 
+            @Override
             public void set(double e) {
                 if (lastRet < 0) {
                     throw new IllegalStateException();
@@ -1086,6 +1103,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 }
             }
 
+            @Override
             public void add(double e) {
                 checkForComodification();
                 try {
@@ -1244,10 +1262,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             updateSizeAndModCount(fromIndex - toIndex);
         }
 
+        @Override
         public boolean addAll(DoubleList c) {
             return addAll(this.size, c);
         }
 
+        @Override
         public boolean addAll(int index, DoubleList c) {
             rangeCheckForAdd(index);
             int cSize = c.size();
@@ -1260,19 +1280,23 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return true;
         }
 
+        @Override
         public DoubleList filter(DoublePredicate predicate) {
             return DoubleArrayList.filter(size, offset, root.elementData, predicate);
         }
 
+        @Override
         public DoubleList shuffle() {
             DoubleArrayList.shuffle(size, offset, root.elementData);
             return this;
         }
 
+        @Override
         public boolean removeAll(DoubleList c) {
             return batchRemove(c, false);
         }
 
+        @Override
         public boolean retainAll(DoubleList c) {
             return batchRemove(c, true);
         }
@@ -1287,11 +1311,13 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return modified;
         }
 
+        @Override
         public double[] toArray() {
             checkForComodification();
             return Arrays.copyOfRange(root.elementData, offset, offset + size);
         }
 
+        @Override
         public void sort() {
             Arrays.sort(root.elementData, offset, offset + size);
             checkForComodification();
@@ -1317,12 +1343,14 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             return hash;
         }
 
+        @Override
         public int indexOf(double o) {
             int index = root.indexOfRange(o, offset, offset + size);
             checkForComodification();
             return index >= 0 ? index - offset : -1;
         }
 
+        @Override
         public int lastIndexOf(double o) {
             int index = root.lastIndexOfRange(o, offset, offset + size);
             checkForComodification();
@@ -1349,10 +1377,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 int lastRet = -1;
                 int expectedModCount = SubList.this.modCount;
 
+                @Override
                 public boolean hasNext() {
                     return cursor != SubList.this.size;
                 }
 
+                @Override
                 public double next() {
                     checkForComodification();
                     int i = cursor;
@@ -1367,10 +1397,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     return elementData[offset + (lastRet = i)];
                 }
 
+                @Override
                 public boolean hasPrevious() {
                     return cursor != 0;
                 }
 
+                @Override
                 public double previous() {
                     checkForComodification();
                     int i = cursor - 1;
@@ -1385,6 +1417,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     return elementData[offset + (lastRet = i)];
                 }
 
+                @Override
                 public void forEachRemaining(DoubleConsumer action) {
                     Objects.requireNonNull(action);
                     final int size = SubList.this.size;
@@ -1404,14 +1437,17 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     }
                 }
 
+                @Override
                 public int nextIndex() {
                     return cursor;
                 }
 
+                @Override
                 public int previousIndex() {
                     return cursor - 1;
                 }
 
+                @Override
                 public void remove() {
                     if (lastRet < 0) {
                         throw new IllegalStateException();
@@ -1428,6 +1464,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     }
                 }
 
+                @Override
                 public void set(double e) {
                     if (lastRet < 0) {
                         throw new IllegalStateException();
@@ -1441,6 +1478,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                     }
                 }
 
+                @Override
                 public void add(double e) {
                     checkForComodification();
 
@@ -1463,6 +1501,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             };
         }
 
+        @Override
         public DoubleList subList(int fromIndex, int toIndex) {
             subListRangeCheck(fromIndex, toIndex, size);
             return new SubList(this, fromIndex, toIndex);
@@ -1493,6 +1532,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             } while (slist != null);
         }
 
+        @Override
         public Spliterator.OfDouble spliterator() {
             checkForComodification();
 

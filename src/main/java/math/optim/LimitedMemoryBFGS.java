@@ -61,10 +61,12 @@ public final class LimitedMemoryBFGS implements Optimizer {
         lineMaximizer = new BackTrackLineSearch(function);
     }
 
+    @Override
     public Optimizable getOptimizable() {
         return optimizable;
     }
 
+    @Override
     public boolean isConverged() {
         return converged;
     }
@@ -81,10 +83,12 @@ public final class LimitedMemoryBFGS implements Optimizer {
         return iterations;
     }
 
+    @Override
     public boolean optimize() {
         return optimize(Integer.MAX_VALUE);
     }
 
+    @Override
     public boolean optimize(int numIterations) {
 
         double initialValue = optimizable.getValue();
