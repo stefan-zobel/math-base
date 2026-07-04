@@ -6,7 +6,10 @@ import math.fun.DTriFunction;
 
 public class InfiniteIntegrator {
 
-    /**
+    // =========================================================================
+    // ONEDIMENSIONAL INFINITE INTEGRATOR (1D)
+    // =========================================================================
+    /*
      * Extended 1D integral that automatically handles infinite bounds.
      * Supports: [-inf, +inf], [a, +inf] and [-inf, b]
      */
