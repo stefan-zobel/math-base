@@ -10,8 +10,10 @@ import java.util.stream.IntStream;
  * note that for a symmetric matrix row-major and column-major storage are
  * identical, so the caller does not have to care,</li>
  * <li>parallel round-robin ordering (Brent-Luk): per round {@code n/2}
- * index-disjoint rotations that are applied in two barrier-separated passes so
- * that they can run concurrently without conflict.</li>
+ * index-disjoint rotations, so that every column belongs to exactly one of
+ * them. Each rotation can therefore apply both sides of its two-sided update on
+ * the two columns it owns, which lets a whole round run as a single parallel
+ * dispatch without a barrier.</li>
  * </ul>
  *
  * Decomposes a symmetric {@code n x n} matrix {@code A} into
