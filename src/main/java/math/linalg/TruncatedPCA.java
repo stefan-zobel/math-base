@@ -93,6 +93,7 @@ public final class TruncatedPCA {
      *
      * @param oversampling extra dimensions carried along beyond {@code no_dims}
      * @param iterations   number of subspace iterations to run
+     * @return a {@code TruncatedPCA} that always runs exactly {@code iterations} iterations
      */
     public static TruncatedPCA fixedIterations(int oversampling, int iterations) {
         return new TruncatedPCA(oversampling, 0.0, iterations, DEFAULT_SEED);
@@ -197,19 +198,39 @@ public final class TruncatedPCA {
         return projected;
     }
 
-    /** Whether the last {@link #pca} call reached its tolerance before {@code maxIterations}. */
+    /**
+     * Whether the last {@link #pca} call reached its tolerance before {@code maxIterations}.
+     *
+     * @return {@code true} if the last fit converged
+     */
     public boolean converged() { return converged; }
 
-    /** Iterations the last {@link #pca} call needed. */
+    /**
+     * Iterations the last {@link #pca} call needed.
+     *
+     * @return the number of subspace iterations performed by the last fit
+     */
     public int getIterations() { return iterations; }
 
-    /** Per-feature mean used for centering (length n). */
+    /**
+     * Per-feature mean used for centering (length n).
+     *
+     * @return the per-feature mean of the last fit
+     */
     public double[] getMean() { return mean; }
 
-    /** Kept principal directions, {@code [no_dims][n]}, row k = k-th component. */
+    /**
+     * Kept principal directions, {@code [no_dims][n]}, row k = k-th component.
+     *
+     * @return the principal directions of the last fit
+     */
     public double[][] getComponents() { return components; }
 
-    /** Singular values of the centered matrix for the kept components (descending). */
+    /**
+     * Singular values of the centered matrix for the kept components (descending).
+     *
+     * @return the singular values of the last fit
+     */
     public double[] getSingularValues() { return singularValues; }
 
     // ------------------------------------------------------------------
