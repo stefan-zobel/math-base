@@ -7,359 +7,28 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 import math.linalg.VectorOps;
+import math.minpack.MghProblems.Problem;
 
 /**
  * Tests for the MINPACK port, which had none at all: 3590 lines, no test and no
- * caller. The oracle is external -- the problem set of More, Garbow and
- * Hillstrom, <i>Testing Unconstrained Optimization Software</i>, ACM TOMS 7(1),
- * 1981 -- with the starting points and minimal sums of squares as published
- * there.
+ * caller. The oracle is external -- {@link MghProblems}, the collection of More,
+ * Garbow and Hillstrom -- and the port is exercised through its own FORTRAN
+ * calling convention here, which is what {@code math.optim.LevenbergMarquardt}
+ * exists to hide.
  * <p>
  * The published numbers are not the load-bearing assertion, though. Two checks
- * come first and depend on nothing but the problem definitions in this file:
- * that the analytic Jacobians here agree with finite differences, so that a
- * wrong derivation cannot be mistaken for a defect in the port, and that the
- * gradient of the sum of squares vanishes at every reported solution, which is
- * the defining equation of a least squares minimum. The published minima then
- * catch what those two cannot -- a mistyped data constant, which is
- * self-consistent and would pass both.
+ * come first and depend on nothing but the problem definitions: that their
+ * analytic Jacobians agree with finite differences, so that a wrong derivation
+ * cannot be mistaken for a defect in the port, and that the gradient of the sum
+ * of squares vanishes at every reported solution, which is the defining
+ * equation of a least squares minimum. The published minima then catch what
+ * those two cannot -- a mistyped data constant, which is self-consistent and
+ * would pass both.
  */
 public class MinpackTest {
 
     /** Recommended lower limit for the MINPACK tolerances. */
     private static final double SQRT_EPS = Math.sqrt(Math.ulp(1.0));
-
-    private static final double[] BARD_Y = { 0.14, 0.18, 0.22, 0.25, 0.29, 0.32, 0.35, 0.39, 0.37, 0.58, 0.73, 0.96,
-            1.34, 2.10, 4.39 };
-
-    private static final double[] MEYER_Y = { 34780.0, 28610.0, 23650.0, 19630.0, 16370.0, 13720.0, 11540.0, 9744.0,
-            8261.0, 7030.0, 6005.0, 5147.0, 4427.0, 3820.0, 3307.0, 2872.0 };
-
-    private static final double[] KOWALIK_Y = { 0.1957, 0.1947, 0.1735, 0.1600, 0.0844, 0.0627, 0.0456, 0.0342, 0.0323,
-            0.0235, 0.0246 };
-
-    private static final double[] KOWALIK_U = { 4.0, 2.0, 1.0, 0.5, 0.25, 0.167, 0.125, 0.1, 0.0833, 0.0714, 0.0625 };
-
-    private static final double[] OSBORNE1_Y = { 0.844, 0.908, 0.932, 0.936, 0.925, 0.908, 0.881, 0.850, 0.818, 0.784,
-            0.751, 0.718, 0.685, 0.658, 0.628, 0.603, 0.580, 0.558, 0.538, 0.522, 0.506, 0.490, 0.478, 0.467, 0.457,
-            0.448, 0.438, 0.431, 0.424, 0.420, 0.414, 0.411, 0.406 };
-
-    /**
-     * One problem of the collection, stated zero-based and independent of the
-     * FORTRAN calling convention the port uses.
-     */
-    private abstract static class Problem {
-
-        final String name;
-        final int m;
-        final int n;
-        final double[] start;
-        /** Published sum of squares at the minimum. */
-        final double minimum;
-        /** Tolerance on it, set by how many digits the source publishes. */
-        final double minimumTolerance;
-        /** Published minimizer, or {@code null} when only the value is given. */
-        final double[] solution;
-        /** Tolerance on the minimizer, relative for components above one. */
-        final double solutionTolerance;
-        final int maxEvaluations;
-
-        Problem(String name, int m, int n, double[] start, double minimum, double minimumTolerance, double[] solution,
-                double solutionTolerance, int maxEvaluations) {
-            this.name = name;
-            this.m = m;
-            this.n = n;
-            this.start = start;
-            this.minimum = minimum;
-            this.minimumTolerance = minimumTolerance;
-            this.solution = solution;
-            this.solutionTolerance = solutionTolerance;
-            this.maxEvaluations = maxEvaluations;
-        }
-
-        abstract void residuals(double[] x, double[] r);
-
-        abstract void jacobian(double[] x, double[][] jac);
-
-        boolean hasZeroResidual() {
-            return minimum == 0.0;
-        }
-    }
-
-    private static Problem[] problems() {
-        return new Problem[] {
-
-                // (1) Rosenbrock
-                new Problem("Rosenbrock", 2, 2, new double[] { -1.2, 1.0 }, 0.0, 1.0e-14, new double[] { 1.0, 1.0 },
-                        1.0e-8, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        r[0] = 10.0 * (x[1] - x[0] * x[0]);
-                        r[1] = 1.0 - x[0];
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        jac[0][0] = -20.0 * x[0];
-                        jac[0][1] = 10.0;
-                        jac[1][0] = -1.0;
-                        jac[1][1] = 0.0;
-                    }
-                },
-
-                // (3) Powell badly scaled
-                new Problem("Powell badly scaled", 2, 2, new double[] { 0.0, 1.0 }, 0.0, 1.0e-14,
-                        new double[] { 1.098159e-5, 9.106146 }, 1.0e-5, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        r[0] = 1.0e4 * x[0] * x[1] - 1.0;
-                        r[1] = Math.exp(-x[0]) + Math.exp(-x[1]) - 1.0001;
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        jac[0][0] = 1.0e4 * x[1];
-                        jac[0][1] = 1.0e4 * x[0];
-                        jac[1][0] = -Math.exp(-x[0]);
-                        jac[1][1] = -Math.exp(-x[1]);
-                    }
-                },
-
-                // (4) Brown badly scaled
-                new Problem("Brown badly scaled", 3, 2, new double[] { 1.0, 1.0 }, 0.0, 1.0e-8,
-                        new double[] { 1.0e6, 2.0e-6 }, 1.0e-6, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        r[0] = x[0] - 1.0e6;
-                        r[1] = x[1] - 2.0e-6;
-                        r[2] = x[0] * x[1] - 2.0;
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        jac[0][0] = 1.0;
-                        jac[0][1] = 0.0;
-                        jac[1][0] = 0.0;
-                        jac[1][1] = 1.0;
-                        jac[2][0] = x[1];
-                        jac[2][1] = x[0];
-                    }
-                },
-
-                // (5) Beale
-                new Problem("Beale", 3, 2, new double[] { 1.0, 1.0 }, 0.0, 1.0e-14, new double[] { 3.0, 0.5 }, 1.0e-7,
-                        1000) {
-                    private final double[] y = { 1.5, 2.25, 2.625 };
-
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        for (int i = 0; i < 3; i++) {
-                            r[i] = y[i] - x[0] * (1.0 - Math.pow(x[1], i + 1));
-                        }
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        for (int i = 0; i < 3; i++) {
-                            jac[i][0] = -(1.0 - Math.pow(x[1], i + 1));
-                            jac[i][1] = (i + 1) * x[0] * Math.pow(x[1], i);
-                        }
-                    }
-                },
-
-                // (7) Helical valley
-                new Problem("Helical valley", 3, 3, new double[] { -1.0, 0.0, 0.0 }, 0.0, 1.0e-14,
-                        new double[] { 1.0, 0.0, 0.0 }, 1.0e-8, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        // theta as the source states it, not atan2: for x0 < 0
-                        // the two differ by a full turn on one side of the
-                        // negative axis, which is where this problem starts.
-                        // atan2 jumps there, the definition below does not.
-                        double theta = Math.atan(x[1] / x[0]) / (2.0 * Math.PI);
-                        if (x[0] < 0.0) {
-                            theta += 0.5;
-                        }
-                        r[0] = 10.0 * (x[2] - 10.0 * theta);
-                        r[1] = 10.0 * (Math.sqrt(x[0] * x[0] + x[1] * x[1]) - 1.0);
-                        r[2] = x[2];
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        double tmp = x[0] * x[0] + x[1] * x[1];
-                        double root = Math.sqrt(tmp);
-                        double tpi = 2.0 * Math.PI;
-                        jac[0][0] = 100.0 * x[1] / (tpi * tmp);
-                        jac[0][1] = -100.0 * x[0] / (tpi * tmp);
-                        jac[0][2] = 10.0;
-                        jac[1][0] = 10.0 * x[0] / root;
-                        jac[1][1] = 10.0 * x[1] / root;
-                        jac[1][2] = 0.0;
-                        jac[2][0] = 0.0;
-                        jac[2][1] = 0.0;
-                        jac[2][2] = 1.0;
-                    }
-                },
-
-                // (8) Bard
-                new Problem("Bard", 15, 3, new double[] { 1.0, 1.0, 1.0 }, 8.21487e-3, 1.0e-8, null, 0.0, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        for (int i = 0; i < 15; i++) {
-                            double u = i + 1;
-                            double v = 15 - i;
-                            double w = Math.min(u, v);
-                            r[i] = BARD_Y[i] - (x[0] + u / (v * x[1] + w * x[2]));
-                        }
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        for (int i = 0; i < 15; i++) {
-                            double u = i + 1;
-                            double v = 15 - i;
-                            double w = Math.min(u, v);
-                            double d = v * x[1] + w * x[2];
-                            jac[i][0] = -1.0;
-                            jac[i][1] = u * v / (d * d);
-                            jac[i][2] = u * w / (d * d);
-                        }
-                    }
-                },
-
-                // (10) Meyer
-                new Problem("Meyer", 16, 3, new double[] { 0.02, 4000.0, 250.0 }, 87.9458, 1.0e-3, null, 0.0, 4000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        for (int i = 0; i < 16; i++) {
-                            double t = 45.0 + 5.0 * (i + 1);
-                            r[i] = x[0] * Math.exp(x[1] / (t + x[2])) - MEYER_Y[i];
-                        }
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        for (int i = 0; i < 16; i++) {
-                            double t = 45.0 + 5.0 * (i + 1);
-                            double d = t + x[2];
-                            double e = Math.exp(x[1] / d);
-                            jac[i][0] = e;
-                            jac[i][1] = x[0] * e / d;
-                            jac[i][2] = -x[0] * e * x[1] / (d * d);
-                        }
-                    }
-                },
-
-                // (13) Powell singular -- the Jacobian is rank deficient at the
-                // minimum, which is what makes it worth having here
-                new Problem("Powell singular", 4, 4, new double[] { 3.0, -1.0, 0.0, 1.0 }, 0.0, 1.0e-12,
-                        new double[] { 0.0, 0.0, 0.0, 0.0 }, 1.0e-3, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        r[0] = x[0] + 10.0 * x[1];
-                        r[1] = Math.sqrt(5.0) * (x[2] - x[3]);
-                        r[2] = (x[1] - 2.0 * x[2]) * (x[1] - 2.0 * x[2]);
-                        r[3] = Math.sqrt(10.0) * (x[0] - x[3]) * (x[0] - x[3]);
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        for (int i = 0; i < 4; i++) {
-                            for (int j = 0; j < 4; j++) {
-                                jac[i][j] = 0.0;
-                            }
-                        }
-                        jac[0][0] = 1.0;
-                        jac[0][1] = 10.0;
-                        jac[1][2] = Math.sqrt(5.0);
-                        jac[1][3] = -Math.sqrt(5.0);
-                        jac[2][1] = 2.0 * (x[1] - 2.0 * x[2]);
-                        jac[2][2] = -4.0 * (x[1] - 2.0 * x[2]);
-                        jac[3][0] = 2.0 * Math.sqrt(10.0) * (x[0] - x[3]);
-                        jac[3][3] = -2.0 * Math.sqrt(10.0) * (x[0] - x[3]);
-                    }
-                },
-
-                // (15) Kowalik and Osborne
-                new Problem("Kowalik and Osborne", 11, 4, new double[] { 0.25, 0.39, 0.415, 0.39 }, 3.07505e-4, 1.0e-9,
-                        null, 0.0, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        for (int i = 0; i < 11; i++) {
-                            double u = KOWALIK_U[i];
-                            double num = u * u + u * x[1];
-                            double den = u * u + u * x[2] + x[3];
-                            r[i] = KOWALIK_Y[i] - x[0] * num / den;
-                        }
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        for (int i = 0; i < 11; i++) {
-                            double u = KOWALIK_U[i];
-                            double num = u * u + u * x[1];
-                            double den = u * u + u * x[2] + x[3];
-                            jac[i][0] = -num / den;
-                            jac[i][1] = -x[0] * u / den;
-                            jac[i][2] = x[0] * num * u / (den * den);
-                            jac[i][3] = x[0] * num / (den * den);
-                        }
-                    }
-                },
-
-                // (16) Brown and Dennis
-                new Problem("Brown and Dennis", 20, 4, new double[] { 25.0, 5.0, -5.0, -1.0 }, 85822.2, 0.1, null, 0.0,
-                        4000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        for (int i = 0; i < 20; i++) {
-                            double t = (i + 1) / 5.0;
-                            double a = x[0] + t * x[1] - Math.exp(t);
-                            double b = x[2] + x[3] * Math.sin(t) - Math.cos(t);
-                            r[i] = a * a + b * b;
-                        }
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        for (int i = 0; i < 20; i++) {
-                            double t = (i + 1) / 5.0;
-                            double a = x[0] + t * x[1] - Math.exp(t);
-                            double b = x[2] + x[3] * Math.sin(t) - Math.cos(t);
-                            jac[i][0] = 2.0 * a;
-                            jac[i][1] = 2.0 * a * t;
-                            jac[i][2] = 2.0 * b;
-                            jac[i][3] = 2.0 * b * Math.sin(t);
-                        }
-                    }
-                },
-
-                // (17) Osborne 1
-                new Problem("Osborne 1", 33, 5, new double[] { 0.5, 1.5, -1.0, 0.01, 0.02 }, 5.46489e-5, 1.0e-9, null,
-                        0.0, 1000) {
-                    @Override
-                    void residuals(double[] x, double[] r) {
-                        for (int i = 0; i < 33; i++) {
-                            double t = 10.0 * i;
-                            r[i] = OSBORNE1_Y[i]
-                                    - (x[0] + x[1] * Math.exp(-t * x[3]) + x[2] * Math.exp(-t * x[4]));
-                        }
-                    }
-
-                    @Override
-                    void jacobian(double[] x, double[][] jac) {
-                        for (int i = 0; i < 33; i++) {
-                            double t = 10.0 * i;
-                            jac[i][0] = -1.0;
-                            jac[i][1] = -Math.exp(-t * x[3]);
-                            jac[i][2] = -Math.exp(-t * x[4]);
-                            jac[i][3] = x[1] * t * Math.exp(-t * x[3]);
-                            jac[i][4] = x[2] * t * Math.exp(-t * x[4]);
-                        }
-                    }
-                } };
-    }
 
     /** What a run of the port returns, unpacked back to zero-based arrays. */
     private static final class Outcome {
@@ -372,40 +41,36 @@ public class MinpackTest {
         int jacobianEvaluations;
     }
 
-    /** Bridges a {@link Problem} to the one-based FORTRAN calling convention. */
+    /**
+     * Bridges a {@link Problem} to the one-based FORTRAN calling convention,
+     * including the turn from the column-major Jacobian the library uses to the
+     * row-major two-dimensional one MINPACK wants.
+     */
     private static final class Bridge implements Lmder_fcn, Lmdif_fcn {
 
         private final Problem p;
         private final double[] x;
         private final double[] r;
-        private final double[][] jac;
+        private final double[] jac;
 
         Bridge(Problem p) {
             this.p = p;
             this.x = new double[p.n];
             this.r = new double[p.m];
-            this.jac = new double[p.m][p.n];
-        }
-
-        private void unpack(double[] xOneBased) {
-            for (int j = 0; j < p.n; j++) {
-                x[j] = xOneBased[j + 1];
-            }
+            this.jac = new double[p.m * p.n];
         }
 
         @Override
         public void fcn(int m, int n, double[] xOneBased, double[] fvec, double[][] fjac, int[] iflag) {
-            unpack(xOneBased);
+            System.arraycopy(xOneBased, 1, x, 0, n);
             if (iflag[1] == 1) {
-                p.residuals(x, r);
-                for (int i = 0; i < m; i++) {
-                    fvec[i + 1] = r[i];
-                }
+                p.valueAt(x, r);
+                System.arraycopy(r, 0, fvec, 1, m);
             } else {
-                p.jacobian(x, jac);
-                for (int i = 0; i < m; i++) {
-                    for (int j = 0; j < n; j++) {
-                        fjac[i + 1][j + 1] = jac[i][j];
+                p.jacobianAt(x, jac);
+                for (int j = 0; j < n; j++) {
+                    for (int i = 0; i < m; i++) {
+                        fjac[i + 1][j + 1] = jac[j * m + i];
                     }
                 }
             }
@@ -413,23 +78,21 @@ public class MinpackTest {
 
         @Override
         public void fcn(int m, int n, double[] xOneBased, double[] fvec, int[] iflag) {
-            unpack(xOneBased);
-            p.residuals(x, r);
-            for (int i = 0; i < m; i++) {
-                fvec[i + 1] = r[i];
-            }
+            System.arraycopy(xOneBased, 1, x, 0, n);
+            p.valueAt(x, r);
+            System.arraycopy(r, 0, fvec, 1, m);
         }
     }
 
-    /** Runs {@code lmder_f77}, the full driver -- {@code lmder1_f77} keeps its
-     * evaluation counts to itself. */
+    /**
+     * Runs {@code lmder_f77}, the full driver -- {@code lmder1_f77} keeps its
+     * evaluation counts to itself.
+     */
     private static Outcome runLmder(Problem p, double tol) {
         int m = p.m;
         int n = p.n;
         double[] x = new double[n + 1];
-        for (int j = 0; j < n; j++) {
-            x[j + 1] = p.start[j];
-        }
+        System.arraycopy(p.start, 0, x, 1, n);
         double[] fvec = new double[m + 1];
         double[][] fjac = new double[m + 1][n + 1];
         double[] diag = new double[n + 1];
@@ -450,9 +113,7 @@ public class MinpackTest {
         int m = p.m;
         int n = p.n;
         double[] x = new double[n + 1];
-        for (int j = 0; j < n; j++) {
-            x[j + 1] = p.start[j];
-        }
+        System.arraycopy(p.start, 0, x, 1, n);
         double[] fvec = new double[m + 1];
         double[][] fjac = new double[m + 1][n + 1];
         double[] diag = new double[n + 1];
@@ -470,14 +131,12 @@ public class MinpackTest {
     private static Outcome unpack(Problem p, double[] x, double[] fvec, int[] info, int[] nfev, int[] njev) {
         Outcome o = new Outcome();
         o.x = new double[p.n];
-        for (int j = 0; j < p.n; j++) {
-            o.x[j] = x[j + 1];
-        }
+        System.arraycopy(x, 1, o.x, 0, p.n);
         o.residuals = new double[p.m];
+        System.arraycopy(fvec, 1, o.residuals, 0, p.m);
         double ssq = 0.0;
         for (int i = 0; i < p.m; i++) {
-            o.residuals[i] = fvec[i + 1];
-            ssq += fvec[i + 1] * fvec[i + 1];
+            ssq += o.residuals[i] * o.residuals[i];
         }
         o.sumOfSquares = ssq;
         o.info = info[1];
@@ -490,41 +149,33 @@ public class MinpackTest {
      * The success codes. One and two are the two tolerances met, three is both,
      * and four is a residual orthogonal to the Jacobian -- a stationary point.
      * <p>
-     * Eight belongs here too, and only looks like a failure: it says the same
-     * thing four does and adds that the requested {@code gtol} was below what
-     * can be achieved, which is trivially the case because these runs ask for
-     * {@code gtol == 0}. {@code lmder1_f77} makes the same judgement in the
-     * port itself, remapping eight to four before it returns. The distinction
-     * matters for the facade -- read as a plain number, eight is larger than
-     * every success code and smaller than nothing.
+     * Eight belongs here too, and only looks like a failure: MINPACK sets it
+     * when the scaled gradient norm is down at machine precision, which is a
+     * stationary point by any measure, and files it under "gtol is too small"
+     * merely because a smaller one was asked for. {@code lmder1_f77} makes the
+     * same judgement in the port itself, remapping eight to four before it
+     * returns. The distinction matters for the facade -- read as a plain
+     * number, eight is larger than every success code and smaller than nothing.
      */
     private static boolean isSuccess(int info) {
         return (info >= 1 && info <= 4) || info == 8;
     }
 
-    private static double sumOfSquares(Problem p, double[] x) {
-        double[] r = new double[p.m];
-        p.residuals(x, r);
-        double s = 0.0;
-        for (int i = 0; i < p.m; i++) {
-            s += r[i] * r[i];
-        }
-        return s;
-    }
-
     /**
-     * Every analytic Jacobian in this file, against central differences. This
-     * runs first on purpose: a wrong derivation here would send the solver
-     * somewhere odd and look exactly like a defect in the port.
+     * Every analytic Jacobian of the collection, against central differences.
+     * This runs first on purpose: a wrong derivation there would send the solver
+     * somewhere odd and look exactly like a defect in the port. It pins the
+     * column-major layout at the same time, since a transposed Jacobian would
+     * disagree with the differences everywhere off the diagonal.
      */
     @Test
     public void testAnalyticJacobiansAgreeWithFiniteDifferences() {
         double h = Math.cbrt(Math.ulp(1.0));
-        Problem[] all = problems();
+        Problem[] all = MghProblems.all();
         for (int k = 0; k < all.length; k++) {
             Problem p = all[k];
-            double[][] analytic = new double[p.m][p.n];
-            p.jacobian(p.start, analytic);
+            double[] analytic = new double[p.m * p.n];
+            p.jacobianAt(p.start, analytic);
 
             double[] plus = new double[p.m];
             double[] minus = new double[p.m];
@@ -532,15 +183,15 @@ public class MinpackTest {
             for (int j = 0; j < p.n; j++) {
                 double step = h * Math.max(Math.abs(p.start[j]), 1.0);
                 x[j] = p.start[j] + step;
-                p.residuals(x, plus);
+                p.valueAt(x, plus);
                 x[j] = p.start[j] - step;
-                p.residuals(x, minus);
+                p.valueAt(x, minus);
                 x[j] = p.start[j];
 
                 for (int i = 0; i < p.m; i++) {
                     double numeric = (plus[i] - minus[i]) / (2.0 * step);
                     double scale = Math.max(Math.abs(numeric), 1.0);
-                    assertEquals(p.name + ": d f[" + i + "] / d x[" + j + "]", numeric, analytic[i][j],
+                    assertEquals(p.name + ": d f[" + i + "] / d x[" + j + "]", numeric, analytic[j * p.m + i],
                             1.0e-5 * scale);
                 }
             }
@@ -553,7 +204,7 @@ public class MinpackTest {
      */
     @Test
     public void testZeroResidualProblemsReachTheirKnownSolution() {
-        Problem[] all = problems();
+        Problem[] all = MghProblems.all();
         for (int k = 0; k < all.length; k++) {
             Problem p = all[k];
             if (!p.hasZeroResidual()) {
@@ -578,7 +229,7 @@ public class MinpackTest {
      */
     @Test
     public void testNonZeroResidualProblemsReachThePublishedMinimum() {
-        Problem[] all = problems();
+        Problem[] all = MghProblems.all();
         for (int k = 0; k < all.length; k++) {
             Problem p = all[k];
             if (p.hasZeroResidual()) {
@@ -626,7 +277,7 @@ public class MinpackTest {
     @Test
     public void testTheGradientVanishesAtEverySolution() {
         double[] tolerances = { SQRT_EPS, 1.0e-12 };
-        Problem[] all = problems();
+        Problem[] all = MghProblems.all();
         for (int t = 0; t < tolerances.length; t++) {
             double tol = tolerances[t];
             for (int k = 0; k < all.length; k++) {
@@ -636,15 +287,15 @@ public class MinpackTest {
                 }
                 Outcome o = runLmder(p, tol);
 
-                double[][] jac = new double[p.m][p.n];
-                p.jacobian(o.x, jac);
+                double[] jac = new double[p.m * p.n];
+                p.jacobianAt(o.x, jac);
                 double residualNorm = VectorOps.twoNorm(o.residuals);
                 for (int j = 0; j < p.n; j++) {
                     double dot = 0.0;
                     double columnNorm = 0.0;
                     for (int i = 0; i < p.m; i++) {
-                        dot += jac[i][j] * o.residuals[i];
-                        columnNorm += jac[i][j] * jac[i][j];
+                        dot += jac[j * p.m + i] * o.residuals[i];
+                        columnNorm += jac[j * p.m + i] * jac[j * p.m + i];
                     }
                     columnNorm = Math.sqrt(columnNorm);
                     if (columnNorm == 0.0) {
@@ -652,7 +303,8 @@ public class MinpackTest {
                     }
                     double cosine = Math.abs(dot) / (columnNorm * residualNorm);
                     assertTrue(p.name + " at tol " + tol + ": column " + j
-                            + " is not orthogonal to the residual, cosine = " + cosine, cosine < 10.0 * Math.sqrt(tol));
+                            + " is not orthogonal to the residual, cosine = " + cosine,
+                            cosine < 10.0 * Math.sqrt(tol));
                 }
             }
         }
@@ -664,13 +316,13 @@ public class MinpackTest {
      */
     @Test
     public void testReturnedResidualsBelongToTheReturnedPoint() {
-        Problem[] all = problems();
+        Problem[] all = MghProblems.all();
         for (int k = 0; k < all.length; k++) {
             Problem p = all[k];
             Outcome o = runLmder(p, SQRT_EPS);
 
             double[] expected = new double[p.m];
-            p.residuals(o.x, expected);
+            p.valueAt(o.x, expected);
             for (int i = 0; i < p.m; i++) {
                 assertEquals(p.name + ": residual " + i, expected[i], o.residuals[i], 0.0);
             }
@@ -683,13 +335,13 @@ public class MinpackTest {
      */
     @Test
     public void testNoProblemEndsWorseThanItStarted() {
-        Problem[] all = problems();
+        Problem[] all = MghProblems.all();
         for (int k = 0; k < all.length; k++) {
             Problem p = all[k];
             Outcome o = runLmder(p, SQRT_EPS);
 
-            assertTrue(p.name + ": " + o.sumOfSquares + " > " + sumOfSquares(p, p.start),
-                    o.sumOfSquares <= sumOfSquares(p, p.start));
+            assertTrue(p.name + ": " + o.sumOfSquares + " > " + p.sumOfSquaresAt(p.start),
+                    o.sumOfSquares <= p.sumOfSquaresAt(p.start));
         }
     }
 
@@ -705,7 +357,7 @@ public class MinpackTest {
      */
     @Test
     public void testLmdifReachesTheSameMinimaWithoutAnAnalyticJacobian() {
-        Problem[] all = problems();
+        Problem[] all = MghProblems.all();
         for (int k = 0; k < all.length; k++) {
             Problem p = all[k];
             Outcome withJacobian = runLmder(p, SQRT_EPS);
@@ -738,14 +390,7 @@ public class MinpackTest {
      */
     @Test
     public void testTheDerivativeFreePathPaysForARankDeficientJacobian() {
-        Problem powellSingular = null;
-        Problem[] all = problems();
-        for (int k = 0; k < all.length; k++) {
-            if ("Powell singular".equals(all[k].name)) {
-                powellSingular = all[k];
-            }
-        }
-        assertTrue("Powell singular is in the set", powellSingular != null);
+        Problem powellSingular = byName("Powell singular");
 
         Outcome withJacobian = runLmder(powellSingular, SQRT_EPS);
         Outcome withoutJacobian = runLmdif(powellSingular, SQRT_EPS);
@@ -805,21 +450,12 @@ public class MinpackTest {
      */
     @Test
     public void testBudgetExhaustionIsReportedAsFiveRatherThanSuccess() {
-        Problem meyer = null;
-        Problem[] all = problems();
-        for (int k = 0; k < all.length; k++) {
-            if ("Meyer".equals(all[k].name)) {
-                meyer = all[k];
-            }
-        }
-        assertTrue("Meyer is in the set", meyer != null);
+        Problem meyer = byName("Meyer");
 
         int m = meyer.m;
         int n = meyer.n;
         double[] x = new double[n + 1];
-        for (int j = 0; j < n; j++) {
-            x[j + 1] = meyer.start[j];
-        }
+        System.arraycopy(meyer.start, 0, x, 1, n);
         double[] fvec = new double[m + 1];
         double[][] fjac = new double[m + 1][n + 1];
         double[] diag = new double[n + 1];
@@ -833,13 +469,13 @@ public class MinpackTest {
                 info, nfev, njev, ipvt, qtf);
 
         assertEquals("info", 5, info[1]);
-        assertFalse("5 is not one of the success codes", info[1] >= 1 && info[1] <= 4);
+        assertFalse("5 is not one of the success codes", isSuccess(info[1]));
     }
 
     /** Improper input is reported as {@code info = 0}, not thrown. */
     @Test
     public void testImproperInputIsReportedAsZero() {
-        Problem p = problems()[0];
+        Problem p = MghProblems.all()[0];
         int m = p.m;
         int n = p.n;
         double[] fvec = new double[m + 1];
@@ -861,5 +497,15 @@ public class MinpackTest {
         Minpack_f77.lmder_f77(new Bridge(p), 1, n, new double[n + 1], fvec, fjac, SQRT_EPS, SQRT_EPS, 0.0, 100, diag,
                 1, 100.0, 0, info, nfev, njev, ipvt, qtf);
         assertEquals("m < n", 0, info[1]);
+    }
+
+    private static Problem byName(String name) {
+        Problem[] all = MghProblems.all();
+        for (int k = 0; k < all.length; k++) {
+            if (name.equals(all[k].name)) {
+                return all[k];
+            }
+        }
+        throw new AssertionError(name + " is not in the collection");
     }
 }
