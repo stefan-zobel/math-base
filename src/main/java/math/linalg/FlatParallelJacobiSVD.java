@@ -170,7 +170,15 @@ public final class FlatParallelJacobiSVD {
         if (Math.abs(apq) <= eps * Math.sqrt(app * aqq)) return false;
 
         double tau = (aqq - app) / (2.0 * apq);
-        double t   = Math.signum(tau) / (Math.abs(tau) + Math.sqrt(1.0 + tau * tau));
+        // sign(tau) has to be +1 at tau == 0, which is what Math.signum does NOT
+        // give: it returns 0.0 there, so t, s and the whole rotation collapse to
+        // the identity. Two columns of exactly equal norm - duplicated columns,
+        // or any symmetric pair - then never get orthogonalized and the sweeps
+        // run to the limit without converging. Same form as
+        // SymmetricJacobiEigen, including its overflow guard.
+        double at  = Math.abs(tau);
+        double t   = (at > 1e150) ? 0.5 / tau
+                : ((tau >= 0.0) ? 1.0 : -1.0) / (at + Math.sqrt(1.0 + tau * tau));
         double c   = 1.0 / Math.sqrt(1.0 + t * t);
         double s   = t * c;
 

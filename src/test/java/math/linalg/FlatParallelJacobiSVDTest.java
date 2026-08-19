@@ -293,4 +293,29 @@ public class FlatParallelJacobiSVDTest {
     public void testInPlaceRejectsWideMatrix() {
         new FlatParallelJacobiSVD().decomposeInPlace(new double[6], 2, 3);
     }
+
+    @Test
+    public void testColumnPairOfExactlyEqualNormIsRotated() {
+        // Regression: the rotation angle came from Math.signum(tau), which is
+        // 0.0 at tau == 0 rather than +1. Two columns of exactly equal norm
+        // give tau == 0, so the rotation collapsed to the identity, the pair
+        // was never orthogonalized, the sweeps ran to the limit and the second
+        // singular value came back equal to the first instead of zero.
+        int m = 40;
+        double[] a = new double[m * 2];
+        double[] col = random(m, 1, 4711L);
+        for (int i = 0; i < m; i++) {
+            a[i] = col[i];
+            a[m + i] = col[i];
+        }
+
+        Result r = new FlatParallelJacobiSVD().decompose(a, m, 2);
+
+        assertTrue("a duplicated column pair has to converge", r.converged);
+        assertEquals("the second singular value of a rank one matrix", 0.0, r.sigma[1], EPSILON);
+        assertTrue("the first singular value must not vanish", r.sigma[0] > 0.0);
+        assertEquals("A = U S V^T", 0.0, FlatParallelJacobiSVD.reconstructionError(a, r), EPSILON);
+        // as in testRankDeficientMatrix, only V stays orthogonal for a singular A
+        assertEquals("V orthonormal", 0.0, FlatParallelJacobiSVD.orthonormalityError(r.V, 2, 2), EPSILON);
+    }
 }
