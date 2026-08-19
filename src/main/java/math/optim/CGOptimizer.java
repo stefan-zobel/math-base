@@ -15,6 +15,7 @@ package math.optim;
 
 import java.text.DecimalFormat;
 
+import math.fun.DiffDFunction;
 import math.fun.DiffDMultiFunction;
 import math.fun.DMultiFunctionEval;
 
@@ -43,13 +44,15 @@ public final class CGOptimizer {
     private static final boolean CHECK_SIMPLE_GD_CONVERGENCE = true;
 
     // constants
-    private static final double GOLD = 1.618034;
-    private static final double GLIMIT = 100.0;
-    private static final double TINY = 1.0e-20;
-
-    // overridden in dbrent()
     private static final int ITMAX = 10001;
     private static final double EPS = 1.0e-30;
+
+    // The one-dimensional minimizer this used to carry as private helpers. Its
+    // settings are the ones that were hard-coded in the extracted dbrent, so
+    // the line search behaves as it always did.
+    private static final BrentMinimizer LINE_MINIMIZER = new BrentMinimizer(1.0e-4, 100, 200);
+    // where a line search starts looking, in units of the direction vector
+    private static final double INITIAL_STEP = 0.01;
 
     private static final int RESET_FREQ = 10;
     // default function tolerance
@@ -76,7 +79,8 @@ public final class CGOptimizer {
         }
     } // Minimand
 
-    static final class OneDimDiffFunction {
+    /** The multivariate function restricted to a line, as seen by the minimizer. */
+    static final class OneDimDiffFunction implements DiffDFunction {
         private final DiffDMultiFunction function;
         private final double[] initial;
         private final double[] direction;
@@ -99,11 +103,13 @@ public final class CGOptimizer {
             return currVector;
         }
 
-        double valueAt(double x) {
+        @Override
+        public double apply(double x) {
             return function.apply(vectorOf(x));
         }
 
-        double derivativeAt(double x) {
+        @Override
+        public double derivativeAt(double x) {
             function.derivativeAt(vectorOf(x), currGradient);
             double d = 0.0;
             for (int i = 0; i < currGradient.length; i++) {
@@ -183,7 +189,6 @@ public final class CGOptimizer {
         double[] g = new double[dimension];
         double[] h = new double[dimension];
         double[] p = new double[dimension];
-        double[] bracketing = new double[3];
         for (int j = 0; j < dimension; j++) {
             g[j] = -xi[j];
             xi[j] = g[j];
@@ -199,7 +204,14 @@ public final class CGOptimizer {
                 System.err.print("Iter " + iter + ' ');
             }
             // do a line min along descent direction
-            double[] p2 = lineMinimize(function, p, xi, bracketing);
+            double[] p2 = lineMinimize(function, p, xi);
+            if (p2 == null) {
+                // The function falls without bound along this direction, so
+                // there is nothing to minimize onto. Stop here rather than
+                // iterate the budget away on infinities.
+                return new DMultiFunctionEval(p, sign * function.apply(p), iter,
+                        false);
+            }
             double fp2 = function.apply(p2);
 
             if (!silent) {
@@ -277,237 +289,33 @@ public final class CGOptimizer {
             ++iter;
         } // while
 
-        // too many iterations
-        System.err.println("Warning: exiting minimize because ITER exceeded!");
+        // too many iterations; the returned converged flag says so
         return new DMultiFunctionEval(p, sign * function.apply(p),
                 iter, false);
     }
 
+    /**
+     * Minimizes {@code function} along the line through {@code initial} in the
+     * given {@code direction}. Returns {@code null} if the function has no
+     * minimum along it, which the caller must treat as the end of the run.
+     */
     private static double[] lineMinimize(DiffDMultiFunction function,
-            double[] initial, double[] direction, double[] bracketing) {
-        // make a 1-dim function along the direction line
-        // THIS IS A HACK (but it's the NRiC peoples' hack)
+            double[] initial, double[] direction) {
         OneDimDiffFunction oneDim = new OneDimDiffFunction(function, initial,
                 direction);
-        // do a 1-dim line min on this function
-        // bracket the extreme point
-        double guess = 0.01;
-        bracketing[0] = 0.0;
-        bracketing[1] = guess;
-        bracketing[2] = 0.0;
-        mnbrak(bracketing, oneDim);
-        double ax = bracketing[0];
-        double xx = bracketing[1];
-        double bx = bracketing[2];
-        // CHECK FOR END OF WORLD
-        if (!(ax <= xx && xx <= bx) && !(bx <= xx && xx <= ax)) {
-            System.err.println("Bad bracket order!");
+        BrentMinimizer.Bracket bracket = LINE_MINIMIZER.bracket(oneDim, 0.0,
+                INITIAL_STEP);
+        if (!bracket.bracketed) {
+            return null;
         }
-        // find the extreme point
-        double xmin = dbrent(oneDim, ax, xx, bx);
-        // return the full vector
+        BrentMinimizer.Result min = LINE_MINIMIZER.minimize(oneDim, bracket);
+        double xmin = min.x;
+        // A search that ran out of iterations has not shown that it improved on
+        // where the line started, so do not step unless it did. On the
+        // converged path the improvement is established and this costs nothing.
+        if (!min.converged && !(min.value < oneDim.apply(0.0))) {
+            xmin = 0.0;
+        }
         return oneDim.vectorOf(xmin);
-    }
-
-    private static void mnbrak(double[] bracketing, OneDimDiffFunction func) {
-        // inputs
-        double ax = bracketing[0];
-        double fa = func.valueAt(ax);
-        double bx = bracketing[1];
-        double fb = func.valueAt(bx);
-
-        if (fb > fa) {
-            // swap
-            double tmp = fa;
-            fa = fb;
-            fb = tmp;
-            tmp = ax;
-            ax = bx;
-            bx = tmp;
-        }
-
-        // guess cx
-        double cx = bx + GOLD * (bx - ax);
-        double fc = func.valueAt(cx);
-
-        // loop until we get a bracket
-        while (fb > fc) {
-            double r = (bx - ax) * (fb - fc);
-            double q = (bx - cx) * (fb - fa);
-            double u = bx - ((bx - cx) * q - (bx - ax) * r)
-                    / (2.0 * sign(Math.max(Math.abs(q - r), TINY), q - r));
-            double fu;
-            double ulim = bx + GLIMIT * (cx - bx);
-            if ((bx - u) * (u - cx) > 0.0) {
-                fu = func.valueAt(u);
-                if (fu < fc) {
-                    bracketing[0] = bx;
-                    bracketing[1] = u;
-                    bracketing[2] = cx;
-                    return;
-                } else if (fu > fb) {
-                    bracketing[0] = ax;
-                    bracketing[1] = bx;
-                    bracketing[2] = u;
-                    return;
-                }
-                u = cx + GOLD * (cx - bx);
-                fu = func.valueAt(u);
-            } else if ((cx - u) * (u - ulim) > 0.0) {
-                fu = func.valueAt(u);
-                if (fu < fc) {
-                    bx = cx;
-                    cx = u;
-                    u = cx + GOLD * (cx - bx);
-                    fb = fc;
-                    fc = fu;
-                    fu = func.valueAt(u);
-                }
-            } else if ((u - ulim) * (ulim - cx) >= 0.0) {
-                u = ulim;
-                fu = func.valueAt(u);
-            } else {
-                u = cx + GOLD * (cx - bx);
-                fu = func.valueAt(u);
-            }
-            ax = bx;
-            bx = cx;
-            cx = u;
-            fa = fb;
-            fb = fc;
-            fc = fu;
-        }
-        bracketing[0] = ax;
-        bracketing[1] = bx;
-        bracketing[2] = cx;
-    }
-
-    private static double dbrent(OneDimDiffFunction func, double ax, double bx,
-            double cx) {
-        // constants
-        final int ITMAX = 100;
-        final double TOL = 1.0e-4;
-
-        double d = 0.0, e = 0.0;
-
-        double a = (ax < cx ? ax : cx);
-        double b = (ax > cx ? ax : cx);
-        double x = bx;
-        double v = bx;
-        double w = bx;
-        double fx = func.valueAt(x);
-        double fv = fx;
-        double fw = fx;
-        double dx = func.derivativeAt(x);
-        double dv = dx;
-        double dw = dx;
-        for (int iteration = 0; iteration < ITMAX; iteration++) {
-            double xm = 0.5 * (a + b);
-            double tol1 = TOL * Math.abs(x);
-            double tol2 = 2.0 * tol1;
-            if (Math.abs(x - xm) <= (tol2 - 0.5 * (b - a))) {
-                return x;
-            }
-            double u;
-            if (Math.abs(e) > tol1) {
-                double d1 = 2.0 * (b - a);
-                double d2 = d1;
-                if (dw != dx) {
-                    d1 = (w - x) * dx / (dx - dw);
-                }
-                if (dv != dx) {
-                    d2 = (v - x) * dx / (dx - dv);
-                }
-                double u1 = x + d1;
-                double u2 = x + d2;
-                boolean ok1 = ((a - u1) * (u1 - b) > 0.0 && dx * d1 <= 0.0);
-                boolean ok2 = ((a - u2) * (u2 - b) > 0.0 && dx * d2 <= 0.0);
-                double olde = e;
-                e = d;
-                if (ok1 || ok2) {
-                    if (ok1 && ok2) {
-                        d = (Math.abs(d1) < Math.abs(d2) ? d1 : d2);
-                    } else if (ok1) {
-                        d = d1;
-                    } else {
-                        d = d2;
-                    }
-                    if (Math.abs(d) <= Math.abs(0.5 * olde)) {
-                        u = x + d;
-                        if (u - a < tol2 || b - u < tol2) {
-                            d = sign(tol1, xm - x);
-                        }
-                    } else {
-                        e = (dx >= 0.0 ? a - x : b - x);
-                        d = 0.5 * e;
-                    }
-                } else {
-                    e = (dx >= 0.0 ? a - x : b - x);
-                    d = 0.5 * e;
-                }
-            } else {
-                e = (dx >= 0.0 ? a - x : b - x);
-                d = 0.5 * e;
-            }
-            double fu;
-            if (Math.abs(d) >= tol1) {
-                u = x + d;
-                fu = func.valueAt(u);
-            } else {
-                u = x + sign(tol1, d);
-                fu = func.valueAt(u);
-                if (fu > fx) {
-                    return x;
-                }
-            }
-            double du = func.derivativeAt(u);
-            if (fu <= fx) {
-                if (u >= x) {
-                    a = x;
-                } else {
-                    b = x;
-                }
-                v = w;
-                fv = fw;
-                dv = dw;
-                w = x;
-                fw = fx;
-                dw = dx;
-                x = u;
-                fx = fu;
-                dx = du;
-            } else {
-                if (u < x) {
-                    a = u;
-                } else {
-                    b = u;
-                }
-                if (fu <= fw || w == x) {
-                    v = w;
-                    fv = fw;
-                    dv = dw;
-                    w = u;
-                    fw = fu;
-                    dw = du;
-                } else if (fu < fv || v == x || v == w) {
-                    v = u;
-                    fv = fu;
-                    dv = du;
-                }
-            }
-        }
-        // Dan's addition:
-        if (fx < func.valueAt(0.0)) {
-            return x;
-        }
-
-        return 0.0;
-    }
-
-    private static double sign(double x, double y) {
-        if (y >= 0.0) {
-            return Math.abs(x);
-        }
-        return -Math.abs(x);
     }
 }
