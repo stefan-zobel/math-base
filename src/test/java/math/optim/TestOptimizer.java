@@ -47,8 +47,6 @@ public class TestOptimizer extends TestCase {
         }
 
         public double getValue() {
-            System.out.println("param = " + params[0] + " value = " + (-3 * params[0] * params[0] + 5 * params[0] - 2));
-
             return -3 * params[0] * params[0] + 5 * params[0] - 2;
         }
 
@@ -75,7 +73,9 @@ public class TestOptimizer extends TestCase {
         SimplePoly poly = new SimplePoly();
         OrthantWiseLimitedMemoryBFGS bfgs = new OrthantWiseLimitedMemoryBFGS(poly, 3.0);
         bfgs.optimize();
-        assertEquals(2.0 / 6.0, poly.params[0], 1e-16);
+        // 4 ulp: the search now stops on the pseudo gradient (KKT residual
+        // 1.3e-15 here) one iteration before the value test would have
+        assertEquals(2.0 / 6.0, poly.params[0], 1e-15);
     }
 
     /**

@@ -25,18 +25,26 @@ public final class LimitedMemoryBFGS implements Optimizer {
     private static final Logger logger = Logger
             .getLogger(LimitedMemoryBFGS.class.getName());
 
+    /** Iteration budget if none is given. */
+    private static final int DEFAULT_MAX_ITERATIONS = 1000;
+    /** Relative change of the objective value that stops the search. */
+    private static final double DEFAULT_TOLERANCE = 1.0e-4;
+    /** Gradient norm that stops the search. */
+    private static final double DEFAULT_GRADIENT_TOLERANCE = 1.0e-3;
+    /** Number of corrections kept for the inverse Hessian. */
+    private static final int DEFAULT_M = 4;
+
     private boolean converged = false;
     private final Optimizable.ByGradientValue optimizable;
-    private final int maxIterations = 1000;
+    private final int maxIterations;
     // xxx need a more principled stopping point
-    // final double tolerance = .0001;
-    private double tolerance = .0001;
-    private final double gradientTolerance = .001;
+    private double tolerance;
+    private final double gradientTolerance;
     private final double eps = 1.0e-5;
 
     // The number of corrections used in BFGS update
     // ideally 3 <= m <= 7. Larger m means more cpu time, memory.
-    private final int m = 4;
+    private final int m;
 
     // Line search function
     private final BackTrackLineSearch lineMaximizer;
@@ -56,7 +64,70 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
     private OptimizerEvaluator.ByGradient eval = null;
 
+    /**
+     * Creates an optimizer with the default stopping rules.
+     *
+     * @param function
+     *            the function to maximize
+     */
     public LimitedMemoryBFGS(Optimizable.ByGradientValue function) {
+        this(function, DEFAULT_MAX_ITERATIONS, DEFAULT_TOLERANCE,
+                DEFAULT_GRADIENT_TOLERANCE, DEFAULT_M);
+    }
+
+    /**
+     * Creates an optimizer with explicit stopping rules.
+     *
+     * @param function
+     *            the function to maximize
+     * @param maxIterations
+     *            iteration budget, {@code 1} or greater; exhausting it stops
+     *            the search without reporting convergence
+     * @param tolerance
+     *            relative change of the objective value below which the search
+     *            stops, greater than {@code 0}; can still be changed later
+     *            through {@link #setTolerance(double)}
+     * @param gradientTolerance
+     *            gradient norm below which the search stops, {@code 0} or
+     *            greater. Loosening it stops the search earlier, but
+     *            tightening it beyond what the line search can resolve buys
+     *            nothing: the accuracy this class reaches is bounded by the
+     *            step tolerances of its internal {@code BackTrackLineSearch}
+     *            ({@code 1e-7} relative, {@code 1e-4} absolute), which no
+     *            caller can reach.
+     * @param m
+     *            number of corrections kept for the inverse Hessian, between
+     *            {@code 1} and {@code 100}; ideally between {@code 3} and
+     *            {@code 7}
+     * @since 1.5.2
+     */
+    public LimitedMemoryBFGS(Optimizable.ByGradientValue function,
+            int maxIterations, double tolerance, double gradientTolerance,
+            int m) {
+        if (function == null) {
+            throw new IllegalArgumentException("function is null");
+        }
+        if (maxIterations < 1) {
+            throw new IllegalArgumentException(
+                    "maxIterations must be >= 1 : " + maxIterations);
+        }
+        if (!(tolerance > 0.0) || Double.isInfinite(tolerance)) {
+            throw new IllegalArgumentException(
+                    "tolerance must be finite and positive : " + tolerance);
+        }
+        if (!(gradientTolerance >= 0.0) || Double.isInfinite(gradientTolerance)) {
+            throw new IllegalArgumentException(
+                    "gradientTolerance must be finite and non-negative : "
+                            + gradientTolerance);
+        }
+        if (m < 1 || m > 100) {
+            throw new IllegalArgumentException(
+                    "m must be between 1 and 100 : " + m);
+        }
+        this.maxIterations = maxIterations;
+        this.tolerance = tolerance;
+        this.gradientTolerance = gradientTolerance;
+        this.m = m;
         optimizable = function;
         lineMaximizer = new BackTrackLineSearch(function);
     }
@@ -150,16 +221,17 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             step = lineMaximizer.optimize(direction, step);
             if (step == 0.0) {
-                // could not step in this direction.
-                // give up and say converged.
+                // Could not step in this direction. This is the flat region
+                // near the maximum as often as it is a real failure, and the
+                // line search has already put the parameters back on the last
+                // good point, so report it rather than discard the result.
                 g = null; // reset search
                 step = 1.0;
-                throw new OptimizationException(
-                        "Line search could not step in the current direction. "
-                                + "(This is not necessarily cause for alarm. Sometimes this happens close to the maximum,"
-                                + " where the function may be very flat.)");
-
-                // return false;
+                logger.warning("L-BFGS could not step in the current direction "
+                        + "on the initial jump. Stopping at the current parameters, "
+                        + "which are not known to be optimal.");
+                converged = false;
+                return false;
             }
 
             optimizable.getParameters(parameters);
@@ -207,25 +279,33 @@ public final class LimitedMemoryBFGS implements Optimizer {
                 direction[i] = g[i];
             }
 
-            if (sy > 0) {
-                throw new InvalidOptimizableException("sy = " + sy + " > 0");
+            // This class maximizes, so the curvature condition it needs is
+            // sy < 0. It holds for a strictly concave objective, which is the
+            // only kind this originally had to serve, and fails routinely on
+            // one that is merely concave or not concave at all -- the
+            // Rosenbrock function from its classic starting point violates it
+            // in the first iterations. sy is a divisor below and yy is one in
+            // gamma, so zero or non-finite values would poison the direction
+            // with an infinity or a NaN. Skip the update in all these cases
+            // and fall back to the plain gradient direction, keeping the pairs
+            // already stored.
+            double gamma = -1.0;
+            if (sy < 0.0 && yy > 0.0 && !Double.isInfinite(sy)
+                    && !Double.isInfinite(yy)) {
+                gamma = sy / yy; // scaling factor
+
+                rho.addLast(1.0 / sy);
+                // These arrays are now the *differences* between parameters
+                // and gradient.
+                s.addLast(oldParameters);
+                y.addLast(oldg);
+
+                assert (s.size() == y.size()) : "s.size: " + s.size()
+                        + " y.size: " + y.size();
+            } else if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Skipping the BFGS update: sy = " + sy + ", yy = "
+                        + yy + " gives no usable curvature information");
             }
-
-            double gamma = sy / yy; // scaling factor
-
-            if (gamma > 0) {
-                throw new InvalidOptimizableException("gamma = " + gamma
-                        + " > 0");
-            }
-
-            rho.addLast(1.0 / sy);
-            // These arrays are now the *differences* between parameters and
-            // gradient.
-            s.addLast(oldParameters);
-            y.addLast(oldg);
-
-            assert (s.size() == y.size()) : "s.size: " + s.size() + " y.size: "
-                    + y.size();
 
             //
             // This next section is where we calculate the new direction
@@ -271,14 +351,11 @@ public final class LimitedMemoryBFGS implements Optimizer {
             if (step == 0.0) { // could not step in this direction.
                 g = null; // reset search
                 step = 1.0;
-                // xxx Temporary test; passed OK
-                // TestMaximizable.testValueAndGradientInDirection (maxable,
-                // direction);
-                throw new OptimizationException(
-                        "Line search could not step in the current direction. "
-                                + "(This is not necessarily cause for alarm. Sometimes this happens close to the maximum,"
-                                + " where the function may be very flat.)");
-                // return false;
+                logger.warning("L-BFGS could not step in the current direction "
+                        + "after " + iterations + " iterations. Stopping at the "
+                        + "current parameters, which are not known to be optimal.");
+                converged = false;
+                return false;
             }
             optimizable.getParameters(parameters);
             optimizable.getValueGradient(g);
@@ -320,11 +397,13 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             iterations++;
             if (iterations > maxIterations) {
-                System.err
-                        .println("Too many iterations in L-BFGS.java. Continuing with current parameters.");
-                converged = true;
-                return true;
-                // throw new IllegalStateException ("Too many iterations.");
+                // exhausting the budget is not convergence; reporting it as
+                // convergence makes the two indistinguishable to the caller
+                logger.warning("Too many iterations in L-BFGS (" + maxIterations
+                        + "). Stopping with the current parameters, which are "
+                        + "not known to be optimal.");
+                converged = false;
+                return false;
             }
 
             // End of iteration. Call evaluator
@@ -332,7 +411,9 @@ public final class LimitedMemoryBFGS implements Optimizer {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Exiting L-BFGS on termination #4: evaluator returned false.");
                 }
-                converged = true;
+                // the evaluator aborted the search; that is not convergence,
+                // and the returned false already said so
+                converged = false;
                 return false;
             }
         }

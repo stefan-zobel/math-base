@@ -83,7 +83,12 @@ final class BackTrackLineSearch {
                     + ",\ndirection.oneNorm:" + VectorOps.oneNorm(line)
                     + "  direction.infNorm:" + VectorOps.infinityNorm(line));
         }
-        assert (!VectorOps.isNaN(g));
+        // an assertion is a no-op in the shipped artifact, where a NaN
+        // gradient would otherwise propagate silently into the parameters
+        if (VectorOps.isNaN(g)) {
+            throw new InvalidOptimizableException(
+                    "Gradient contains NaN: check your gradient!");
+        }
         double sum = VectorOps.twoNorm(line);
         if (sum > stpmax) {
             logger.warning("attempted step too big. scaling: sum=" + sum
@@ -220,6 +225,12 @@ final class BackTrackLineSearch {
             }
             alam = Math.max(tmplam, .1 * alam); // lambda >= .1*Lambda_1
         }
+        // Exhausting the iterations is the third way out, and unlike the two
+        // above it used to leave the optimizable standing on the last rejected
+        // trial point.
+        function.setParameters(oldParameters);
+        logger.warning("EXITING BACKTRACK: no acceptable step in "
+                + maxIterations + " iterations. Using xold.");
         return 0.0;
     }
 
