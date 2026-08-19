@@ -11,7 +11,7 @@ import math.fun.DTriFunction;
  * estimate {@code |K - G|}, and the adaptive variants bisect the longest edge
  * until that estimate meets the tolerance.
  *
- * <h3>Forced initial subdivision</h3>
+ * <h2>Forced initial subdivision</h2>
  * On the undivided domain the error estimate is not to be trusted. A feature
  * narrower than the spacing of the 15 Kronrod nodes is missed by the Kronrod
  * and by the Gauss rule alike; the two then agree, {@code |K - G|} reports a
