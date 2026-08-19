@@ -1,8 +1,10 @@
 package math.optim;
 
 import math.MathConsts;
+import math.fun.DVectorFunction;
 import math.fun.DiffDVectorFunction;
 import math.minpack.Lmder_fcn;
+import math.minpack.Lmdif_fcn;
 import math.minpack.Minpack_f77;
 
 /**
@@ -155,11 +157,15 @@ public final class LevenbergMarquardt {
     /** Stands for the budget of {@code 100 * (n + 1)} that MINPACK defaults to. */
     private static final int EVALUATIONS_FROM_PROBLEM_SIZE = 0;
 
+    /** Residuals are assumed accurate to machine precision unless said otherwise. */
+    private static final double DEFAULT_FUNCTION_ACCURACY = 0.0;
+
     private final double valueTolerance;
     private final double stepTolerance;
     private final double gradientTolerance;
     private final int maxEvaluations;
     private final double initialStepBound;
+    private final double functionAccuracy;
 
     /**
      * Creates a solver with the default stopping rules: both the value and the
@@ -199,6 +205,43 @@ public final class LevenbergMarquardt {
      */
     public LevenbergMarquardt(double valueTolerance, double stepTolerance, double gradientTolerance,
             int maxEvaluations, double initialStepBound) {
+        this(valueTolerance, stepTolerance, gradientTolerance, maxEvaluations, initialStepBound,
+                DEFAULT_FUNCTION_ACCURACY);
+    }
+
+    /**
+     * Creates a solver that also knows how accurately the residuals themselves
+     * can be computed, which matters only on the derivative-free path.
+     *
+     * @param valueTolerance
+     *            as above
+     * @param stepTolerance
+     *            as above
+     * @param gradientTolerance
+     *            as above
+     * @param maxEvaluations
+     *            as above
+     * @param initialStepBound
+     *            as above
+     * @param functionAccuracy
+     *            the relative error with which {@code valueAt} computes the
+     *            residuals, {@code 0} or greater, {@code 0} meaning machine
+     *            precision. Ignored by
+     *            {@link #solve(DiffDVectorFunction, double[], int)}, which is
+     *            handed the derivative and never has to guess a step for it.
+     *            {@link #solve(DVectorFunction, double[], int)} does have to,
+     *            and it picks that step from this number: a residual that comes
+     *            out of a simulation, a quadrature or a table is accurate to
+     *            far less than machine precision, and differencing it over the
+     *            default step measures the error rather than the derivative.
+     *            MINPACK calls it {@code epsfcn}
+     */
+    public LevenbergMarquardt(double valueTolerance, double stepTolerance, double gradientTolerance,
+            int maxEvaluations, double initialStepBound, double functionAccuracy) {
+        if (!(functionAccuracy >= 0.0) || Double.isInfinite(functionAccuracy)) {
+            throw new IllegalArgumentException(
+                    "functionAccuracy must be finite and non-negative : " + functionAccuracy);
+        }
         if (!(valueTolerance >= 0.0) || Double.isInfinite(valueTolerance)) {
             throw new IllegalArgumentException("valueTolerance must be finite and non-negative : " + valueTolerance);
         }
@@ -221,6 +264,7 @@ public final class LevenbergMarquardt {
         this.gradientTolerance = gradientTolerance;
         this.maxEvaluations = maxEvaluations;
         this.initialStepBound = initialStepBound;
+        this.functionAccuracy = functionAccuracy;
     }
 
     /**
@@ -246,26 +290,9 @@ public final class LevenbergMarquardt {
      *             {@code residualCount} is smaller than {@code initial.length}
      */
     public Result solve(DiffDVectorFunction function, double[] initial, int residualCount) {
-        if (function == null) {
-            throw new IllegalArgumentException("function is null");
-        }
-        if (initial == null) {
-            throw new IllegalArgumentException("initial is null");
-        }
+        checkArguments(function, initial, residualCount);
         int n = initial.length;
-        if (n < 1) {
-            throw new IllegalArgumentException("initial is empty");
-        }
         int m = residualCount;
-        if (m < n) {
-            throw new IllegalArgumentException(
-                    "residualCount must be >= initial.length : " + m + " < " + n);
-        }
-        for (int j = 0; j < n; j++) {
-            if (Double.isNaN(initial[j]) || Double.isInfinite(initial[j])) {
-                throw new IllegalArgumentException("initial[" + j + "] is not finite : " + initial[j]);
-            }
-        }
 
         // MINPACK indexes from one, so every array is one longer than it needs
         // to be and element zero stays unused
@@ -280,11 +307,105 @@ public final class LevenbergMarquardt {
         int[] nfev = new int[2];
         int[] njev = new int[2];
 
-        int budget = (maxEvaluations == EVALUATIONS_FROM_PROBLEM_SIZE) ? 100 * (n + 1) : maxEvaluations;
         // mode 1 is MINPACK's internal scaling, nprint 0 turns off its tracing
-        Minpack_f77.lmder_f77(new Adapter(function, m, n), m, n, x, fvec, fjac, valueTolerance, stepTolerance,
-                gradientTolerance, budget, diag, 1, initialStepBound, 0, info, nfev, njev, ipvt, qtf);
+        Minpack_f77.lmder_f77(new JacobianAdapter(function, m, n), m, n, x, fvec, fjac, valueTolerance,
+                stepTolerance, gradientTolerance, budgetFor(n), diag, 1, initialStepBound, 0, info, nfev, njev,
+                ipvt, qtf);
 
+        return unpack(x, fvec, n, m, info[1], nfev[1], njev[1]);
+    }
+
+    /**
+     * Minimizes the sum of the squared residuals of {@code function} without
+     * being given a derivative, approximating the Jacobian by forward
+     * differences instead.
+     * <p>
+     * This costs both accuracy and evaluations -- on the collection of More,
+     * Garbow and Hillstrom it reaches the same minima, but never in fewer
+     * evaluations and sometimes in eighty times as many. Supply a derivative
+     * through {@link #solve(DiffDVectorFunction, double[], int)} where one can
+     * be had. Note that Java picks between the two by the <em>static</em> type
+     * of the argument, so a {@link DiffDVectorFunction} held in a variable
+     * declared {@link DVectorFunction} lands here and its derivative goes
+     * unused.
+     * <p>
+     * If the residuals are not computed to machine precision, say so through
+     * the {@code functionAccuracy} of the six-argument constructor. The step
+     * for the difference is chosen from it, and left at the default it will be
+     * far too small to see past the error in the values. That failure is
+     * silent and it reports success: with a step below the resolution of the
+     * residuals every difference comes out zero, the approximated Jacobian is
+     * the zero matrix, and a zero matrix is orthogonal to every residual -- so
+     * MINPACK's gradient test fires and the run ends with
+     * {@link Status#GRADIENT_TOLERANCE_REACHED} on the starting point, having
+     * moved nothing. There is no way to tell that from a genuine minimum after
+     * the fact, which is why it has to be declared beforehand.
+     *
+     * @param function
+     *            the residuals
+     * @param initial
+     *            the starting parameters, of length {@code n}, all finite (not
+     *            modified)
+     * @param residualCount
+     *            the number {@code m} of residuals {@code function} produces,
+     *            which must be at least {@code n}
+     * @return the parameters found, the residuals there, and why the search
+     *         stopped. {@link Result#jacobianEvaluations} is {@code 0}: the
+     *         Jacobian is never evaluated, only approximated, and the cost of
+     *         that shows up in {@link Result#functionEvaluations}
+     * @throws IllegalArgumentException
+     *             if an argument is null, empty, not finite, or if
+     *             {@code residualCount} is smaller than {@code initial.length}
+     */
+    public Result solve(DVectorFunction function, double[] initial, int residualCount) {
+        checkArguments(function, initial, residualCount);
+        int n = initial.length;
+        int m = residualCount;
+
+        double[] x = new double[n + 1];
+        System.arraycopy(initial, 0, x, 1, n);
+        double[] fvec = new double[m + 1];
+        double[][] fjac = new double[m + 1][n + 1];
+        double[] diag = new double[n + 1];
+        double[] qtf = new double[n + 1];
+        int[] ipvt = new int[n + 1];
+        int[] info = new int[2];
+        int[] nfev = new int[2];
+
+        Minpack_f77.lmdif_f77(new ValueAdapter(function, m, n), m, n, x, fvec, valueTolerance, stepTolerance,
+                gradientTolerance, budgetFor(n), functionAccuracy, diag, 1, initialStepBound, 0, info, nfev, fjac,
+                ipvt, qtf);
+
+        return unpack(x, fvec, n, m, info[1], nfev[1], 0);
+    }
+
+    private static void checkArguments(DVectorFunction function, double[] initial, int residualCount) {
+        if (function == null) {
+            throw new IllegalArgumentException("function is null");
+        }
+        if (initial == null) {
+            throw new IllegalArgumentException("initial is null");
+        }
+        int n = initial.length;
+        if (n < 1) {
+            throw new IllegalArgumentException("initial is empty");
+        }
+        if (residualCount < n) {
+            throw new IllegalArgumentException(
+                    "residualCount must be >= initial.length : " + residualCount + " < " + n);
+        }
+        for (int j = 0; j < n; j++) {
+            if (Double.isNaN(initial[j]) || Double.isInfinite(initial[j])) {
+                throw new IllegalArgumentException("initial[" + j + "] is not finite : " + initial[j]);
+            }
+        }
+    }
+
+    private int budgetFor(int n) {
+        return (maxEvaluations == EVALUATIONS_FROM_PROBLEM_SIZE) ? 100 * (n + 1) : maxEvaluations;
+    }
+
+    private static Result unpack(double[] x, double[] fvec, int n, int m, int info, int nfev, int njev) {
         double[] parameters = new double[n];
         System.arraycopy(x, 1, parameters, 0, n);
         double[] residuals = new double[m];
@@ -293,7 +414,7 @@ public final class LevenbergMarquardt {
         for (int i = 0; i < m; i++) {
             sumOfSquares += residuals[i] * residuals[i];
         }
-        return new Result(parameters, residuals, sumOfSquares, nfev[1], njev[1], statusOf(info[1]));
+        return new Result(parameters, residuals, sumOfSquares, nfev, njev, statusOf(info));
     }
 
     private static Status statusOf(int info) {
@@ -314,14 +435,14 @@ public final class LevenbergMarquardt {
      * between value and derivative made by a flag rather than by which method
      * is called.
      */
-    private static final class Adapter implements Lmder_fcn {
+    private static final class JacobianAdapter implements Lmder_fcn {
 
         private final DiffDVectorFunction function;
         private final double[] x;
         private final double[] values;
         private final double[] jacobian;
 
-        Adapter(DiffDVectorFunction function, int m, int n) {
+        JacobianAdapter(DiffDVectorFunction function, int m, int n) {
             this.function = function;
             this.x = new double[n];
             this.values = new double[m];
@@ -344,6 +465,30 @@ public final class LevenbergMarquardt {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * The same for the derivative-free path, where MINPACK asks only for
+     * values and builds the Jacobian from them itself.
+     */
+    private static final class ValueAdapter implements Lmdif_fcn {
+
+        private final DVectorFunction function;
+        private final double[] x;
+        private final double[] values;
+
+        ValueAdapter(DVectorFunction function, int m, int n) {
+            this.function = function;
+            this.x = new double[n];
+            this.values = new double[m];
+        }
+
+        @Override
+        public void fcn(int m, int n, double[] xOneBased, double[] fvec, int[] iflag) {
+            System.arraycopy(xOneBased, 1, x, 0, n);
+            function.valueAt(x, values);
+            System.arraycopy(values, 0, fvec, 1, m);
         }
     }
 }

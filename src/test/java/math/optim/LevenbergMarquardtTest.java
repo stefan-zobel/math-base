@@ -10,8 +10,13 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 
 import math.MathConsts;
+import math.fun.DVectorFunction;
 import math.fun.DiffDVectorFunction;
+import math.linalg.DMatrix;
+import math.linalg.LSSummary;
+import math.linalg.OLS;
 import math.minpack.Lmder_fcn;
+import math.minpack.Lmdif_fcn;
 import math.minpack.MghProblems;
 import math.minpack.MghProblems.Problem;
 import math.minpack.Minpack_f77;
@@ -81,7 +86,40 @@ public class LevenbergMarquardtTest {
         return raw;
     }
 
-    private static final class Bridge implements Lmder_fcn {
+    /** The same for {@code lmdif_f77}, which asks only for values. */
+    private static Raw runRawWithoutJacobian(Problem p, double tol) {
+        int m = p.m;
+        int n = p.n;
+        double[] x = new double[n + 1];
+        System.arraycopy(p.start, 0, x, 1, n);
+        double[] fvec = new double[m + 1];
+        double[][] fjac = new double[m + 1][n + 1];
+        double[] diag = new double[n + 1];
+        double[] qtf = new double[n + 1];
+        int[] ipvt = new int[n + 1];
+        int[] info = new int[2];
+        int[] nfev = new int[2];
+
+        Minpack_f77.lmdif_f77(new Bridge(p), m, n, x, fvec, tol, tol, 0.0, p.maxEvaluations, 0.0, diag, 1, 100.0, 0,
+                info, nfev, fjac, ipvt, qtf);
+
+        Raw raw = new Raw();
+        raw.parameters = new double[n];
+        System.arraycopy(x, 1, raw.parameters, 0, n);
+        raw.residuals = new double[m];
+        System.arraycopy(fvec, 1, raw.residuals, 0, m);
+        double ssq = 0.0;
+        for (int i = 0; i < m; i++) {
+            ssq += raw.residuals[i] * raw.residuals[i];
+        }
+        raw.sumOfSquares = ssq;
+        raw.info = info[1];
+        raw.functionEvaluations = nfev[1];
+        raw.jacobianEvaluations = 0;
+        return raw;
+    }
+
+    private static final class Bridge implements Lmder_fcn, Lmdif_fcn {
 
         private final Problem p;
         private final double[] x;
@@ -110,6 +148,13 @@ public class LevenbergMarquardtTest {
                 }
             }
         }
+
+        @Override
+        public void fcn(int m, int n, double[] xOneBased, double[] fvec, int[] iflag) {
+            System.arraycopy(xOneBased, 1, x, 0, n);
+            p.valueAt(x, r);
+            System.arraycopy(r, 0, fvec, 1, m);
+        }
     }
 
     /** The load-bearing test: two doors, one engine, identical numbers. */
@@ -129,6 +174,148 @@ public class LevenbergMarquardtTest {
             assertEquals(p.name + ": function evaluations", raw.functionEvaluations, r.functionEvaluations);
             assertEquals(p.name + ": Jacobian evaluations", raw.jacobianEvaluations, r.jacobianEvaluations);
             assertEquals(p.name + ": status", raw.info, r.status.code());
+        }
+    }
+
+    /** The same for the derivative-free path, which goes through {@code lmdif}. */
+    @Test
+    public void testTheDerivativeFreePathReproducesTheRawPortExactly() {
+        Problem[] all = MghProblems.all();
+        for (int k = 0; k < all.length; k++) {
+            Problem p = all[k];
+            Raw raw = runRawWithoutJacobian(p, SQRT_EPS);
+
+            LevenbergMarquardt lm = new LevenbergMarquardt(SQRT_EPS, SQRT_EPS, 0.0, p.maxEvaluations, 100.0);
+            LevenbergMarquardt.Result r = lm.solve((DVectorFunction) p, p.start, p.m);
+
+            assertArrayEquals(p.name + ": parameters", raw.parameters, r.parameters, 0.0);
+            assertArrayEquals(p.name + ": residuals", raw.residuals, r.residuals, 0.0);
+            assertEquals(p.name + ": sum of squares", raw.sumOfSquares, r.sumOfSquares, 0.0);
+            assertEquals(p.name + ": function evaluations", raw.functionEvaluations, r.functionEvaluations);
+            assertEquals(p.name + ": status", raw.info, r.status.code());
+            assertEquals(p.name + ": the Jacobian is approximated, never evaluated", 0, r.jacobianEvaluations);
+        }
+    }
+
+    /**
+     * Not supplying a derivative reaches the same minima and never costs less.
+     * The agreement asserted is on the minimum rather than on the point, and
+     * loosely: a forward difference is a different algorithm, not a slower way
+     * of running the same one.
+     */
+    @Test
+    public void testTheDerivativeFreePathCostsMoreAndFindsTheSame() {
+        Problem[] all = MghProblems.all();
+        for (int k = 0; k < all.length; k++) {
+            Problem p = all[k];
+            LevenbergMarquardt lm = new LevenbergMarquardt(SQRT_EPS, SQRT_EPS, 0.0, p.maxEvaluations, 100.0);
+            LevenbergMarquardt.Result withJacobian = lm.solve(p, p.start, p.m);
+            LevenbergMarquardt.Result withoutJacobian = lm.solve((DVectorFunction) p, p.start, p.m);
+
+            double scale = Math.max(Math.abs(withJacobian.sumOfSquares), 1.0e-8);
+            assertEquals(p.name + ": sum of squares", withJacobian.sumOfSquares, withoutJacobian.sumOfSquares,
+                    1.0e-4 * scale);
+            assertTrue(p.name + ": " + withoutJacobian.functionEvaluations + " against "
+                    + withJacobian.functionEvaluations,
+                    withoutJacobian.functionEvaluations >= withJacobian.functionEvaluations);
+            assertTrue(p.name + ": a Jacobian was evaluated on the analytic path",
+                    withJacobian.jacobianEvaluations > 0);
+        }
+    }
+
+    /**
+     * Which of the two overloads runs is decided by the <em>static</em> type of
+     * the argument, as Java always decides it. Worth an executable statement
+     * rather than only a sentence of documentation, because the same object
+     * takes both paths here and the cheaper one is not the default it looks
+     * like.
+     */
+    @Test
+    public void testTheOverloadIsChosenByTheStaticType() {
+        Problem rosenbrock = byName("Rosenbrock");
+        DVectorFunction sameObjectSeenAsValuesOnly = rosenbrock;
+        LevenbergMarquardt lm = new LevenbergMarquardt();
+
+        LevenbergMarquardt.Result declared = lm.solve(rosenbrock, rosenbrock.start, rosenbrock.m);
+        LevenbergMarquardt.Result widened = lm.solve(sameObjectSeenAsValuesOnly, rosenbrock.start, rosenbrock.m);
+
+        assertTrue("the declared type carries the Jacobian", declared.jacobianEvaluations > 0);
+        assertEquals("the widened one does not", 0, widened.jacobianEvaluations);
+        assertTrue("and pays for it: " + widened.functionEvaluations + " against " + declared.functionEvaluations,
+                widened.functionEvaluations > declared.functionEvaluations);
+        for (int j = 0; j < rosenbrock.n; j++) {
+            assertEquals("both still land on the minimum", 1.0, declared.parameters[j], 1.0e-8);
+            assertEquals("both still land on the minimum", 1.0, widened.parameters[j], 1.0e-8);
+        }
+    }
+
+    /**
+     * The sharpest edge on the derivative-free path, and the reason
+     * {@code functionAccuracy} is a constructor argument rather than something
+     * left at MINPACK's default.
+     * <p>
+     * The residuals below are a straight line whose values are rounded to 1e-6,
+     * which is what a residual computed by a simulation, a quadrature or a
+     * lookup table looks like. Left to assume machine precision, the difference
+     * quotient is taken over a step of about 1.5e-8, every rounded value comes
+     * out unchanged, and the approximated Jacobian is <em>identically zero</em>.
+     * A zero matrix is orthogonal to every residual, so MINPACK's gradient test
+     * fires, and the run reports {@code GRADIENT_TOLERANCE_REACHED} -- a
+     * success -- after three evaluations, on the starting point, having moved
+     * nothing.
+     * <p>
+     * Told that the values are only good to 1e-6, the same solver picks a step
+     * of 1e-3 instead and lands on the exact answer in seven evaluations.
+     */
+    @Test
+    public void testANoisyResidualNeedsToBeDeclaredOrTheFitSilentlySucceedsAtTheStart() {
+        DVectorFunction quantizedLine = new DVectorFunction() {
+            @Override
+            public void valueAt(double[] p, double[] r) {
+                for (int i = 0; i < 20; i++) {
+                    double t = i / 10.0;
+                    double coarse = Math.rint((p[0] * t + p[1]) * 1.0e6) / 1.0e6;
+                    r[i] = coarse - (2.0 * t - 1.0);
+                }
+            }
+        };
+        double[] start = { 0.0, 0.0 };
+
+        LevenbergMarquardt assumingFullPrecision = new LevenbergMarquardt(1.0e-10, 1.0e-10, 0.0, 2000, 100.0);
+        LevenbergMarquardt.Result trap = assumingFullPrecision.solve(quantizedLine, start, 20);
+
+        assertEquals("a zero Jacobian is orthogonal to everything, so this reports success",
+                LevenbergMarquardt.Status.GRADIENT_TOLERANCE_REACHED, trap.status);
+        assertTrue("and it is a success by every measure the library has", trap.converged);
+        assertArrayEquals("on the starting point, unmoved", start, trap.parameters, 0.0);
+        assertTrue("with the sum of squares it started at: " + trap.sumOfSquares, trap.sumOfSquares > 1.0);
+
+        LevenbergMarquardt told = new LevenbergMarquardt(1.0e-10, 1.0e-10, 0.0, 2000, 100.0, 1.0e-6);
+        LevenbergMarquardt.Result fit = told.solve(quantizedLine, start, 20);
+
+        assertTrue(fit.converged);
+        assertEquals("slope", 2.0, fit.parameters[0], 1.0e-9);
+        assertEquals("intercept", -1.0, fit.parameters[1], 1.0e-9);
+        assertTrue("and cheaply: " + fit.functionEvaluations, fit.functionEvaluations < 20);
+    }
+
+    /**
+     * {@code functionAccuracy} is meaningless where the derivative is supplied,
+     * and changing it must therefore change nothing at all on that path.
+     */
+    @Test
+    public void testFunctionAccuracyDoesNotTouchTheAnalyticPath() {
+        Problem[] all = MghProblems.all();
+        for (int k = 0; k < all.length; k++) {
+            Problem p = all[k];
+            LevenbergMarquardt.Result byDefault = new LevenbergMarquardt(SQRT_EPS, SQRT_EPS, 0.0, p.maxEvaluations,
+                    100.0).solve(p, p.start, p.m);
+            LevenbergMarquardt.Result declared = new LevenbergMarquardt(SQRT_EPS, SQRT_EPS, 0.0, p.maxEvaluations,
+                    100.0, 1.0e-3).solve(p, p.start, p.m);
+
+            assertArrayEquals(p.name, byDefault.parameters, declared.parameters, 0.0);
+            assertEquals(p.name, byDefault.functionEvaluations, declared.functionEvaluations);
+            assertEquals(p.name, byDefault.status, declared.status);
         }
     }
 
@@ -299,6 +486,239 @@ public class LevenbergMarquardtTest {
 
         assertEquals(LevenbergMarquardt.Status.GRADIENT_TOLERANCE_REACHED, r.status);
         assertTrue(r.converged);
+    }
+
+    /** The inline generator the test conventions ask for, seeded per test. */
+    private static final class Lcg {
+
+        private long state;
+
+        Lcg(long seed) {
+            this.state = seed;
+        }
+
+        /** Uniform on {@code [-0.5, 0.5)}. */
+        double next() {
+            state = state * 6364136223846793005L + 1442695040888963407L;
+            return ((state >>> 11) * 0x1.0p-53) - 0.5;
+        }
+    }
+
+    /** A linear model {@code X b}, which is the one case with an outside answer. */
+    private static final class LinearModel implements DiffDVectorFunction {
+
+        final DMatrix x;
+        final DMatrix y;
+        private final double[] design;
+        private final double[] target;
+        private final int m;
+        private final int n;
+
+        LinearModel(int m, int n, long seed, double noise) {
+            this.m = m;
+            this.n = n;
+            Lcg lcg = new Lcg(seed);
+            double[] beta = { 2.0, -1.5, 0.5, 3.0 };
+            x = new DMatrix(m, n);
+            for (int i = 0; i < m; i++) {
+                x.set(i, 0, 1.0);
+                for (int j = 1; j < n; j++) {
+                    x.set(i, j, 4.0 * lcg.next());
+                }
+            }
+            y = new DMatrix(m, 1);
+            for (int i = 0; i < m; i++) {
+                double v = 0.0;
+                for (int j = 0; j < n; j++) {
+                    v += x.get(i, j) * beta[j];
+                }
+                y.set(i, 0, v + noise * lcg.next());
+            }
+            // DMatrix stores column-major with idx(i, j) == j * rows + i, which
+            // is the layout DJacobian asks for, so the design matrix is the
+            // Jacobian -- the same array, not a rearrangement of it
+            design = x.getArrayUnsafe();
+            target = y.getArrayUnsafe();
+        }
+
+        @Override
+        public void valueAt(double[] b, double[] r) {
+            for (int i = 0; i < m; i++) {
+                double v = 0.0;
+                for (int j = 0; j < n; j++) {
+                    v += design[j * m + i] * b[j];
+                }
+                r[i] = v - target[i];
+            }
+        }
+
+        @Override
+        public void jacobianAt(double[] b, double[] jac) {
+            System.arraycopy(design, 0, jac, 0, m * n);
+        }
+    }
+
+    /**
+     * The check that is not a comparison against MINPACK. A linear least
+     * squares problem is a nonlinear one whose Jacobian happens to be constant,
+     * so {@link OLS} -- which answers it through the singular values, sharing
+     * no code and no idea with a trust region method -- must give the same
+     * coefficients.
+     * <p>
+     * It agrees to 5.6e-16 relative, and the reason it agrees that closely is
+     * worth knowing: on a linear model the Gauss Newton step is exact, so the
+     * first step lands on the answer and the run is over in three evaluations
+     * from any starting point, including one a million away. The tolerance
+     * never binds, which is why the loose default reaches the same place the
+     * tight setting does.
+     */
+    @Test
+    public void testALinearProblemReproducesOrdinaryLeastSquares() {
+        LinearModel model = new LinearModel(40, 4, 20260820L, 0.05);
+        LSSummary ols = OLS.estimate(0.05, model.x, model.y);
+
+        double[][] starts = { { 0.0, 0.0, 0.0, 0.0 }, { 100.0, -100.0, 100.0, -100.0 },
+                { 1.0e6, 1.0e6, 1.0e6, 1.0e6 } };
+        for (int s = 0; s < starts.length; s++) {
+            LevenbergMarquardt.Result r = new LevenbergMarquardt().solve(model, starts[s], 40);
+
+            assertTrue("start " + s + ": " + r.status, r.converged);
+            assertTrue("start " + s + ": an exact step needs no iterating, " + r.functionEvaluations,
+                    r.functionEvaluations <= 5);
+            for (int j = 0; j < 4; j++) {
+                double reference = ols.getBeta().get(j);
+                double scale = Math.max(Math.abs(reference), 1.0);
+                assertEquals("start " + s + ": beta[" + j + "]", reference, r.parameters[j], 1.0e-12 * scale);
+            }
+        }
+    }
+
+    /** And without a derivative, where the difference of a linear model is exact. */
+    @Test
+    public void testTheDerivativeFreePathAlsoReproducesOrdinaryLeastSquares() {
+        LinearModel model = new LinearModel(40, 4, 20260820L, 0.05);
+        LSSummary ols = OLS.estimate(0.05, model.x, model.y);
+
+        LevenbergMarquardt.Result r = new LevenbergMarquardt().solve((DVectorFunction) model,
+                new double[] { 0.0, 0.0, 0.0, 0.0 }, 40);
+
+        assertTrue(r.status.toString(), r.converged);
+        for (int j = 0; j < 4; j++) {
+            double reference = ols.getBeta().get(j);
+            double scale = Math.max(Math.abs(reference), 1.0);
+            assertEquals("beta[" + j + "]", reference, r.parameters[j], 1.0e-7 * scale);
+        }
+    }
+
+    /**
+     * The case the class actually exists for, which no linear method answers:
+     * three parameters entering an exponential decay {@code A exp(-k t) + C}.
+     * <p>
+     * The parameters are recovered only as well as the noise allows, so the
+     * assertion that carries the weight is the one that does not depend on the
+     * noise at all -- the fit must be at least as good as the truth it was
+     * generated from. A fit that is worse than the generating parameters has
+     * not converged, whatever it reports.
+     */
+    @Test
+    public void testAnExponentialDecayIsRecovered() {
+        final int m = 30;
+        final double[] truth = { 5.0, 0.7, 1.2 };
+        final double[] t = new double[m];
+        final double[] y = new double[m];
+        Lcg lcg = new Lcg(987654321L);
+        for (int i = 0; i < m; i++) {
+            t[i] = 5.0 * i / (m - 1);
+            y[i] = truth[0] * Math.exp(-truth[1] * t[i]) + truth[2] + 1.0e-3 * lcg.next();
+        }
+
+        DiffDVectorFunction decay = new DiffDVectorFunction() {
+            @Override
+            public void valueAt(double[] p, double[] r) {
+                for (int i = 0; i < m; i++) {
+                    r[i] = p[0] * Math.exp(-p[1] * t[i]) + p[2] - y[i];
+                }
+            }
+
+            @Override
+            public void jacobianAt(double[] p, double[] jac) {
+                for (int i = 0; i < m; i++) {
+                    double e = Math.exp(-p[1] * t[i]);
+                    jac[0 * m + i] = e;
+                    jac[1 * m + i] = -p[0] * t[i] * e;
+                    jac[2 * m + i] = 1.0;
+                }
+            }
+        };
+
+        LevenbergMarquardt.Result r = new LevenbergMarquardt().solve(decay, new double[] { 1.0, 1.0, 0.0 }, m);
+
+        assertTrue(r.status.toString(), r.converged);
+        double[] atTruth = new double[m];
+        decay.valueAt(truth, atTruth);
+        double truthSumOfSquares = 0.0;
+        for (int i = 0; i < m; i++) {
+            truthSumOfSquares += atTruth[i] * atTruth[i];
+        }
+        assertTrue("the fit must beat the parameters the data came from: " + r.sumOfSquares + " against "
+                + truthSumOfSquares, r.sumOfSquares <= truthSumOfSquares);
+
+        assertEquals("amplitude", truth[0], r.parameters[0], 1.0e-3);
+        assertEquals("rate", truth[1], r.parameters[1], 1.0e-3);
+        assertEquals("offset", truth[2], r.parameters[2], 1.0e-3);
+    }
+
+    /**
+     * Multiplying every residual by a constant multiplies the sum of squares by
+     * its square and leaves the minimizer where it was. MINPACK scales the
+     * parameters from the columns of the Jacobian, which scale with the
+     * residuals, so the scaled problem is the same problem.
+     * <p>
+     * The same problem, but not the same arithmetic: over sixteen orders of
+     * magnitude of scaling the answer moves by at most three units in the last
+     * place, never more. Floating-point multiplication is not quite
+     * distributive, so the column norms, the factorization and the trust region
+     * radius all round a little differently. The bound below is stated at 1e-14
+     * relative, which is some forty ulps of room, and still four orders of
+     * magnitude tighter than any agreement that could happen by accident.
+     */
+    @Test
+    public void testScalingTheResidualsLeavesTheMinimizerWhereItWas() {
+        final LinearModel model = new LinearModel(40, 4, 4242L, 0.05);
+        double[] start = { 0.0, 0.0, 0.0, 0.0 };
+        LevenbergMarquardt.Result plain = new LevenbergMarquardt().solve(model, start, 40);
+
+        double[] factors = { 1.0e-8, 1.0e-6, 1.0e-3, 1.0e3, 1.0e6, 1.0e8 };
+        for (int k = 0; k < factors.length; k++) {
+            final double c = factors[k];
+            DiffDVectorFunction scaled = new DiffDVectorFunction() {
+                @Override
+                public void valueAt(double[] b, double[] r) {
+                    model.valueAt(b, r);
+                    for (int i = 0; i < r.length; i++) {
+                        r[i] *= c;
+                    }
+                }
+
+                @Override
+                public void jacobianAt(double[] b, double[] jac) {
+                    model.jacobianAt(b, jac);
+                    for (int i = 0; i < jac.length; i++) {
+                        jac[i] *= c;
+                    }
+                }
+            };
+
+            LevenbergMarquardt.Result r = new LevenbergMarquardt().solve(scaled, start, 40);
+
+            for (int j = 0; j < plain.parameters.length; j++) {
+                double scale = Math.max(Math.abs(plain.parameters[j]), 1.0);
+                assertEquals("factor " + c + ": the minimizer moved at parameter " + j, plain.parameters[j],
+                        r.parameters[j], 1.0e-14 * scale);
+            }
+            assertEquals("factor " + c + ": the sum of squares scales by the square",
+                    plain.sumOfSquares * c * c, r.sumOfSquares, 1.0e-12 * plain.sumOfSquares * c * c);
+        }
     }
 
     /** Arguments are checked, not passed on to be misread. */
