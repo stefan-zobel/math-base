@@ -86,6 +86,22 @@ public class MetaIntegratorTest {
                      exactValue, result, TOLERANCE);
     }
 
+    @Test
+    public void test1DHighFrequencyOscillationIsNotAliased() {
+        // f(x) = sin(1000*x) over [0, 1]. The fixed 65 point Chebyshev grid that
+        // used to serve the oscillation branch resolves about 32 half waves;
+        // this integrand has 159 of them, so it came back with a relative error
+        // of 22 and the wrong sign, with nothing to indicate it. ClenshawCurtis
+        // now refines until its own estimate meets the tolerance, and
+        // MetaIntegrator falls back to the subdivision if it cannot.
+        DFunction fast1D = x -> Math.sin(1000.0 * x);
+        double exactValue = (1.0 - Math.cos(1000.0)) / 1000.0;
+
+        double result = MetaIntegrator.integrate1DSmart(ruleSetup, fast1D, 0.0, 1.0, TOLERANCE);
+
+        assertEquals("High frequency 1D integration was aliased", exactValue, result, TOLERANCE);
+    }
+
     // =========================================================================
     // 2D INTEGRATION TESTS
     // =========================================================================
@@ -97,7 +113,7 @@ public class MetaIntegratorTest {
         DBiFunction oscillatory2D = (x, y) -> Math.sin(20.0 * x) * Math.cos(20.0 * y);
         double exactValue = ((1.0 - Math.cos(20.0)) / 20.0) * (Math.sin(20.0) / 20.0);
 
-        // This must route to performClenshawCurtis2D automatically
+        // This must route to the Clenshaw-Curtis branch automatically
         double result = MetaIntegrator.integrate2DSmart(ruleSetup, oscillatory2D, 0.0, 1.0, 0.0, 1.0, TOLERANCE);
 
         assertEquals("Highly oscillatory 2D matrix calculation failed inside Clenshaw-Curtis router", 
@@ -179,7 +195,7 @@ public class MetaIntegratorTest {
         double exactValue = ((1.0 - Math.cos(freq)) / freq) * (Math.sin(freq) / freq) * ((1.0 - Math.cos(freq)) / freq);
 
         // This will force K15 to fail due to heavy under-sampling,
-        // triggering the console log and routing to performClenshawCurtis3D
+        // triggering the console log and routing to the Clenshaw-Curtis branch
         double result = MetaIntegrator.integrate3DSmart(ruleSetup, highFreq3D, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, TOLERANCE);
 
         assertEquals("High frequency 3D Clenshaw-Curtis routing failed", exactValue, result, 1e-4);
