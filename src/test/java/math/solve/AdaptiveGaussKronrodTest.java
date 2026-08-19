@@ -140,4 +140,81 @@ public class AdaptiveGaussKronrodTest {
         assertEquals("Adaptive 3D subdivision engine failed to correctly isolate localized volume peak",
                      expectedValue, result, LOOSE_TOLERANCE);
     }
+
+    @Test
+    public void testNarrowPeakBetweenTheNodesIsNotMissed() {
+        // A peak of width 1/sqrt(2*20000) ~ 0.005 centered at 0.53 falls between
+        // the Kronrod nodes of the undivided domain. Both the Kronrod and the
+        // Gauss rule then return ~0, agree, and |K - G| reports an error of
+        // ~1e-26 for a value that is wrong by 100 percent. Without the forced
+        // initial subdivision the 3D case returned 4.06e-27 instead of 1.97e-06.
+        // The peak sits 66 standard deviations from either boundary, so the
+        // integral over the unit domain equals the one over all of R.
+        final double sharpness = 20000.0;
+        final double center = 0.53;
+        double oneAxis = Math.sqrt(Math.PI / sharpness);
+
+        DFunction peak1D = x -> Math.exp(-sharpness * (x - center) * (x - center));
+        double result1D = AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, peak1D, 0.0, 1.0, 1e-8, 20);
+        assertEquals("1D: narrow peak between the nodes was missed", oneAxis, result1D, 1e-9);
+
+        DBiFunction peak2D = (x, y) -> Math.exp(-sharpness
+                * ((x - center) * (x - center) + (y - center) * (y - center)));
+        double result2D = AdaptiveGaussKronrod.integrate2DAdaptive(ruleSetup, peak2D, 0.0, 1.0, 0.0, 1.0, 1e-8, 12);
+        assertEquals("2D: narrow peak between the nodes was missed", oneAxis * oneAxis, result2D, 1e-9);
+
+        // 3D needs a recursion budget beyond the 8 that MetaIntegrator passes:
+        // with 6 of 8 levels forced, too little of it is left for the adaptive
+        // part to resolve a peak this narrow
+        DTriFunction peak3D = (x, y, z) -> Math.exp(-sharpness
+                * ((x - center) * (x - center) + (y - center) * (y - center) + (z - center) * (z - center)));
+        double expected3D = oneAxis * oneAxis * oneAxis;
+        double result3D = AdaptiveGaussKronrod.integrate3DAdaptive(ruleSetup, peak3D,
+                0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1e-8, 14);
+        assertEquals("3D: narrow peak between the nodes was missed", expected3D, result3D, 1e-2 * expected3D);
+    }
+
+    @Test
+    public void testExplicitForcedSubdivisionsClosesTheResidual3DRisk() {
+        // 0.38 is one of the peak positions that the 3D default of three forced
+        // levels still misses: it returns ~0 and reports convergence. Six
+        // levels, two bisections per axis, resolve it.
+        final double sharpness = 20000.0;
+        final double center = 0.38;
+        double oneAxis = Math.sqrt(Math.PI / sharpness);
+        double expected = oneAxis * oneAxis * oneAxis;
+        DTriFunction peak3D = (x, y, z) -> Math.exp(-sharpness
+                * ((x - center) * (x - center) + (y - center) * (y - center) + (z - center) * (z - center)));
+
+        double byDefault = AdaptiveGaussKronrod.integrate3DAdaptive(ruleSetup, peak3D,
+                0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1e-8, 14);
+        assertTrue("the default is supposed to miss this one, otherwise the test has lost its point",
+                   Math.abs(byDefault - expected) > 0.5 * expected);
+
+        double raised = AdaptiveGaussKronrod.integrate3DAdaptive(ruleSetup, peak3D,
+                0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1e-8, 14, 6);
+        assertEquals("six forced levels must resolve the peak the default misses",
+                     expected, raised, 1e-5 * expected);
+    }
+
+    @Test
+    public void testExplicitForcedSubdivisionsAgreesWithTheDefaultAndClamps() {
+        DFunction smooth = x -> Math.exp(x);
+        double byDefault = AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, smooth, 0.0, 1.0, 1e-10, 20);
+
+        // passing the default explicitly must change nothing at all
+        assertEquals("explicit default must reproduce the default bit for bit", byDefault,
+                     AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, smooth, 0.0, 1.0, 1e-10, 20, 3), 0.0);
+        // a negative count is clamped to zero, i.e. to no forced subdivision
+        assertEquals("negative forced count must behave like zero",
+                     AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, smooth, 0.0, 1.0, 1e-10, 20, 0),
+                     AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, smooth, 0.0, 1.0, 1e-10, 20, -5), 0.0);
+        // a count above the recursion budget is clamped to the budget
+        assertEquals("forced count above maxDepth must behave like maxDepth",
+                     AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, smooth, 0.0, 1.0, 1e-10, 4, 4),
+                     AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, smooth, 0.0, 1.0, 1e-10, 4, 999), 0.0);
+        // and all of them still integrate correctly
+        assertEquals("forced subdivisions must not change the value on a smooth integrand",
+                     Math.E - 1.0, byDefault, STRICT_TOLERANCE);
+    }
 }
