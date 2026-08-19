@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Continuous distributions
+ * Continuous and discrete distributions
  */
 package math.distribution;
