@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Stefan Zobel
+ * Copyright 2023, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package math.linalg;
 
 import java.util.ArrayList;
 
+import math.cern.ProbabilityFuncs;
 import math.distribution.StudentT;
 import math.list.DoubleArrayList;
 import math.list.DoubleList;
@@ -40,10 +41,21 @@ public final class OLS {
             throw new IllegalArgumentException("alpha >= 1 : " + alpha);
         }
         LSSummary smmry = new LSSummary(alpha, X, y);
-        DMatrix Xtrans = X.transpose();
-        // Note: this may be numerically unstable!
-        DMatrix XtransTimesXInverse = Xtrans.mul(X).inverse();
-        DMatrix beta = XtransTimesXInverse.mul(Xtrans).mul(y);
+        int n = X.numRows();
+        int p = X.numColumns();
+        // Solved through the singular values rather than through the normal
+        // equations: forming X'X squares the condition number, which used to
+        // let the variances come out negative on a merely awkward design.
+        FlatParallelJacobiSVD.Result svd = new FlatParallelJacobiSVD().decompose(X.getArrayUnsafe(), n, p);
+        if (!svd.converged) {
+            throw new RuntimeException("the singular value decomposition of X did not converge");
+        }
+        int deficient = SvdLeastSquares.rankDeficientAt(svd);
+        if (deficient >= 0) {
+            throw new RuntimeException(
+                    "X is rank deficient: singular value " + deficient + " of " + p + " is negligible");
+        }
+        DMatrix beta = new DMatrix(p, 1, SvdLeastSquares.solve(svd, y.getArrayUnsafe(), 0.0));
         smmry.setBeta(beta);
         DMatrix yHat = X.mul(beta);
         smmry.setYHat(yHat);
@@ -70,16 +82,13 @@ public final class OLS {
         smmry.setDegreesOfFreedom(df);
         double sigmaHatSquared = epsHat.transpose().mul(epsHat).scaleInplace(1.0 / (df)).get(0, 0);
         smmry.setSigmaHatSquared(sigmaHatSquared);
-        DMatrix varCov = XtransTimesXInverse.scaleInplace(sigmaHatSquared);
+        DMatrix varCov = new DMatrix(p, p, SvdLeastSquares.varianceMatrix(svd, 0.0)).scaleInplace(sigmaHatSquared);
         smmry.setVarianceCovarianceMatrix(varCov);
         DoubleList standardErrors = new DoubleArrayList(varCov.numRows());
         for (int i = 0; i < varCov.numRows(); ++i) {
-            double vari = varCov.get(i, i);
-            if (vari < 0.0) {
-                vari = Double.MIN_NORMAL;
-                varCov.set(i, i, vari);
-            }
-            standardErrors.add(Math.sqrt(vari));
+            // V diag(1/d_i^2) V' has a diagonal of sums of squares, so no
+            // guard against a negative variance is needed here any more
+            standardErrors.add(Math.sqrt(varCov.get(i, i)));
         }
         smmry.setCoefficientStandardErrors(standardErrors);
         DoubleList tValues = new DoubleArrayList(varCov.numRows());
@@ -91,11 +100,14 @@ public final class OLS {
             double coeff = beta.get(i, 0);
             double se = standardErrors.get(i);
             double t = coeff / se;
-            double p = 2.0 * (1.0 - tDist.cdf(Math.abs(t)));
+            // P(|T| > |t|) as a regularized incomplete beta. Written as
+            // 2 * (1 - cdf(|t|)) this cancels to exactly 0.0 from about
+            // |t| = 8 upwards, and a p value of exactly zero is always wrong.
+            double pv = ProbabilityFuncs.beta(df / 2.0, 0.5, df / (df + t * t));
             double min = coeff - tval * se;
             double max = coeff + tval * se;
             tValues.add(t);
-            pValues.add(p);
+            pValues.add(pv);
             confIntervals.add(DoubleList.of(min, max));
         }
         smmry.setTValues(tValues);
