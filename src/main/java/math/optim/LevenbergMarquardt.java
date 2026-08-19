@@ -130,9 +130,43 @@ public final class LevenbergMarquardt {
         public final Status status;
         /** Shorthand for {@code status.isSuccess()}. */
         public final boolean converged;
+        /** {@code m - n}, the degrees of freedom left for estimating the noise. */
+        public final int degreesOfFreedom;
+        /**
+         * The estimated variance-covariance matrix of {@link #parameters},
+         * {@code n} by {@code n}, flat and column-major, or {@code null} where
+         * it cannot be formed -- see below.
+         * <p>
+         * It is {@code s^2 (J'J)^-1} with {@code s^2 = sumOfSquares /
+         * degreesOfFreedom}, taken from the factorization the search already
+         * produced. <strong>Two things have to hold before it means
+         * anything.</strong> The residuals must be independent draws of equal
+         * variance, or it estimates the wrong quantity; and for a model that is
+         * nonlinear in its parameters -- which is the only reason to be using
+         * this class -- it is the linearization at the solution, exact only in
+         * the limit of many observations. Close to the minimum of a
+         * well-conditioned problem it is a good approximation and it is what
+         * every curve fitting package reports; on a badly conditioned or
+         * strongly curved one it can understate the true uncertainty by a lot.
+         * A bootstrap over the residuals answers the same question without
+         * either assumption, and {@code math.probe.Bootstrap} is in this
+         * library.
+         * <p>
+         * {@code null} when {@code m == n}, where there is no spread left to
+         * estimate a variance from, and when the Jacobian at the solution is
+         * numerically rank deficient, where the inverse does not exist. Neither
+         * is reported as an error, because neither says the fit failed -- the
+         * parameters are as good as they ever were.
+         */
+        public final double[] covariance;
+        /**
+         * The square roots of the diagonal of {@link #covariance}, of length
+         * {@code n}, or {@code null} whenever that is. The same caveats apply.
+         */
+        public final double[] standardErrors;
 
         Result(double[] parameters, double[] residuals, double sumOfSquares, int functionEvaluations,
-                int jacobianEvaluations, Status status) {
+                int jacobianEvaluations, Status status, int degreesOfFreedom, double[] covariance) {
             this.parameters = parameters;
             this.residuals = residuals;
             this.sumOfSquares = sumOfSquares;
@@ -140,6 +174,18 @@ public final class LevenbergMarquardt {
             this.jacobianEvaluations = jacobianEvaluations;
             this.status = status;
             this.converged = status.isSuccess();
+            this.degreesOfFreedom = degreesOfFreedom;
+            this.covariance = covariance;
+            if (covariance == null) {
+                this.standardErrors = null;
+            } else {
+                int n = parameters.length;
+                double[] errors = new double[n];
+                for (int j = 0; j < n; j++) {
+                    errors[j] = Math.sqrt(covariance[j * n + j]);
+                }
+                this.standardErrors = errors;
+            }
         }
     }
 
@@ -312,7 +358,7 @@ public final class LevenbergMarquardt {
                 stepTolerance, gradientTolerance, budgetFor(n), diag, 1, initialStepBound, 0, info, nfev, njev,
                 ipvt, qtf);
 
-        return unpack(x, fvec, n, m, info[1], nfev[1], njev[1]);
+        return unpack(x, fvec, fjac, ipvt, n, m, info[1], nfev[1], njev[1]);
     }
 
     /**
@@ -376,7 +422,7 @@ public final class LevenbergMarquardt {
                 gradientTolerance, budgetFor(n), functionAccuracy, diag, 1, initialStepBound, 0, info, nfev, fjac,
                 ipvt, qtf);
 
-        return unpack(x, fvec, n, m, info[1], nfev[1], 0);
+        return unpack(x, fvec, fjac, ipvt, n, m, info[1], nfev[1], 0);
     }
 
     private static void checkArguments(DVectorFunction function, double[] initial, int residualCount) {
@@ -405,7 +451,8 @@ public final class LevenbergMarquardt {
         return (maxEvaluations == EVALUATIONS_FROM_PROBLEM_SIZE) ? 100 * (n + 1) : maxEvaluations;
     }
 
-    private static Result unpack(double[] x, double[] fvec, int n, int m, int info, int nfev, int njev) {
+    private static Result unpack(double[] x, double[] fvec, double[][] fjac, int[] ipvt, int n, int m, int info,
+            int nfev, int njev) {
         double[] parameters = new double[n];
         System.arraycopy(x, 1, parameters, 0, n);
         double[] residuals = new double[m];
@@ -414,7 +461,71 @@ public final class LevenbergMarquardt {
         for (int i = 0; i < m; i++) {
             sumOfSquares += residuals[i] * residuals[i];
         }
-        return new Result(parameters, residuals, sumOfSquares, nfev, njev, statusOf(info));
+        return new Result(parameters, residuals, sumOfSquares, nfev, njev, statusOf(info), m - n,
+                covarianceOf(fjac, ipvt, m, n, sumOfSquares));
+    }
+
+    /**
+     * The variance-covariance matrix, from what the search left behind rather
+     * than from anything recomputed. Both drivers return the upper triangular
+     * {@code R} of the pivoted {@code QR} of the final Jacobian in {@code fjac}
+     * and the pivoting in {@code ipvt}, with
+     * {@code P' (J'J) P = R'R}, so
+     * {@code (J'J)^-1 = P (R'R)^-1 P' = P R^-1 R^-T P'}.
+     * <p>
+     * MINPACK ships a {@code covar} routine that does this in place; it was not
+     * part of the translation, and inverting the triangle by plain back
+     * substitution is easier to check than reproducing that packing would be.
+     *
+     * @return the matrix, or {@code null} if it does not exist
+     */
+    private static double[] covarianceOf(double[][] fjac, int[] ipvt, int m, int n, double sumOfSquares) {
+        int degreesOfFreedom = m - n;
+        if (degreesOfFreedom < 1) {
+            return null;
+        }
+        // the pivoting orders the diagonal of R by nonincreasing magnitude, so
+        // the first entry is the largest and sets the scale for the rank test
+        double tolerance = Math.abs(fjac[1][1]) * Math.max(m, n) * MathConsts.MACH_EPS_DBL;
+        for (int k = 0; k < n; k++) {
+            if (!(Math.abs(fjac[k + 1][k + 1]) > tolerance)) {
+                return null;
+            }
+        }
+
+        // invert the upper triangle by back substitution, column by column
+        double[] inverse = new double[n * n];
+        for (int j = 0; j < n; j++) {
+            inverse[j * n + j] = 1.0 / fjac[j + 1][j + 1];
+            for (int i = j - 1; i >= 0; i--) {
+                double s = 0.0;
+                for (int k = i + 1; k <= j; k++) {
+                    s += fjac[i + 1][k + 1] * inverse[j * n + k];
+                }
+                inverse[j * n + i] = -s / fjac[i + 1][i + 1];
+            }
+        }
+
+        double sigmaSquared = sumOfSquares / degreesOfFreedom;
+        double[] covariance = new double[n * n];
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i <= j; i++) {
+                double s = 0.0;
+                // the inverse is upper triangular, so both factors are non-zero
+                // only from row j onwards
+                for (int k = j; k < n; k++) {
+                    s += inverse[k * n + i] * inverse[k * n + j];
+                }
+                double value = sigmaSquared * s;
+                // undo the pivoting: position i of the factorization belongs to
+                // the parameter ipvt[i] the caller passed in
+                int a = ipvt[i + 1] - 1;
+                int b = ipvt[j + 1] - 1;
+                covariance[b * n + a] = value;
+                covariance[a * n + b] = value;
+            }
+        }
+        return covariance;
     }
 
     private static Status statusOf(int info) {

@@ -721,6 +721,172 @@ public class LevenbergMarquardtTest {
         }
     }
 
+    /**
+     * The covariance is not recomputed from the Jacobian but read out of the
+     * factorization the search already produced, which is a second chance to
+     * get an index wrong -- the triangle is pivoted, so undoing that pivoting
+     * is part of the answer. {@link OLS} forms the same matrix on the same
+     * linear problem by an unrelated route, through the singular values, and
+     * the two have to meet. They meet to 9e-15 relative across the whole
+     * matrix; the bound below leaves two orders of magnitude of room for a
+     * different JDK to round differently.
+     */
+    @Test
+    public void testTheCovarianceReproducesOrdinaryLeastSquares() {
+        LinearModel model = new LinearModel(40, 4, 20260820L, 0.05);
+        LSSummary ols = OLS.estimate(0.05, model.x, model.y);
+        DMatrix reference = ols.getVarianceCovarianceMatrix();
+
+        LevenbergMarquardt.Result r = new LevenbergMarquardt().solve(model, new double[] { 0.0, 0.0, 0.0, 0.0 }, 40);
+
+        assertEquals("degrees of freedom", ols.getDegreesOfFreedom(), r.degreesOfFreedom);
+        assertTrue("a covariance exists here", r.covariance != null);
+        for (int j = 0; j < 4; j++) {
+            for (int i = 0; i < 4; i++) {
+                double expected = reference.get(i, j);
+                double scale = Math.max(Math.abs(expected), 1.0e-12);
+                assertEquals("covariance[" + i + "][" + j + "]", expected, r.covariance[j * 4 + i], 1.0e-12 * scale);
+            }
+        }
+        for (int j = 0; j < 4; j++) {
+            double expected = ols.getCoefficientStandardErrors().get(j);
+            assertEquals("standard error " + j, expected, r.standardErrors[j], 1.0e-12 * expected);
+        }
+    }
+
+    /**
+     * Without a derivative the covariance is only as good as the difference
+     * quotient the Jacobian was built from -- 3e-7 relative against the same
+     * reference where the analytic path reaches 9e-15. Worth stating as a
+     * number, because a covariance carries no sign of where it came from and a
+     * caller comparing standard errors across the two paths should know that
+     * seven digits is the ceiling on one of them.
+     */
+    @Test
+    public void testTheDerivativeFreeCovarianceIsLimitedByTheDifferenceQuotient() {
+        LinearModel model = new LinearModel(40, 4, 20260820L, 0.05);
+        DMatrix reference = OLS.estimate(0.05, model.x, model.y).getVarianceCovarianceMatrix();
+
+        LevenbergMarquardt.Result r = new LevenbergMarquardt().solve((DVectorFunction) model,
+                new double[] { 0.0, 0.0, 0.0, 0.0 }, 40);
+
+        assertTrue("a covariance exists here too", r.covariance != null);
+        double worst = 0.0;
+        for (int j = 0; j < 4; j++) {
+            for (int i = 0; i < 4; i++) {
+                double expected = reference.get(i, j);
+                worst = Math.max(worst, Math.abs(r.covariance[j * 4 + i] - expected) / Math.abs(expected));
+            }
+        }
+        assertTrue("worst relative difference " + worst, worst < 1.0e-5);
+        assertTrue("but visibly worse than the analytic path's 9e-15: " + worst, worst > 1.0e-12);
+    }
+
+    /** Structure, on every problem that has one. */
+    @Test
+    public void testTheCovarianceIsSymmetricWithNonNegativeVariances() {
+        Problem[] all = MghProblems.all();
+        for (int k = 0; k < all.length; k++) {
+            Problem p = all[k];
+            LevenbergMarquardt lm = new LevenbergMarquardt(SQRT_EPS, SQRT_EPS, 0.0, p.maxEvaluations, 100.0);
+            LevenbergMarquardt.Result r = lm.solve(p, p.start, p.m);
+            if (r.covariance == null) {
+                continue;
+            }
+
+            assertEquals(p.name + ": size", p.n * p.n, r.covariance.length);
+            for (int j = 0; j < p.n; j++) {
+                assertTrue(p.name + ": variance " + j + " is negative", r.covariance[j * p.n + j] >= 0.0);
+                assertEquals(p.name + ": standard error " + j, Math.sqrt(r.covariance[j * p.n + j]),
+                        r.standardErrors[j], 0.0);
+                for (int i = 0; i < p.n; i++) {
+                    assertEquals(p.name + ": not symmetric at " + i + "," + j, r.covariance[j * p.n + i],
+                            r.covariance[i * p.n + j], 0.0);
+                }
+            }
+        }
+    }
+
+    /**
+     * And absent, rather than wrong, where it cannot exist: with as many
+     * residuals as parameters there is nothing left to estimate a variance
+     * from, and Powell singular has a rank deficient Jacobian at its minimum on
+     * top of that.
+     */
+    @Test
+    public void testTheCovarianceIsAbsentWhereItCannotExist() {
+        Problem[] all = MghProblems.all();
+        int square = 0;
+        for (int k = 0; k < all.length; k++) {
+            Problem p = all[k];
+            if (p.m != p.n) {
+                continue;
+            }
+            square++;
+            LevenbergMarquardt lm = new LevenbergMarquardt(SQRT_EPS, SQRT_EPS, 0.0, p.maxEvaluations, 100.0);
+            LevenbergMarquardt.Result r = lm.solve(p, p.start, p.m);
+
+            assertEquals(p.name + ": degrees of freedom", 0, r.degreesOfFreedom);
+            assertTrue(p.name + ": there is no variance to report", r.covariance == null);
+            assertTrue(p.name + ": and no standard errors either", r.standardErrors == null);
+        }
+        assertTrue("the collection has square problems to check", square >= 3);
+    }
+
+    /**
+     * The statistical statement, on a model that is genuinely nonlinear and so
+     * out of reach of {@link OLS}: with four times as many observations of the
+     * same quality, a standard error is halved. That follows from the
+     * definition and from nothing about this implementation, which is what
+     * makes it worth asserting.
+     */
+    @Test
+    public void testStandardErrorsShrinkWithTheSquareRootOfTheSampleSize() {
+        double[] few = decayStandardErrors(60, 111L);
+        double[] many = decayStandardErrors(240, 111L);
+
+        for (int j = 0; j < 3; j++) {
+            double ratio = few[j] / many[j];
+            assertTrue("parameter " + j + ": ratio " + ratio + " is not near 2", ratio > 1.7 && ratio < 2.3);
+        }
+    }
+
+    /** Fits {@code A exp(-k t) + C} to {@code m} noisy points and reports the errors. */
+    private static double[] decayStandardErrors(final int m, long seed) {
+        final double[] truth = { 5.0, 0.7, 1.2 };
+        final double[] t = new double[m];
+        final double[] y = new double[m];
+        Lcg lcg = new Lcg(seed);
+        for (int i = 0; i < m; i++) {
+            t[i] = 5.0 * i / (m - 1);
+            y[i] = truth[0] * Math.exp(-truth[1] * t[i]) + truth[2] + 0.02 * lcg.next();
+        }
+
+        DiffDVectorFunction decay = new DiffDVectorFunction() {
+            @Override
+            public void valueAt(double[] p, double[] r) {
+                for (int i = 0; i < m; i++) {
+                    r[i] = p[0] * Math.exp(-p[1] * t[i]) + p[2] - y[i];
+                }
+            }
+
+            @Override
+            public void jacobianAt(double[] p, double[] jac) {
+                for (int i = 0; i < m; i++) {
+                    double e = Math.exp(-p[1] * t[i]);
+                    jac[0 * m + i] = e;
+                    jac[1 * m + i] = -p[0] * t[i] * e;
+                    jac[2 * m + i] = 1.0;
+                }
+            }
+        };
+
+        LevenbergMarquardt.Result r = new LevenbergMarquardt().solve(decay, new double[] { 1.0, 1.0, 0.0 }, m);
+        assertTrue(r.converged);
+        assertTrue("m = " + m + " must have standard errors", r.standardErrors != null);
+        return r.standardErrors;
+    }
+
     /** Arguments are checked, not passed on to be misread. */
     @Test
     public void testArgumentValidation() {
