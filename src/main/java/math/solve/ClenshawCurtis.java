@@ -29,6 +29,8 @@ import math.fun.DTriFunction;
  * integrand, but two coarse grids can agree by accident. The ladder therefore
  * starts one level below the grid a caller would have chosen as a fixed one, so
  * that the first estimate compares that grid against its predecessor.
+ *
+ * @since 1.5.1
  */
 public final class ClenshawCurtis {
 
@@ -183,7 +185,6 @@ public final class ClenshawCurtis {
      *            error tolerance for {@code |I_2N - I_N|}
      * @return the approximated integral, its error estimate, the grid used and
      *         whether the tolerance was met
-     * @since 1.5.1
      */
     public static IntegralResult integrate1D(DFunction f, double a, double b, double epsTol) {
         return integrate1D(f, a, b, epsTol, MIN_N_1D, MAX_N_1D);
@@ -211,7 +212,6 @@ public final class ClenshawCurtis {
      *            subintervals of the last grid
      * @return the approximated integral, its error estimate, the grid used and
      *         whether the tolerance was met
-     * @since 1.5.1
      */
     public static IntegralResult integrate1D(DFunction f, double a, double b, double epsTol, int minN, int maxN) {
         int lo = normalize(minN);
@@ -295,7 +295,6 @@ public final class ClenshawCurtis {
      *            error tolerance for {@code |I_2N - I_N|}
      * @return the approximated integral, its error estimate, the grid used and
      *         whether the tolerance was met
-     * @since 1.5.1
      */
     public static IntegralResult integrate2D(DBiFunction f, double ax, double bx, double ay, double by,
             double epsTol) {
@@ -327,7 +326,6 @@ public final class ClenshawCurtis {
      *            subintervals per axis of the last grid
      * @return the approximated integral, its error estimate, the grid used and
      *         whether the tolerance was met
-     * @since 1.5.1
      */
     public static IntegralResult integrate2D(DBiFunction f, double ax, double bx, double ay, double by, double epsTol,
             int minN, int maxN) {
@@ -444,7 +442,6 @@ public final class ClenshawCurtis {
      *            error tolerance for {@code |I_2N - I_N|}
      * @return the approximated integral, its error estimate, the grid used and
      *         whether the tolerance was met
-     * @since 1.5.1
      */
     public static IntegralResult integrate3D(DTriFunction f, double ax, double bx, double ay, double by, double az,
             double bz, double epsTol) {
@@ -481,7 +478,6 @@ public final class ClenshawCurtis {
      *            subintervals per axis of the last grid
      * @return the approximated integral, its error estimate, the grid used and
      *         whether the tolerance was met
-     * @since 1.5.1
      */
     public static IntegralResult integrate3D(DTriFunction f, double ax, double bx, double ay, double by, double az,
             double bz, double epsTol, int minN, int maxN) {
