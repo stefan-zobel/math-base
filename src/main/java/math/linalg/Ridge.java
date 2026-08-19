@@ -91,7 +91,6 @@ public final class Ridge {
      *             if the dimensions do not match, if {@code X} has more columns
      *             than rows, if {@code lambda} is negative or not finite, or if
      *             a column of {@code X} is constant
-     * @since 1.5.2
      */
     public static Result estimate(DMatrix X, DMatrix y, double lambda) {
         if (X.numRows() != y.numRows()) {
@@ -113,54 +112,19 @@ public final class Ridge {
         double[] xs = X.getArrayUnsafe();
         double[] ys = y.getArrayUnsafe();
 
-        double yBar = mean(ys, n);
-        double[] xBar = new double[p];
-        double[] scale = new double[p];
-        // centered and scaled copy of X, column-major like the original
-        double[] xt = new double[n * p];
-        for (int j = 0; j < p; j++) {
-            int col = j * n;
-            xBar[j] = mean(xs, n, col);
-            double ss = 0.0;
-            for (int i = 0; i < n; i++) {
-                double centred = xs[col + i] - xBar[j];
-                xt[col + i] = centred;
-                ss += centred * centred;
-            }
-            double s = Math.sqrt(ss / n);
-            if (s == 0.0) {
-                throw new IllegalArgumentException(
-                        "column " + j + " of X is constant; the intercept is fitted separately, "
-                                + "so a constant column carries no information");
-            }
-            scale[j] = s;
-            for (int i = 0; i < n; i++) {
-                xt[col + i] /= s;
-            }
-        }
+        Standardization std = Standardization.of(xs, ys, n, p, null);
+        double yBar = std.yBar;
 
-        double[] yt = new double[n];
-        for (int i = 0; i < n; i++) {
-            yt[i] = ys[i] - yBar;
-        }
-
-        // decomposeInPlace consumes xt, which is ours and not needed afterwards
-        FlatParallelJacobiSVD.Result svd = new FlatParallelJacobiSVD().decomposeInPlace(xt, n, p);
+        // decomposeInPlace consumes std.x, which is ours and not needed afterwards
+        FlatParallelJacobiSVD.Result svd = new FlatParallelJacobiSVD().decomposeInPlace(std.x, n, p);
         if (lambda == 0.0 && SvdLeastSquares.rankDeficientAt(svd) >= 0) {
             throw new IllegalArgumentException(
                     "X is rank deficient and lambda is 0, which is the case ridge regression exists to avoid; "
                             + "use a positive lambda");
         }
 
-        double[] betaScaled = SvdLeastSquares.solve(svd, yt, lambda);
-        double[] beta = new double[p];
-        for (int j = 0; j < p; j++) {
-            beta[j] = betaScaled[j] / scale[j];
-        }
-        double intercept = yBar;
-        for (int j = 0; j < p; j++) {
-            intercept -= beta[j] * xBar[j];
-        }
+        double[] beta = std.unscale(SvdLeastSquares.solve(svd, std.y, lambda));
+        double intercept = std.intercept(beta);
 
         double[] fitted = new double[n];
         double[] residuals = new double[n];
@@ -185,24 +149,12 @@ public final class Ridge {
         double[] standardErrors = new double[p];
         for (int j = 0; j < p; j++) {
             // beta_j = betaScaled_j / scale_j, so the variance divides by scale_j^2
-            standardErrors[j] = Math.sqrt(sigmaHatSquared * varDiag[j]) / scale[j];
+            standardErrors[j] = Math.sqrt(sigmaHatSquared * varDiag[j]) / std.scale[j];
         }
         double rSquared = (sst == 0.0) ? 1.0 : (1.0 - rss / sst);
 
         return new Result(beta, intercept, lambda, fitted, residuals, rSquared, sigmaHatSquared, standardErrors,
                 effectiveDf, svd.converged);
-    }
-
-    private static double mean(double[] a, int n) {
-        return mean(a, n, 0);
-    }
-
-    private static double mean(double[] a, int n, int offset) {
-        double sum = 0.0;
-        for (int i = 0; i < n; i++) {
-            sum += a[offset + i];
-        }
-        return sum / n;
     }
 
     private Ridge() {
