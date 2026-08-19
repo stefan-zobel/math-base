@@ -5,6 +5,38 @@ import math.fun.DFunction;
 import math.fun.DBiFunction;
 import math.fun.DTriFunction;
 
+/**
+ * Picks an integration strategy per call: a cheap oscillation heuristic decides
+ * between fixed-order Clenshaw-Curtis for an oscillating integrand and the
+ * adaptive Gauss-Kronrod subdivision of {@link AdaptiveGaussKronrod} for
+ * everything else.
+ *
+ * <h2>Known limitation of the Clenshaw-Curtis branch</h2>
+ * That branch uses a <em>fixed</em> number of Chebyshev points - 65 in 1D,
+ * 33 x 33 in 2D, 17 x 17 x 17 in 3D. It has no error estimate and no
+ * refinement, so an integrand that oscillates faster than the grid resolves is
+ * aliased and the wrong value is returned without any indication. Measured on
+ * {@code sin(k*x)} over {@code [0, 1]}:
+ * <table border="1">
+ *   <caption>relative error of the Clenshaw-Curtis branch</caption>
+ *   <tr><th>k</th><th>relative error</th></tr>
+ *   <tr><td>30</td><td>1.1e-15</td></tr>
+ *   <tr><td>200</td><td>3.6e-04</td></tr>
+ *   <tr><td>1000</td><td>2.2e+01, the sign is wrong too</td></tr>
+ *   <tr><td>5000</td><td>4.7e+02</td></tr>
+ * </table>
+ * 65 points resolve about 32 half waves, {@code sin(1000*x)} has 159 of them.
+ * The fix is to compute the rule at {@code N} and at {@code 2N} points and
+ * compare: Chebyshev grids are nested, so the {@code N + 1} points already
+ * evaluated are reused and the second pass costs one further set of
+ * evaluations, which would give this branch its first error estimate. Until
+ * then, an integrand known to oscillate rapidly should not be sent through
+ * here.
+ * <p>
+ * The heuristic that routes into that branch rests on the error estimate of the
+ * <em>undivided</em> domain and is therefore no more reliable than that
+ * estimate; see the class comment of {@link AdaptiveGaussKronrod}.
+ */
 public class MetaIntegrator {
 
     // 1D Configuration (N=64 -> 65 Points)
@@ -115,8 +147,12 @@ public class MetaIntegrator {
                                            double a, double b, double epsTol) {
         AdaptiveGaussKronrod.IntegralResult firstStep = AdaptiveGaussKronrod.integrate1D(setup, f, a, b);
 
-        if (firstStep.approximatedErrorEstimate < epsTol) return firstStep.value; // case 1: Smooth
-
+        // There is deliberately no early return on the value of firstStep here.
+        // On the undivided domain the error estimate is worthless whenever the
+        // integrand has a feature narrower than the node spacing - see the
+        // class comment of AdaptiveGaussKronrod. firstStep is used for the
+        // oscillation heuristic only; the tolerance test happens in
+        // integrate1DAdaptive, after its forced subdivisions.
         AdaptiveGaussKronrod.IntegralResult absStep = AdaptiveGaussKronrod.integrate1D(setup, x -> Math.abs(f.apply(x)), a, b);
         double oscillationIndex = Math.abs(firstStep.value) / (absStep.value + 1e-15);
 
@@ -139,8 +175,7 @@ public class MetaIntegrator {
                                            double ax, double bx, double ay, double by, double epsTol) {
         AdaptiveGaussKronrod.IntegralResult firstStep = AdaptiveGaussKronrod.integrate2DParallel(setup, f, ax, bx, ay, by);
 
-        if (firstStep.approximatedErrorEstimate < epsTol) return firstStep.value;
-
+        // no early return on firstStep, see integrate1DSmart
         AdaptiveGaussKronrod.IntegralResult absStep = AdaptiveGaussKronrod.integrate2DParallel(setup, (x, y) -> Math.abs(f.apply(x, y)), ax, bx, ay, by);
         double oscillationIndex = Math.abs(firstStep.value) / (absStep.value + 1e-15);
 
@@ -160,8 +195,7 @@ public class MetaIntegrator {
             double ax, double bx, double ay, double by, double epsTol) {
         AdaptiveGaussKronrod.IntegralResult firstStep = AdaptiveGaussKronrod.integrate2DParallel(setup, f, ax, bx, ay, by);
 
-        if (firstStep.approximatedErrorEstimate < epsTol) return firstStep.value;
-
+        // no early return on firstStep, see integrate1DSmart
         AdaptiveGaussKronrod.IntegralResult absStep = AdaptiveGaussKronrod.integrate2DParallel(setup, (x, y) -> Math.abs(f.apply(x, y)), ax, bx, ay, by);
         double oscillationIndex = Math.abs(firstStep.value) / (absStep.value + 1e-15);
 
@@ -185,9 +219,7 @@ public class MetaIntegrator {
         AdaptiveGaussKronrod.IntegralResult firstStep = AdaptiveGaussKronrod.integrate3DParallel(setup, f, ax, bx, ay,
                 by, az, bz);
 
-        if (firstStep.approximatedErrorEstimate < epsTol)
-            return firstStep.value;
-
+        // no early return on firstStep, see integrate1DSmart
         AdaptiveGaussKronrod.IntegralResult absStep = AdaptiveGaussKronrod.integrate3DParallel(setup,
                 (x, y, z) -> Math.abs(f.apply(x, y, z)), ax, bx, ay, by, az, bz);
         double oscillationIndex = Math.abs(firstStep.value) / (absStep.value + 1e-15);
@@ -201,6 +233,12 @@ public class MetaIntegrator {
             return performClenshawCurtis3D(f, ax, bx, ay, by, az, bz);
         }
 
-        return AdaptiveGaussKronrod.integrate3DAdaptive(setup, f, ax, bx, ay, by, az, bz, epsTol, 8);
+        // Two bisections per axis and a budget that leaves room for the
+        // adaptive part on top of them. The 8 that used to stand here was too
+        // small to resolve a narrow peak even once the premature accept above
+        // was gone: 22 of 31 peak positions came out wrong by 100 percent,
+        // and raising only the budget did not help, because three forced
+        // levels do not sample finely enough to notice the peak at all.
+        return AdaptiveGaussKronrod.integrate3DAdaptive(setup, f, ax, bx, ay, by, az, bz, epsTol, 14, 6);
     }
 }
