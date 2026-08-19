@@ -88,16 +88,15 @@ public class LimitedMemoryBfgsTest {
     }
 
     /**
-     * Tightening the tolerances does not make this class more accurate, and the
-     * constructor says so. What binds is the step tolerance of the internal
-     * {@code BackTrackLineSearch}, which has setters but no reachable instance,
-     * so the search stops at the same point no matter how much precision is
-     * asked for -- it merely stops by running out of steps instead of by
-     * meeting a tolerance. Asserted so the day the line search opens up, this
-     * test says so.
+     * Tightening the stopping rules of the search alone does not make this
+     * class more accurate, and the constructor says so. What binds is the step
+     * tolerance of the internal {@code BackTrackLineSearch}: the search stops
+     * at the same point no matter how much precision is asked for -- it merely
+     * stops by running out of steps instead of by meeting a tolerance. The
+     * ceiling is real, which is what makes the test below worth having.
      */
     @Test
-    public void testTighteningTheTolerancesIsBoundedByTheLineSearch() {
+    public void testTighteningTheStoppingRulesAloneIsBoundedByTheLineSearch() {
         Concave loose = new Concave();
         assertTrue(new LimitedMemoryBFGS(loose, 1000, 1.0e-4, 1.0e-3, 4).optimize());
         double[] wLoose = new double[2];
@@ -113,8 +112,72 @@ public class LimitedMemoryBfgsTest {
         assertEquals("w[1] unchanged by the tighter request", wLoose[1], wTight[1], 0.0);
         // and both are only as good as that step tolerance allows
         assertEquals("w[0]", 2.0, wTight[0], 1.0e-4);
-        assertTrue("closer than 1e-8 would mean the line search opened up",
+        assertTrue("the default line search resolves no better than 1e-8",
                 Math.abs(wTight[0] - 2.0) > 1.0e-8);
+    }
+
+    /**
+     * Tightening the step tolerances along with them does. They were reachable
+     * only through two setters on a package-private class whose only instance
+     * was private to this one, so the ceiling above could not be lifted from
+     * outside; they are constructor arguments now. On this quadratic the
+     * default settles 2.8e-6 away from the maximum and the opened-up line
+     * search lands on it exactly, which is five orders of magnitude of
+     * accuracy that no caller could ask for before.
+     */
+    @Test
+    public void testOpeningTheLineSearchLiftsTheCeiling() {
+        Concave f = new Concave();
+        LimitedMemoryBFGS bfgs = new LimitedMemoryBFGS(f, 1000, 1.0e-30, 1.0e-30, 4, 1.0e-20, 1.0e-20);
+
+        assertTrue(bfgs.optimize());
+        assertTrue(bfgs.isConverged());
+
+        double[] w = new double[2];
+        f.getParameters(w);
+        assertEquals("w[0]", 2.0, w[0], 0.0);
+        assertEquals("w[1]", -1.0, w[1], 0.0);
+    }
+
+    /**
+     * The step tolerances trade accuracy against work monotonically rather than
+     * being an all-or-nothing switch, so a caller can ask for what it needs.
+     */
+    @Test
+    public void testAccuracyImprovesMonotonicallyWithTheStepTolerances() {
+        double[] steps = { 1.0e-4, 1.0e-8, 1.0e-12, 1.0e-16 };
+        double previousError = Double.MAX_VALUE;
+        for (int k = 0; k < steps.length; k++) {
+            Concave f = new Concave();
+            new LimitedMemoryBFGS(f, 1000, 1.0e-30, 1.0e-30, 4, steps[k], steps[k]).optimize();
+            double[] w = new double[2];
+            f.getParameters(w);
+
+            double error = Math.abs(w[0] - 2.0) + Math.abs(w[1] + 1.0);
+            assertTrue("step tolerance " + steps[k] + ": error " + error + " is not below " + previousError,
+                    error < previousError);
+            previousError = error;
+        }
+    }
+
+    /**
+     * The defaults of the new constructor are the values the line search always
+     * had, so nothing moves for a caller that does not ask for them.
+     */
+    @Test
+    public void testTheStepToleranceDefaultsReproduceTheOldBehaviour() {
+        Concave shorthand = new Concave();
+        new LimitedMemoryBFGS(shorthand, 1000, 1.0e-4, 1.0e-3, 4).optimize();
+        double[] wShorthand = new double[2];
+        shorthand.getParameters(wShorthand);
+
+        Concave explicit = new Concave();
+        new LimitedMemoryBFGS(explicit, 1000, 1.0e-4, 1.0e-3, 4, 1.0e-7, 1.0e-4).optimize();
+        double[] wExplicit = new double[2];
+        explicit.getParameters(wExplicit);
+
+        assertEquals("w[0]", wShorthand[0], wExplicit[0], 0.0);
+        assertEquals("w[1]", wShorthand[1], wExplicit[1], 0.0);
     }
 
     /**
@@ -214,6 +277,11 @@ public class LimitedMemoryBfgsTest {
         expectIae("gradientTolerance", 1000, 1.0e-4, -1.0e-9, 4);
         expectIae("m", 1000, 1.0e-4, 1.0e-3, 0);
         expectIae("m", 1000, 1.0e-4, 1.0e-3, 101);
+        expectIae("stepRelTolerance", 0.0, 1.0e-4);
+        expectIae("stepRelTolerance", Double.NaN, 1.0e-4);
+        expectIae("stepRelTolerance", -1.0e-7, 1.0e-4);
+        expectIae("stepAbsTolerance", 1.0e-7, 0.0);
+        expectIae("stepAbsTolerance", 1.0e-7, Double.POSITIVE_INFINITY);
     }
 
     private static void expectIae(String what, int maxIterations, double tolerance, double gradientTolerance,
@@ -221,6 +289,15 @@ public class LimitedMemoryBfgsTest {
         Optimizable.ByGradientValue f = (what == null) ? null : new Concave();
         try {
             new LimitedMemoryBFGS(f, maxIterations, tolerance, gradientTolerance, m);
+            fail("expected IllegalArgumentException for " + what);
+        } catch (IllegalArgumentException expected) {
+            // as it should be
+        }
+    }
+
+    private static void expectIae(String what, double stepRelTolerance, double stepAbsTolerance) {
+        try {
+            new LimitedMemoryBFGS(new Concave(), 1000, 1.0e-4, 1.0e-3, 4, stepRelTolerance, stepAbsTolerance);
             fail("expected IllegalArgumentException for " + what);
         } catch (IllegalArgumentException expected) {
             // as it should be

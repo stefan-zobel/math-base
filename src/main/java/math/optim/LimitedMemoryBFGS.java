@@ -76,7 +76,9 @@ public final class LimitedMemoryBFGS implements Optimizer {
     }
 
     /**
-     * Creates an optimizer with explicit stopping rules.
+     * Creates an optimizer with explicit stopping rules, leaving the line
+     * search at its default step tolerances of {@code 1e-7} relative and
+     * {@code 1e-4} absolute.
      *
      * @param function
      *            the function to maximize
@@ -89,12 +91,7 @@ public final class LimitedMemoryBFGS implements Optimizer {
      *            through {@link #setTolerance(double)}
      * @param gradientTolerance
      *            gradient norm below which the search stops, {@code 0} or
-     *            greater. Loosening it stops the search earlier, but
-     *            tightening it beyond what the line search can resolve buys
-     *            nothing: the accuracy this class reaches is bounded by the
-     *            step tolerances of its internal {@code BackTrackLineSearch}
-     *            ({@code 1e-7} relative, {@code 1e-4} absolute), which no
-     *            caller can reach.
+     *            greater
      * @param m
      *            number of corrections kept for the inverse Hessian, between
      *            {@code 1} and {@code 100}; ideally between {@code 3} and
@@ -104,6 +101,51 @@ public final class LimitedMemoryBFGS implements Optimizer {
     public LimitedMemoryBFGS(Optimizable.ByGradientValue function,
             int maxIterations, double tolerance, double gradientTolerance,
             int m) {
+        this(function, maxIterations, tolerance, gradientTolerance, m,
+                BackTrackLineSearch.DEFAULT_REL_TOLX,
+                BackTrackLineSearch.DEFAULT_ABS_TOLX);
+    }
+
+    /**
+     * Creates an optimizer with explicit stopping rules for the search and for
+     * the line search underneath it.
+     * <p>
+     * The two step tolerances are what actually bounds the accuracy of this
+     * class. The line search stops as soon as a step is smaller than either of
+     * them, so no stopping rule of the search proper can resolve the maximum
+     * more finely than they allow: with the defaults, tightening
+     * {@code tolerance} or {@code gradientTolerance} alone returns the same
+     * point and merely reports no convergence instead of convergence. Tighten
+     * them together, or leave both alone.
+     *
+     * @param function
+     *            the function to maximize
+     * @param maxIterations
+     *            iteration budget, {@code 1} or greater; exhausting it stops
+     *            the search without reporting convergence
+     * @param tolerance
+     *            relative change of the objective value below which the search
+     *            stops, greater than {@code 0}; can still be changed later
+     *            through {@link #setTolerance(double)}
+     * @param gradientTolerance
+     *            gradient norm below which the search stops, {@code 0} or
+     *            greater
+     * @param m
+     *            number of corrections kept for the inverse Hessian, between
+     *            {@code 1} and {@code 100}; ideally between {@code 3} and
+     *            {@code 7}
+     * @param stepRelTolerance
+     *            the line search gives up on a step whose size relative to the
+     *            current parameters is below this, greater than {@code 0}.
+     *            Default {@code 1e-7}
+     * @param stepAbsTolerance
+     *            the line search gives up on a step below this in absolute
+     *            size, greater than {@code 0}. Default {@code 1e-4}
+     * @since 1.5.2
+     */
+    public LimitedMemoryBFGS(Optimizable.ByGradientValue function,
+            int maxIterations, double tolerance, double gradientTolerance,
+            int m, double stepRelTolerance, double stepAbsTolerance) {
         if (function == null) {
             throw new IllegalArgumentException("function is null");
         }
@@ -129,7 +171,9 @@ public final class LimitedMemoryBFGS implements Optimizer {
         this.gradientTolerance = gradientTolerance;
         this.m = m;
         optimizable = function;
-        lineMaximizer = new BackTrackLineSearch(function);
+        // the constructor validates the two step tolerances
+        lineMaximizer = new BackTrackLineSearch(function, stepRelTolerance,
+                stepAbsTolerance);
     }
 
     @Override

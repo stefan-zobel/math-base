@@ -24,39 +24,51 @@ final class BackTrackLineSearch {
     private static final Logger logger = Logger
             .getLogger(BackTrackLineSearch.class.getName());
 
+    /** Default tolerance on the relative step, {@code |delta x / x|}. */
+    static final double DEFAULT_REL_TOLX = 1e-7;
+    /** Default tolerance on the absolute step, {@code |delta x|}. */
+    static final double DEFAULT_ABS_TOLX = 1e-4;
+
     private final Optimizable.ByGradientValue function;
 
+    // termination conditions: either
+    // a) abs(delta x/x) < relTolx for all coordinates
+    // b) abs(delta x) < absTolx for all coordinates
+    // c) sufficient function increase (uses ALF)
+    // These were settable through two public setters, but the only instance
+    // ever built was private to LimitedMemoryBFGS, so nothing could reach
+    // them. They are constructor arguments now: the caller above chooses them
+    // once, and they cannot change under a running search.
+    private final double relTolx;
+    private final double absTolx;
+
     public BackTrackLineSearch(Optimizable.ByGradientValue optimizable) {
+        this(optimizable, DEFAULT_REL_TOLX, DEFAULT_ABS_TOLX);
+    }
+
+    public BackTrackLineSearch(Optimizable.ByGradientValue optimizable,
+            double relTolx, double absTolx) {
+        if (optimizable == null) {
+            throw new IllegalArgumentException("optimizable is null");
+        }
+        if (!(relTolx > 0.0) || Double.isInfinite(relTolx)) {
+            throw new IllegalArgumentException(
+                    "relTolx must be finite and positive : " + relTolx);
+        }
+        if (!(absTolx > 0.0) || Double.isInfinite(absTolx)) {
+            throw new IllegalArgumentException(
+                    "absTolx must be finite and positive : " + absTolx);
+        }
         this.function = optimizable;
+        this.relTolx = relTolx;
+        this.absTolx = absTolx;
     }
 
     private static final int maxIterations = 100;
     private static final double stpmax = 100;
     // private static final double EPS = 3.0e-12;
 
-    // termination conditions: either
-    // a) abs(delta x/x) < REL_TOLX for all coordinates
-    // b) abs(delta x) < ABS_TOLX for all coordinates
-    // c) sufficient function increase (uses ALF)
-    private double relTolx = 1e-7;
-    private double absTolx = 1e-4; // tolerance on absolute value difference
     private static final double ALF = 1e-4;
-
-    /**
-     * Sets the tolerance of relative diff in function value. Line search
-     * converges if <tt>abs(delta x / x) < tolx</tt> for all coordinates.
-     */
-    public void setRelTolx(double tolx) {
-        relTolx = tolx;
-    }
-
-    /**
-     * Sets the tolerance of absolute diff in function value. Line search
-     * converges if <tt>abs(delta x) < tolx</tt> for all coordinates.
-     */
-    public void setAbsTolx(double tolx) {
-        absTolx = tolx;
-    }
 
     // initialStep is ignored. This is b/c if the initial step is not 1.0,
     // it sometimes confuses the backtracking for reasons I don't
