@@ -27,8 +27,6 @@ import math.optim.SpectralProjectedGradient;
  */
 public class BoundedLeastSquaresTest {
 
-    private static final double EPS = 1.11022302462515654042e-16;
-
     // -----------------------------------------------------------------
     // feasibility and the exactness of the bounds
     // -----------------------------------------------------------------
