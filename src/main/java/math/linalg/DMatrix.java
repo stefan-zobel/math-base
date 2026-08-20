@@ -154,7 +154,10 @@ public class DMatrix {
         }
         DMatrix identity = identity(this.numRows());
         DMatrix inv = LinearEquationsSolver.solve(this, identity, new DMatrix(this.numRows(), this.numColumns()));
-        // double check: Dgesv doesn't reliably detect singularity
+        // A second net, complementary rather than redundant: the solver now
+        // rejects a factorization whose triangular factor has a tiny diagonal
+        // entry, but no diagonal test catches a matrix that is nearly singular
+        // while its factor looks harmless. A residual does.
         if (!approximatelyEquals(this.mul(inv), identity, 1.5 * Math.sqrt(MathConsts.MACH_EPS_DBL))) {
             throw new RuntimeException("Matrix A may be (close to) singular.");
         }
