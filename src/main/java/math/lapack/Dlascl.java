@@ -57,8 +57,17 @@ final class Dlascl {
 
         if (itype == -1) {
             info.val = -1;
-        } else if (cfrom == 0.0) {
+        } else if (cfrom == 0.0 || !Double.isFinite(cfrom)) {
+            // Reference LAPACK rejects a zero or NaN CFROM here. The test is
+            // widened to infinities because the scaling loop below only
+            // terminates while |cfromc| strictly decreases: for an infinite
+            // CFROM the product cfromc * smlnum stays infinite, the first
+            // branch is taken again on every pass and the routine spins
+            // forever instead of returning
             info.val = -4;
+        } else if (!Double.isFinite(cto)) {
+            // likewise for CTO, whose branch shrinks ctoc by bignum
+            info.val = -5;
         } else if (m < 0) {
             info.val = -6;
         } else if ((n < 0 || (itype == 4 && n != m)) || (itype == 5 && n != m)) {
