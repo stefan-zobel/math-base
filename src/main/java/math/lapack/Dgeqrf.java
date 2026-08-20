@@ -97,7 +97,7 @@ final class Dgeqrf {
             for (int p = (k - nx - 1 + nb) / nb; p > 0; p--) {
                 int ib = Math.min(k - i + 1, nb);
                 Dgeqr2.dgeqr2(m - i + 1, ib, a, i - 1 + (i - 1) * lda + _a_offset, lda, tau, i - 1 + _tau_offset, work,
-                        _work_offset, refInfo);
+                        _work_offset, new intW(0));
                 if (i + ib <= n) {
                     Dlarft.dlarft("Forward", "Columnwise", (m - i) + 1, ib, a, i - 1 + (i - 1) * lda + _a_offset, lda,
                             tau, i - 1 + _tau_offset, work, _work_offset, ldwork);
@@ -113,10 +113,8 @@ final class Dgeqrf {
         }
         if (i <= k) {
             Dgeqr2.dgeqr2(m - i + 1, n - i + 1, a, i - 1 + (i - 1) * lda + _a_offset, lda, tau, i - 1 + _tau_offset,
-                    work, _work_offset, refInfo);
+                    work, _work_offset, new intW(0));
         }
         work[_work_offset] = iws;
     }
-
-    private static final intW refInfo = new intW(0);
 }

@@ -29,7 +29,8 @@ final class Xerbla {
     static void xerbla(String s, int i) {
         String msg = " ** On entry to '" + s + "' parameter number '" + i
                 + "' had an illegal value";
-        System.err.println(msg);
+        // the message travels with the exception; a dependency-free
+        // library has no business writing to the console as well
         throw new IllegalArgumentException(msg);
     }
 }

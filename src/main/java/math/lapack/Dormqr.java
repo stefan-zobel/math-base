@@ -82,7 +82,7 @@ final class Dormqr {
         int nb = 0;
         if (info.val == 0) {
             // Compute the workspace requirements
-            nb = Math.min(nbmax, Ilaenv.ilaenv(1, "DORMQR", side + trans, m, n, k, -1));
+            nb = Math.min(nbmax, Ilaenv.ilaenv(1, "DORMQR", (left ? "L" : "R") + (notran ? "N" : "T"), m, n, k, -1));
             lwkopt = Math.max(1, nw) * nb;
             work[_work_offset] = lwkopt;
         }
@@ -104,14 +104,14 @@ final class Dormqr {
         if (nb > 1 && nb < k) {
             if (lwork < nw * nb) {
                 nb = lwork / ldwork;
-                nbmin = Math.max(2, Ilaenv.ilaenv(2, "DORMQR", side + trans, m, n, k, -1));
+                nbmin = Math.max(2, Ilaenv.ilaenv(2, "DORMQR", (left ? "L" : "R") + (notran ? "N" : "T"), m, n, k, -1));
             }
         }
 
         if (nb < nbmin || nb >= k) {
             // Use unblocked code
             Dorm2r.dorm2r(side, trans, m, n, k, a, _a_offset, lda, tau, _tau_offset, c, _c_offset, ldc, work,
-                    _work_offset, refInfo);
+                    _work_offset, new intW(0));
         } else {
             // Use blocked code
             int ni = 0;
@@ -170,5 +170,4 @@ final class Dormqr {
     }
 
     private static final int nbmax = 64;
-    private static final intW refInfo = new intW(0);
 }

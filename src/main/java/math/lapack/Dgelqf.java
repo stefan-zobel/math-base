@@ -107,7 +107,7 @@ final class Dgelqf {
                 // Compute the LQ factorization of the current block
                 // A(i:i+ib-1,i:n)
                 Dgelq2.dgelq2(ib, n - i + 1, a, i - 1 + (i - 1) * lda + _a_offset, lda, tau, i - 1 + _tau_offset, work,
-                        _work_offset, refInfo);
+                        _work_offset, new intW(0));
                 if (i + ib <= m) {
                     // Form the triangular factor of the block reflector
                     // H = H(i) H(i+1) . . . H(i+ib-1)
@@ -126,10 +126,8 @@ final class Dgelqf {
         // Use unblocked code to factor the last or only block
         if (i <= k) {
             Dgelq2.dgelq2(m - i + 1, n - i + 1, a, i - 1 + (i - 1) * lda + _a_offset, lda, tau, i - 1 + _tau_offset,
-                    work, _work_offset, refInfo);
+                    work, _work_offset, new intW(0));
         }
         work[_work_offset] = iws;
     }
-
-    private static final intW refInfo = new intW(0);
 }

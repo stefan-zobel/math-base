@@ -29,6 +29,15 @@ final class Ilaenv {
 
     static int ilaenv(int ispec, String name, String opts, int n1, int n2, int n3, int n4) {
 
+        if (name == null || name.length() < 6) {
+            // the name is decomposed as name[1..2] and name[3..5] below,
+            // so anything shorter would throw. Reference LAPACK pads
+            // SUBNAM to CHARACTER*6 and then fails to recognize it; 1 is
+            // what this routine already returns for a name it does not
+            // know, see the flag1/flag2 test further down
+            return 1;
+        }
+
         label0: {
             boolean flag1;
             boolean flag2;
