@@ -53,6 +53,50 @@ final class SvdLeastSquares {
     }
 
     /**
+     * {@code beta = V diag(1/d_i) U' y} over the singular values above
+     * {@code tol}, the rest discarded. Where {@link #solve} shrinks a small
+     * singular value by a penalty, this one drops it: at {@code lambda == 0}
+     * the filter is {@code 1/d}, which is unbounded, so a caller that cannot
+     * refuse a rank deficient matrix needs the truncated pseudo-inverse
+     * instead. The result is the minimum norm solution of the reduced problem.
+     *
+     * @param svd
+     *            decomposition of the design matrix
+     * @param y
+     *            the regressand, length {@code svd.m}
+     * @param tol
+     *            singular values at or below this are discarded, customarily
+     *            {@code sigma[0] * max(m, n) * eps}
+     * @return the coefficients, length {@code svd.n}
+     */
+    static double[] solveTruncated(FlatParallelJacobiSVD.Result svd, double[] y, double tol) {
+        int m = svd.m;
+        int n = svd.n;
+        double[] z = new double[n];
+        for (int i = 0; i < n; i++) {
+            double d = svd.sigma[i];
+            if (d <= tol) {
+                continue;
+            }
+            double uty = 0.0;
+            int col = i * m;
+            for (int k = 0; k < m; k++) {
+                uty += svd.U[col + k] * y[k];
+            }
+            z[i] = uty / d;
+        }
+        double[] beta = new double[n];
+        for (int i = 0; i < n; i++) {
+            double sum = 0.0;
+            for (int j = 0; j < n; j++) {
+                sum += svd.V[j * n + i] * z[j];
+            }
+            beta[i] = sum;
+        }
+        return beta;
+    }
+
+    /**
      * Diagonal of {@code V diag(d_i^2 / (d_i^2 + lambda)^2) V'}, which becomes
      * the variances of the coefficients once multiplied by the residual
      * variance. Every entry is a sum of squares over positive denominators and
