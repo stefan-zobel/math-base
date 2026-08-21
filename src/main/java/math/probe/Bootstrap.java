@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.stream.IntStream;
 import math.cern.Arithmetic;
 import math.cern.ProbabilityFuncs;
-import math.rng.SplittablePseudoRandom;
+import math.rng.BitMix;
 import math.rng.XorShiftRot256StarStar;
 
 /**
@@ -22,8 +22,9 @@ import math.rng.XorShiftRot256StarStar;
  * <ul>
  * <li><b>Parallel Execution:</b> Resampling and Jackknife calculations are
  * parallelized using Java Streams to maximize CPU utilization.</li>
- * <li><b>Thread-Safe RNG:</b> Utilizes {@link math.rng.SplittablePseudoRandom}
- * to provide independent, non-blocking random streams for each thread.</li>
+ * <li><b>Thread-Safe RNG:</b> Every replication derives its generator from its
+ * own index, so the threads share no generator state and the outcome does not
+ * depend on how the stream is scheduled.</li>
  * <li><b>BCa Support:</b> Adjusts for bias and skewness in the bootstrap
  * distribution, providing higher accuracy for non-symmetrical statistics.</li>
  * </ul>
@@ -32,6 +33,13 @@ import math.rng.XorShiftRot256StarStar;
  * The complexity is approximately O(B * N) for resampling and O(N^2) for the
  * Jackknife acceleration phase, where B is the number of iterations and N is
  * the sample size.
+ * <p>
+ * Pass a seed to {@link #Bootstrap(double[], SampleStatistic, int, long)} for a
+ * reproducible result: the same seed, sample, statistic and iteration count
+ * produce the same replications, whatever the number of cores. The constructor
+ * without a seed draws one and is therefore not reproducible.
+ * <p>
+ * <a href="https://en.wikipedia.org/wiki/Bootstrapping_(statistics)">Bootstrapping</a>
  *
  * @since 1.4.1
  */
@@ -41,14 +49,50 @@ public final class Bootstrap {
     private final SampleStatistic statistic;
     private final double observedStatistic;
     private final double[] bootResults;
-    private final SplittablePseudoRandom rng;
+    private final long masterSeed;
 
+    /** The odd golden-ratio increment SplitMix64 spaces its seeds by. */
+    private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
+
+    /**
+     * Runs the bootstrap from a seed drawn off the default generator, so the
+     * result cannot be reproduced. Use
+     * {@link #Bootstrap(double[], SampleStatistic, int, long)} when it has to
+     * be.
+     *
+     * @param sample
+     *            the observed sample, copied defensively
+     * @param statistic
+     *            the statistic to resample
+     * @param iterations
+     *            the number of bootstrap replications
+     */
     public Bootstrap(double[] sample, SampleStatistic statistic, int iterations) {
+        this(sample, statistic, iterations, XorShiftRot256StarStar.getDefault().nextLong());
+    }
+
+    /**
+     * Runs the bootstrap from the given seed. The same seed, sample, statistic
+     * and iteration count reproduce the same replications exactly, on any
+     * number of cores, because each replication derives its generator from its
+     * own index rather than from state shared between the threads.
+     *
+     * @param sample
+     *            the observed sample, copied defensively
+     * @param statistic
+     *            the statistic to resample
+     * @param iterations
+     *            the number of bootstrap replications
+     * @param seed
+     *            the seed the replications are derived from
+     * @since 1.5.2
+     */
+    public Bootstrap(double[] sample, SampleStatistic statistic, int iterations, long seed) {
         this.originalSample = sample.clone();
         this.statistic = statistic;
         this.observedStatistic = statistic.apply(originalSample);
         this.bootResults = new double[iterations];
-        this.rng = XorShiftRot256StarStar.getDefault();
+        this.masterSeed = seed;
 
         runResampling(iterations);
     }
@@ -58,9 +102,11 @@ public final class Bootstrap {
 
         // We use Parallel Streams to utilize the hardware cores
         IntStream.range(0, iterations).parallel().forEach(b -> {
-            // Each iteration needs its own RNG state, to avoid
-            // thread interference (SplittablePseudoRandom is ideal)
-            SplittablePseudoRandom localRng = rng.split();
+            // The generator is derived from the replication index, never from
+            // shared state: that is what keeps the threads independent and
+            // makes the whole run reproducible from masterSeed alone
+            XorShiftRot256StarStar localRng = new XorShiftRot256StarStar(
+                    BitMix.staffordMix13(masterSeed + (b + 1) * GOLDEN_GAMMA));
 
             double[] resample = new double[n];
             for (int i = 0; i < n; i++) {

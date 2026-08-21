@@ -14,7 +14,13 @@ public class BootstrapStressTest {
         int n = 2_000;
         int iterations = 100_000; // High load for the parallel streams
 
-        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        // Seeded on purpose. Unseeded, check (B) below asserted that a 95%
+        // interval contains the true variance 1.0, which is a coverage
+        // statement and had to fail roughly one run in ten: the interval is
+        // centred on the sample variance, whose standard error here is about
+        // 0.032 against a half width of about 0.062. With the sample fixed,
+        // the assertion is about this sample and is either true or not
+        PseudoRandom rng = DefaultRng.newPseudoRandom(20260821L);
         double[] data = rng.normal(n, 0.0, 1.0).toArray();
 
         // We test variance as the statistic (slightly more expensive than the mean)
@@ -34,7 +40,7 @@ public class BootstrapStressTest {
         long start = System.currentTimeMillis();
 
         // Run bootstrap
-        Bootstrap bs = new Bootstrap(data, varianceSource, iterations);
+        Bootstrap bs = new Bootstrap(data, varianceSource, iterations, 20260821L);
 
         // Calculate BCa confidence interval (also triggers the parallel Jackknife)
         double[] ci = bs.getConfidenceIntervalBCa(0.95);
@@ -71,7 +77,7 @@ public class BootstrapStressTest {
         int iterations = 50_000;
 
         // Setup: Exponential distribution (theoretical skewness is always = 2.0, independent of lambda)
-        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        PseudoRandom rng = DefaultRng.newPseudoRandom(20260822L);
         // Exponential(lambda=1.0)
         double[] data = rng.exponential(n, 1.0).toArray();
 
@@ -91,7 +97,7 @@ public class BootstrapStressTest {
         };
 
         // Execution
-        Bootstrap bs = new Bootstrap(data, skewness, iterations);
+        Bootstrap bs = new Bootstrap(data, skewness, iterations, 20260822L);
         System.out.println("Exponential Skewness Test:");
         System.out.println(bs.summary(0.95));
 
@@ -114,7 +120,7 @@ public class BootstrapStressTest {
         // Tests whether the system remains stable even with extremely small
         // samples (many Jackknife threads) and a high number of iterations
         double[] tinyData = {1.0, 2.0, 3.0, 4.0, 5.0};
-        Bootstrap bs = new Bootstrap(tinyData, sample -> sample[0], 50_000);
+        Bootstrap bs = new Bootstrap(tinyData, sample -> sample[0], 50_000, 20260823L);
 
         double[] ci = bs.getConfidenceIntervalBCa(0.99);
         Assert.assertNotNull(ci);
