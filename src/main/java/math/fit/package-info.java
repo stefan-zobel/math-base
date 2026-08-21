@@ -14,15 +14,26 @@
 /**
  * Routines for function fitting and data interpolation.
  * <p>
- * All three interpolators here produce a {@link math.fit.CubicSpline}, which
- * evaluates the value, the first and second derivative and the definite
- * integral in closed form. Choose {@link math.fit.SplineInterpolator} for
- * smooth data, where its two continuous derivatives make it the smoothest and,
- * on coarse grids, the most accurate; {@link math.fit.KrugerInterpolator}
- * where the shape of the data has to be preserved, since it is the only one of
- * the three that cannot leave the range of the values; and
- * {@link math.fit.AkimaInterpolator} for data with a few outliers, since it is
- * the only one whose slopes are local, so a single bad value disturbs six
- * segments rather than every segment there is.
+ * In one dimension all three interpolators produce a
+ * {@link math.fit.CubicSpline}, which evaluates the value, the first and second
+ * derivative and the definite integral in closed form. Choose
+ * {@link math.fit.SplineInterpolator} for smooth data, where its two continuous
+ * derivatives make it the smoothest and, on coarse grids, the most accurate;
+ * {@link math.fit.KrugerInterpolator} where the shape of the data has to be
+ * preserved, since it is the only one of the three that cannot leave the range
+ * of the values; and {@link math.fit.AkimaInterpolator} for data with a few
+ * outliers, since it is the only one whose slopes are local, so a single bad
+ * value disturbs six segments rather than every segment there is.
+ * <p>
+ * On a rectangular grid the same three choices reappear, split over two result
+ * types. {@link math.fit.BilinearInterpolator} and
+ * {@link math.fit.BicubicInterpolator} produce a
+ * {@link math.fit.PolynomialSurface}, which has cell coefficients and therefore
+ * partial derivatives and an exact double integral, and evaluates in constant
+ * time; take the first where the surface must not leave the data and the second
+ * where it must be smooth. {@link math.fit.SuccessiveInterpolator} carries the
+ * shape-preserving and local rules into two dimensions by sweeping each
+ * direction in turn; that has no closed-form coefficients, but its Kruger sweep
+ * is the only smooth scheme here that stays inside the data.
  */
 package math.fit;
