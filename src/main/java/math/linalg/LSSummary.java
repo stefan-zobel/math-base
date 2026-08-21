@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Stefan Zobel
+ * Copyright 2023, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,13 @@ import math.list.DoubleArrayList;
 import math.list.DoubleList;
 
 /**
- * Least squares regression summary.
+ * Least squares regression summary, filled by {@link OLS} and by {@link Wls}.
+ * <p>
+ * For a weighted fit the residual variance, the mean of the regressand and the
+ * coefficient of determination are the weighted ones, while
+ * {@link #getResiduals()} stays the raw {@code y - X beta} so that it means the
+ * same thing in both cases. {@link #getWeights()} says which of the two a
+ * summary came from.
  */
 public class LSSummary {
 
@@ -45,6 +51,9 @@ public class LSSummary {
 
     // y - yHat = epsilon
     private DoubleList residuals;
+
+    // the weights of a weighted fit, null for an unweighted one
+    private DoubleList weights;
 
     // coefficient of determination
     private double rSquared;
@@ -81,6 +90,7 @@ public class LSSummary {
         regressand = null;
         yHat = null;
         residuals = null;
+        weights = null;
         tValues = null;
     }
 
@@ -122,6 +132,26 @@ public class LSSummary {
         residuals = new DoubleArrayList(epsilonHat.numRows());
         for (int i = 0; i < epsilonHat.numRows(); ++i) {
             residuals.add(epsilonHat.get(i, 0));
+        }
+    }
+
+    /**
+     * The weights of the fit, or {@code null} if it was unweighted. The
+     * residuals of {@link #getResiduals()} are the raw {@code y - X beta} in
+     * either case, so the weighted residual of observation {@code i} is
+     * {@code sqrt(getWeights().get(i)) * getResiduals().get(i)}.
+     *
+     * @return the weights, or {@code null} for an unweighted fit
+     * @since 1.5.2
+     */
+    public DoubleList getWeights() {
+        return weights;
+    }
+
+    void setWeights(double[] w) {
+        weights = new DoubleArrayList(w.length);
+        for (int i = 0; i < w.length; ++i) {
+            weights.add(w[i]);
         }
     }
 
