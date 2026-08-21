@@ -16,14 +16,14 @@
  */
 /*
  * Any changes, bugfixes or additions made by the maintainers
- * of the https://github.com/stefan-zobel/FFT library are
+ * of the https://github.com/stefan-zobel/math-base library are
  * licensed under the Apache License, Version 2.0, as explained
  * at http://www.apache.org/licenses/LICENSE-2.0
+ * Copyright 2026 Stefan Zobel
  */
 package math.fft;
 
 import jdk.incubator.vector.DoubleVector;
-import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
 /**
@@ -244,29 +244,24 @@ public final class Fourier {
         DoubleVector vScale = DoubleVector.broadcast(SPECIES, scaleFactor);
 
         for (; i < upper; i += SPECIES.length()) {
-            DoubleVector re = DoubleVector.fromArray(SPECIES, dataR, i).mul(vScale);
-            zeroSmall(re).intoArray(dataR, i);
+            DoubleVector.fromArray(SPECIES, dataR, i).mul(vScale).intoArray(dataR, i);
         }
         for (; i < n; ++i) {
-            dataR[i] = zeroSmall(dataR[i] * scaleFactor);
+            dataR[i] = dataR[i] * scaleFactor;
         }
 
         i = 0;
         for (; i < upper; i += SPECIES.length()) {
-            DoubleVector im = DoubleVector.fromArray(SPECIES, dataI, i).mul(vScale);
-            zeroSmall(im).intoArray(dataI, i);
+            DoubleVector.fromArray(SPECIES, dataI, i).mul(vScale).intoArray(dataI, i);
         }
         for (; i < n; ++i) {
-            dataI[i] = zeroSmall(dataI[i] * scaleFactor);
+            dataI[i] = dataI[i] * scaleFactor;
         }
-    }
 
-    private static double zeroSmall(double x) {
-        return (Math.abs(x) <= ComplexArray.TOL) ? 0.0 : x;
-    }
-
-    private static DoubleVector zeroSmall(DoubleVector v) {
-        return v.blend(0.0, v.abs().compare(VectorOperators.LE, ComplexArray.TOL));
+        // relative to the largest coefficient, never absolute: the size of a
+        // transform coefficient is set by the caller's data, so an absolute
+        // threshold cleans nothing at one scale and everything at another
+        ComplexArray.zeroNegligible(dataR, dataI, ComplexArray.largestMagnitude(dataR, dataI), n);
     }
 
     /**

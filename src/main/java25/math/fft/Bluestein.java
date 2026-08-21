@@ -20,15 +20,15 @@
  */
 /*
  * Any changes, bugfixes or additions made by the maintainers
- * of the https://github.com/stefan-zobel/FFT library are
+ * of the https://github.com/stefan-zobel/math-base library are
  * licensed under the Apache License, Version 2.0, as explained
  * at http://www.apache.org/licenses/LICENSE-2.0
+ * Copyright 2026 Stefan Zobel
  */
 package math.fft;
 
 import jdk.incubator.vector.DoubleVector;
 import jdk.incubator.vector.VectorMask;
-import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
 /**
@@ -137,8 +137,8 @@ final class Bluestein {
             DoubleVector vRe = vCre.fma(vCos, vCim.mul(vSin));
             DoubleVector vIm = vCim.fma(vCos, vCre.mul(vSin).neg());
 
-            zeroSmall(vRe).intoArray(re, i);
-            zeroSmall(vIm).intoArray(im, i);
+            vRe.intoArray(re, i);
+            vIm.intoArray(im, i);
         }
         for (; i < n; i += SPECIES.length()) {
             VectorMask<Double> vMask = SPECIES.indexInRange(i, n);
@@ -150,9 +150,10 @@ final class Bluestein {
             DoubleVector vRe = vCre.fma(vCos, vCim.mul(vSin));
             DoubleVector vIm = vCim.fma(vCos, vCre.mul(vSin).neg());
 
-            zeroSmall(vRe).intoArray(re, i, vMask);
-            zeroSmall(vIm).intoArray(im, i, vMask);
+            vRe.intoArray(re, i, vMask);
+            vIm.intoArray(im, i, vMask);
         }
+        ComplexArray.zeroNegligible(re, im, ComplexArray.largestMagnitude(re, im), n);
 
         return new ComplexArray(re, im, false);
     }
@@ -169,16 +170,17 @@ final class Bluestein {
         for (; i < upper; i += SPECIES.length()) {
             DoubleVector vRe = DoubleVector.fromArray(SPECIES, re, i).mul(vInvN);
             DoubleVector vIm = DoubleVector.fromArray(SPECIES, im, i).mul(vInvN);
-            zeroSmall(vRe).intoArray(re, i);
-            zeroSmall(vIm).intoArray(im, i);
+            vRe.intoArray(re, i);
+            vIm.intoArray(im, i);
         }
         for (; i < n; i += SPECIES.length()) {
             VectorMask<Double> m = SPECIES.indexInRange(i, n);
             DoubleVector vRe = DoubleVector.fromArray(SPECIES, re, i, m).mul(vInvN);
             DoubleVector vIm = DoubleVector.fromArray(SPECIES, im, i, m).mul(vInvN);
-            zeroSmall(vRe).intoArray(re, i, m);
-            zeroSmall(vIm).intoArray(im, i, m);
+            vRe.intoArray(re, i, m);
+            vIm.intoArray(im, i, m);
         }
+        ComplexArray.zeroNegligible(re, im, ComplexArray.largestMagnitude(re, im), n);
 
         for (int k = 1; k <= n / 2; ++k) {
             double re_tmp = re[n - k];
@@ -227,10 +229,6 @@ final class Bluestein {
         }
 
         return Fourier.inverseDFT(new ComplexArray(x_re, x_im, false));
-    }
-
-    private static DoubleVector zeroSmall(DoubleVector v) {
-        return v.blend(0.0, v.abs().compare(VectorOperators.LE, ComplexArray.TOL));
     }
 
     private Bluestein() {

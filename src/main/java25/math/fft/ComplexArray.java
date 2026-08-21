@@ -24,11 +24,17 @@ import math.MathConsts;
 /**
  * For computations with arrays of complex numbers.
  * <p>
+ * Every operation here that produces an array flushes the round-off it
+ * generated to exact zeros, so that a coefficient the mathematics makes zero
+ * comes back as {@code 0.0}. The threshold for that is <em>relative</em> to the
+ * largest magnitude in the same result -- an absolute one would mean something
+ * only for data that happens to be of order one, and would silently delete the
+ * whole result of a transform over data that is not. See
+ * {@link #relativeFactor(int)}.
+ * <p>
  * Note that indexes in {@link #set(int, double, double)} are 1-based!
  */
 public final class ComplexArray {
-
-    static final double TOL = 5.0 * MathConsts.MACH_EPS_DBL;
 
     private static final VectorSpecies<Double> SPECIES = DoubleVector.SPECIES_PREFERRED;
 
@@ -101,17 +107,10 @@ public final class ComplexArray {
                 rZ += cosine * rX - sine * iY;
                 iZ += sine * rX + cosine * iY;
             }
-            double x = scale * rZ;
-            double y = scale * iZ;
-            if (Math.abs(x) <= TOL) {
-                x = 0.0;
-            }
-            if (Math.abs(y) <= TOL) {
-                y = 0.0;
-            }
-            real[i] = x;
-            imag[i] = y;
+            real[i] = scale * rZ;
+            imag[i] = scale * iZ;
         }
+        zeroNegligible(real, imag, largestMagnitude(real, imag), N);
         return new ComplexArray(real, imag, false);
     }
 
@@ -148,8 +147,6 @@ public final class ComplexArray {
             DoubleVector vi = DoubleVector.fromArray(SPECIES, imag, i);
 
             DoubleVector square = vr.fma(vr, vi.mul(vi)).mul(vInvScale);
-
-            square = square.blend(0.0, square.compare(VectorOperators.LE, TOL));
             square.intoArray(res, i);
         }
         for (; i < N; i += SPECIES.length()) {
@@ -158,9 +155,19 @@ public final class ComplexArray {
             DoubleVector vi = DoubleVector.fromArray(SPECIES, imag, i, m);
 
             DoubleVector square = vr.fma(vr, vi.mul(vi)).mul(vInvScale);
-
-            square = square.blend(0.0, square.compare(VectorOperators.LE, TOL));
             square.intoArray(res, i, m);
+        }
+        // these are squares, so the threshold is the square of the one that
+        // applies to a magnitude: a coefficient that is nothing but round-off
+        // is at most factor * max|X|, and its square at most factor^2 * maxSquare
+        double max = 0.0;
+        for (int k = 0; k < N; ++k) {
+            max = Math.max(max, res[k]);
+        }
+        if (max > 0.0 && !Double.isInfinite(max)) {
+            double factor = relativeFactor(N);
+            double cutoff = max * factor * factor;
+            blendBelow(res, cutoff);
         }
         return res;
     }
@@ -222,6 +229,7 @@ public final class ComplexArray {
 
         DoubleVector accRe = DoubleVector.zero(SPECIES);
         DoubleVector accIm = DoubleVector.zero(SPECIES);
+        DoubleVector vMax = DoubleVector.zero(SPECIES);
 
         for (; i < upper; i += SPECIES.length()) {
             DoubleVector aRe = DoubleVector.fromArray(SPECIES, a_re_, i);
@@ -232,11 +240,11 @@ public final class ComplexArray {
             DoubleVector rePart = aRe.fma(bRe, aIm.mul(bIm).neg());
             DoubleVector imPart = aRe.fma(bIm, aIm.mul(bRe));
 
-            rePart = zeroSmall(rePart);
-            imPart = zeroSmall(imPart);
-
+            // the terms themselves are not cleaned: zeroing an addend changes
+            // the sum, and nobody ever sees an intermediate
             accRe = accRe.add(rePart);
             accIm = accIm.add(imPart);
+            vMax = vMax.max(rePart.abs()).max(imPart.abs());
         }
         for (; i < n; i += SPECIES.length()) {
             VectorMask<Double> m = SPECIES.indexInRange(i, n);
@@ -248,19 +256,22 @@ public final class ComplexArray {
             DoubleVector rePart = aRe.fma(bRe, aIm.mul(bIm).neg());
             DoubleVector imPart = aRe.fma(bIm, aIm.mul(bRe));
 
-            rePart = zeroSmall(rePart);
-            imPart = zeroSmall(imPart);
-
             accRe = accRe.add(rePart, m);
             accIm = accIm.add(imPart, m);
+            // inactive lanes hold whatever the masked load left, so they are
+            // blended away before they can raise the maximum
+            vMax = vMax.max(rePart.abs().blend(0.0, m.not())).max(imPart.abs().blend(0.0, m.not()));
         }
 
         double res_re = accRe.reduceLanes(VectorOperators.ADD);
         double res_im = accIm.reduceLanes(VectorOperators.ADD);
 
-        res_re = zeroSmall(res_re);
-        res_im = zeroSmall(res_im);
-        return new double[] { res_re, res_im };
+        // the error of a sum of n terms is bounded by n times the largest of
+        // them; a maximum rather than the sum of magnitudes, because it does
+        // not depend on the order the terms were visited in
+        double[] result = { res_re, res_im };
+        zeroNegligible(result, new double[2], n * vMax.reduceLanes(VectorOperators.MAX), n);
+        return result;
     }
 
     public static ComplexArray elementwiseProduct(ComplexArray a, ComplexArray b) {
@@ -288,9 +299,6 @@ public final class ComplexArray {
             DoubleVector rePart = aRe.fma(bRe, aIm.mul(bIm).neg());
             DoubleVector imPart = aRe.fma(bIm, aIm.mul(bRe));
 
-            rePart = zeroSmall(rePart);
-            imPart = zeroSmall(imPart);
-
             rePart.intoArray(real, i);
             imPart.intoArray(imag, i);
         }
@@ -304,12 +312,10 @@ public final class ComplexArray {
             DoubleVector rePart = aRe.fma(bRe, aIm.mul(bIm).neg());
             DoubleVector imPart = aRe.fma(bIm, aIm.mul(bRe));
 
-            rePart = zeroSmall(rePart);
-            imPart = zeroSmall(imPart);
-
             rePart.intoArray(real, i, m);
             imPart.intoArray(imag, i, m);
         }
+        zeroNegligible(real, imag, largestMagnitude(real, imag), n);
 
         return new ComplexArray(real, imag, false);
     }
@@ -343,17 +349,103 @@ public final class ComplexArray {
         }
     }
 
-    private static double zeroSmall(double x) {
-        return (Math.abs(x) <= TOL) ? 0.0 : x;
-    }
-
-    private static DoubleVector zeroSmall(DoubleVector v) {
-        return v.blend(0.0, v.abs().compare(VectorOperators.LE, TOL));
-    }
-
     private void checkArg(int idx) {
         if (idx < 1 || idx > re.length) {
             throw new IllegalArgumentException("Invalid index " + idx + " for [1.." + re.length + "] array");
+        }
+    }
+
+    /**
+     * The relative accuracy an {@code n} point transform or an {@code n} term
+     * sum can be held to: anything at or below this fraction of the largest
+     * magnitude in the same result is round-off and not information.
+     * <p>
+     * The round-off floor of both transform paths grows in proportion to
+     * {@code n}. Measured over 24000 transforms, radix-2 and Bluestein, lengths
+     * from 256 to 16384 and one to five spectral lines, the floor stayed below
+     * {@code 1.6 * n * eps} of the maximum, with a median near
+     * {@code 0.3 * n * eps}; the factor of four is the margin over the worst
+     * of those. Making it larger would cost dynamic range: a genuine
+     * coefficient below this fraction of the largest one is indistinguishable
+     * from round-off here and is lost.
+     *
+     * @param n
+     *            the number of points the result was computed from
+     * @return the relative threshold, as a fraction of the largest magnitude
+     */
+    static double relativeFactor(int n) {
+        return 4.0 * n * MathConsts.MACH_EPS_DBL;
+    }
+
+    /**
+     * The largest magnitude across both components. It is a maximum and not a
+     * sum, so it is exact and independent of the order of traversal, which is
+     * what lets this class and its Java 8 counterpart agree. A {@code NaN}
+     * anywhere propagates, which switches the cleanup off rather than letting
+     * it act on a meaningless reference.
+     *
+     * @param re
+     *            the real parts
+     * @param im
+     *            the imaginary parts, of the same length
+     * @return the largest of {@code |re[i]|} and {@code |im[i]|}
+     */
+    static double largestMagnitude(double[] re, double[] im) {
+        final int n = re.length;
+        int i = 0;
+        int upper = SPECIES.loopBound(n);
+        DoubleVector vMax = DoubleVector.zero(SPECIES);
+        for (; i < upper; i += SPECIES.length()) {
+            vMax = vMax.max(DoubleVector.fromArray(SPECIES, re, i).abs());
+            vMax = vMax.max(DoubleVector.fromArray(SPECIES, im, i).abs());
+        }
+        double max = vMax.reduceLanes(VectorOperators.MAX);
+        // the tail is scalar so that it matches the Java 8 form exactly; a
+        // masked reduction would have to decide what the inactive lanes
+        // contribute, and this way there is nothing to decide
+        for (; i < n; ++i) {
+            max = Math.max(max, Math.abs(re[i]));
+            max = Math.max(max, Math.abs(im[i]));
+        }
+        return max;
+    }
+
+    /**
+     * Zeroes every entry at or below {@code reference * relativeFactor(n)}. A
+     * reference that is zero or not finite leaves both arrays untouched: there
+     * is then nothing to be relative to, and an infinite cutoff would zero
+     * everything.
+     *
+     * @param re
+     *            the real parts, modified in place
+     * @param im
+     *            the imaginary parts, modified in place
+     * @param reference
+     *            the largest magnitude in the result
+     * @param n
+     *            the number of points the result was computed from
+     */
+    static void zeroNegligible(double[] re, double[] im, double reference, int n) {
+        if (!(reference > 0.0) || Double.isInfinite(reference)) {
+            return;
+        }
+        final double cutoff = reference * relativeFactor(n);
+        blendBelow(re, cutoff);
+        blendBelow(im, cutoff);
+    }
+
+    private static void blendBelow(double[] a, double cutoff) {
+        final int n = a.length;
+        int i = 0;
+        int upper = SPECIES.loopBound(n);
+        for (; i < upper; i += SPECIES.length()) {
+            DoubleVector v = DoubleVector.fromArray(SPECIES, a, i);
+            v.blend(0.0, v.abs().compare(VectorOperators.LE, cutoff)).intoArray(a, i);
+        }
+        for (; i < n; ++i) {
+            if (Math.abs(a[i]) <= cutoff) {
+                a[i] = 0.0;
+            }
         }
     }
 }

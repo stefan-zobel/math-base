@@ -228,6 +228,30 @@ public final class ACFTest {
     }
 
     @Test
+    public void testTheTransformPathSurvivesSmallAmplitudeData() {
+        // the two paths have to agree however small the variation is. They did
+        // not: the transform used to clean its output against an absolute
+        // threshold, so from an amplitude of 1e-8 the spectrum was flushed to
+        // zero and this returned 0.0, then NaN. The threshold in math.fft is
+        // relative now, and this is the witness for it from outside that package
+        int n = 512;
+        double[] base = whiteNoise(n, 987L);
+        for (int e = 0; e <= 20; e += 4) {
+            double c = Math.pow(10.0, -e);
+            double[] x = new double[n];
+            for (int i = 0; i < n; ++i) {
+                x[i] = c * base[i];
+            }
+            double[] allLags = ACF.acf(x);
+            double[] fewLags = ACF.acf(x, 5);
+            for (int k = 0; k <= 5; ++k) {
+                Assert.assertFalse("lag " + k + " at amplitude 1e-" + e + " is NaN", Double.isNaN(allLags[k]));
+                Assert.assertEquals("lag " + k + " at amplitude 1e-" + e, fewLags[k], allLags[k], 1e-12);
+            }
+        }
+    }
+
+    @Test
     public void testAConstantSeriesHasNoAutocorrelation() {
         // gamma_0 is zero, so every lag is 0/0; documented rather than hidden
         double[] constant = new double[] { 5.0, 5.0, 5.0, 5.0, 5.0, 5.0 };

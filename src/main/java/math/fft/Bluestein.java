@@ -20,9 +20,10 @@
  */
 /*
  * Any changes, bugfixes or additions made by the maintainers
- * of the https://github.com/stefan-zobel/FFT library are
+ * of the https://github.com/stefan-zobel/math-base library are
  * licensed under the Apache License, Version 2.0, as explained
  * at http://www.apache.org/licenses/LICENSE-2.0
+ * Copyright 2018, 2026 Stefan Zobel
  */
 package math.fft;
 
@@ -86,11 +87,10 @@ final class Bluestein {
             double cos_i = cos[i];
             double c_re_i = c_re[i];
             double c_im_i = c_im[i];
-            double re_i = c_re_i * cos_i + c_im_i * sin_i;
-            double im_i = -c_re_i * sin_i + c_im_i * cos_i;
-            re[i] = (Math.abs(re_i) <= ComplexArray.TOL) ? 0.0 : re_i;
-            im[i] = (Math.abs(im_i) <= ComplexArray.TOL) ? 0.0 : im_i;
+            re[i] = c_re_i * cos_i + c_im_i * sin_i;
+            im[i] = -c_re_i * sin_i + c_im_i * cos_i;
         }
+        ComplexArray.zeroNegligible(re, im, ComplexArray.largestMagnitude(re, im), n);
 
         return new ComplexArray(re, im, false);
     }
@@ -101,11 +101,10 @@ final class Bluestein {
         double[] im = inv.im();
         final int n = re.length;
         for (int i = 0; i < n; ++i) {
-            double re_i = re[i] / n;
-            double im_i = im[i] / n;
-            re[i] = (Math.abs(re_i) <= ComplexArray.TOL) ? 0.0 : re_i;
-            im[i] = (Math.abs(im_i) <= ComplexArray.TOL) ? 0.0 : im_i;
+            re[i] = re[i] / n;
+            im[i] = im[i] / n;
         }
+        ComplexArray.zeroNegligible(re, im, ComplexArray.largestMagnitude(re, im), n);
         for (int i = 1; i <= n / 2; ++i) {
             double re_tmp = re[n - i];
             double im_tmp = im[n - i];
