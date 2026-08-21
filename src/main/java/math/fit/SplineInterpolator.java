@@ -13,45 +13,70 @@
  */
 package math.fit;
 
-import java.util.Arrays;
-
 /**
- * Natural cubic spline interpolation from commons-math3
+ * Natural cubic spline interpolation from commons-math3.
+ * <p>
+ * The interpolant is twice continuously differentiable and its second
+ * derivative vanishes at both ends, which is what "natural" names. That makes
+ * it the smoother and, between the knots, the more accurate of the two schemes
+ * in this package on smooth data, but it does not preserve the shape of the
+ * data: over a monotone step it was measured to leave the range of the values
+ * by 11% in both directions. Where that matters, use
+ * {@link KrugerInterpolator}.
+ * <p>
+ * <a href="https://en.wikipedia.org/wiki/Spline_interpolation">Spline
+ * interpolation</a>
  */
 public final class SplineInterpolator {
 
-    private final double[] knots;
-    private final double[][] polynomials;
-    private final double min;
-    private final double max;
+    private final CubicSpline spline;
 
-    public SplineInterpolator(double points[], double values[]) {
-        knots = points;
-        min = knots[0];
-        max = knots[knots.length - 1];
-        polynomials = polynomials(points, values);
+    /**
+     * Interpolates the given points.
+     *
+     * @param points
+     *            the abscissae, strictly increasing, at least two
+     * @param values
+     *            the values at those abscissae
+     */
+    public SplineInterpolator(double[] points, double[] values) {
+        spline = interpolate(points, values);
     }
 
+    /**
+     * The value of the interpolant at {@code point}.
+     *
+     * @param point
+     *            the abscissa, within the range of the knots
+     * @return the interpolated value
+     */
     public double value(double point) {
-        if (point < min || point > max) {
-            throw new IllegalArgumentException("point out of range [" + min + ", " + max + "]");
-        }
-        int i = Arrays.binarySearch(knots, point);
-        if (i < 0) {
-            i = -i - 2;
-        }
-        // This will handle the case where point is the last knot value
-        // There are only n-1 polynomials, so if point is the last knot
-        // then we use the last polynomial to calculate the value
-        if (i >= polynomials.length) {
-            i--;
-        }
-        double[] coeffs = polynomials[i];
-        return horner(coeffs[0], coeffs[1], coeffs[2], coeffs[3], point - knots[i]);
+        return spline.value(point);
     }
 
-    private static double horner(double a, double b, double c, double d, double x) {
-        return x * (x * (x * d + c) + b) + a;
+    /**
+     * The interpolant itself, which also has the derivative and the integral.
+     *
+     * @return the piecewise cubic this interpolator computed
+     * @since 1.5.2
+     */
+    public CubicSpline spline() {
+        return spline;
+    }
+
+    /**
+     * Interpolates the given points by a natural cubic spline.
+     *
+     * @param points
+     *            the abscissae, strictly increasing, at least two
+     * @param values
+     *            the values at those abscissae
+     * @return the interpolating spline
+     * @since 1.5.2
+     */
+    public static CubicSpline interpolate(double[] points, double[] values) {
+        CubicSpline.checkNodes(points, values);
+        return new CubicSpline(points, polynomials(points, values));
     }
 
     private static double[][] polynomials(double points[], double values[]) {

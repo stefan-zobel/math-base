@@ -13,5 +13,13 @@
  */
 /**
  * Routines for function fitting and data interpolation.
+ * <p>
+ * Both interpolators here produce a {@link math.fit.CubicSpline}, which
+ * evaluates the value, the first and second derivative and the definite
+ * integral in closed form. Choose {@link math.fit.SplineInterpolator} for
+ * smooth data, where its two continuous derivatives make it the more accurate
+ * of the two, and {@link math.fit.KrugerInterpolator} where the shape of the
+ * data has to be preserved, since the natural spline can leave the range of
+ * the values and the constrained one cannot.
  */
 package math.fit;
