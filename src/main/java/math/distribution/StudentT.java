@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,13 @@ public class StudentT implements ContinuousDistribution {
         if (probability >= 1.0) {
             return Double.POSITIVE_INFINITY;
         }
-        return findRoot(probability, mean(), -Double.MAX_VALUE, Double.MAX_VALUE);
+        // Start at 0, not at mean(): the mean does not exist for df <= 1 and is
+        // reported as NaN there, which poisoned every iteration below and made
+        // this method return NaN for a quantile that is perfectly well defined
+        // -- with one degree of freedom this distribution is the Cauchy, whose
+        // quantile is tan(pi * (p - 1/2)). Zero is the median of every
+        // symmetric t and therefore a valid starting point for any df.
+        return findRoot(probability, 0.0, -Double.MAX_VALUE, Double.MAX_VALUE);
     }
 
     @Override
