@@ -321,4 +321,95 @@ public class LimitedMemoryBfgsTest {
         }
     }
 
+    /** Nothing has happened yet, and the class says so rather than saying false. */
+    @Test
+    public void testTerminationBeforeTheFirstRun() {
+        LimitedMemoryBFGS bfgs = new LimitedMemoryBFGS(new Concave());
+
+        assertEquals(Termination.NOT_STARTED, bfgs.getTermination());
+        assertFalse(bfgs.isConverged());
+        assertTrue("gradient norm " + bfgs.getGradientNorm(), Double.isNaN(bfgs.getGradientNorm()));
+    }
+
+    /**
+     * Five different outcomes that a single boolean had to stand for, each one
+     * naming itself now.
+     */
+    @Test
+    public void testEachStoppingRuleNamesItself() {
+        Rosenbrock tightened = new Rosenbrock(new double[] { -1.2, 1.0 });
+        LimitedMemoryBFGS a = new LimitedMemoryBFGS(tightened, 1000, 1.0e-12, 1.0e-9, 4, 1.0e-14, 1.0e-14);
+        assertTrue(a.optimize());
+        assertEquals(Termination.VALUE_TOLERANCE, a.getTermination());
+        assertTrue(a.getTermination().isConvergence());
+
+        Rosenbrock budgeted = new Rosenbrock(new double[] { -2.0, 3.0, -2.0, 3.0, -2.0, 3.0 });
+        LimitedMemoryBFGS b = new LimitedMemoryBFGS(budgeted, 3, 1.0e-14, 1.0e-14, 4);
+        assertFalse(b.optimize());
+        assertEquals(Termination.ITERATION_LIMIT, b.getTermination());
+
+        Rosenbrock aborted = new Rosenbrock(new double[] { -1.2, 1.0 });
+        LimitedMemoryBFGS c = new LimitedMemoryBFGS(aborted);
+        c.setEvaluator(new OptimizerEvaluator.ByGradient() {
+            @Override
+            public boolean evaluate(Optimizable.ByGradientValue maxable, int iter) {
+                return false;
+            }
+        });
+        assertFalse(c.optimize());
+        assertEquals(Termination.EVALUATOR_ABORTED, c.getTermination());
+
+        Rosenbrock partial = new Rosenbrock(new double[] { -2.0, 3.0, -2.0, 3.0, -2.0, 3.0 });
+        LimitedMemoryBFGS d = new LimitedMemoryBFGS(partial);
+        assertFalse("two iterations of many are not a result", d.optimize(2));
+        assertEquals(Termination.PARTIAL_RUN, d.getTermination());
+        assertFalse(d.isConverged());
+
+        Rosenbrock stalling = new Rosenbrock(new double[] { 3.0, -1.0, 0.0, 1.0 });
+        LimitedMemoryBFGS e = new LimitedMemoryBFGS(stalling);
+        assertFalse(e.optimize());
+        assertEquals(Termination.LINE_SEARCH_STALLED, e.getTermination());
+
+    }
+
+    /** A gradient rule that fired is always one of the convergences. */
+    @Test
+    public void testStationaryImpliesConvergence() {
+        for (Termination t : Termination.values()) {
+            assertFalse(t + " is stationary but not a convergence", t.isStationary() && !t.isConvergence());
+        }
+        assertTrue(Termination.GRADIENT_TOLERANCE.isStationary());
+        assertTrue(Termination.ZERO_GRADIENT.isStationary());
+        assertFalse("a value rule says nothing about the gradient", Termination.VALUE_TOLERANCE.isStationary());
+        assertTrue("but it is still one of the convergences", Termination.VALUE_TOLERANCE.isConvergence());
+        assertFalse(Termination.NOT_STARTED.isConvergence());
+    }
+
+    /**
+     * The reason the reason is worth having. Both of these runs report
+     * {@code false}, and they mean opposite things: one stopped a hair from the
+     * maximum, the other never got near it. Only the termination and the
+     * gradient norm can tell them apart.
+     */
+    @Test
+    public void testTheGradientNormSeparatesAStallFromAnExhaustedBudget() {
+        Rosenbrock nearlyThere = new Rosenbrock(new double[] { -1.2, 1.0 });
+        LimitedMemoryBFGS stalled = new LimitedMemoryBFGS(nearlyThere);
+        boolean stallReported = stalled.optimize();
+
+        Rosenbrock nowhereNear = new Rosenbrock(new double[] { -2.0, 3.0, -2.0, 3.0, -2.0, 3.0 });
+        LimitedMemoryBFGS budget = new LimitedMemoryBFGS(nowhereNear, 3, 1.0e-14, 1.0e-14, 4);
+
+        assertFalse("the budget run must not report success", budget.optimize());
+        assertEquals(Termination.ITERATION_LIMIT, budget.getTermination());
+        assertTrue("budget gradient norm " + budget.getGradientNorm(), budget.getGradientNorm() > 1.0);
+
+        if (!stallReported) {
+            assertEquals(Termination.LINE_SEARCH_STALLED, stalled.getTermination());
+            assertTrue("stalled gradient norm " + stalled.getGradientNorm(), stalled.getGradientNorm() < 1.0e-2);
+            assertTrue("the two must be orders of magnitude apart",
+                    budget.getGradientNorm() > 1000.0 * stalled.getGradientNorm());
+        }
+    }
+
 }

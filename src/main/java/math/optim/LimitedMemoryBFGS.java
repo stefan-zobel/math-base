@@ -17,6 +17,14 @@ import math.linalg.VectorOps;
  * Limited Memory BFGS, as described in Byrd, Nocedal, and Schnabel,
  * "Representations of Quasi-Newton Matrices and Their Use in Limited Memory
  * Methods"
+ * <p>
+ * This class maximizes. {@link #optimize()} reports whether a stopping
+ * tolerance was met; {@link #getTermination()} says <em>which</em> one, which
+ * is the part a caller usually needs. A search that stopped because the
+ * objective stopped moving is not the same as one that reached a point where
+ * the gradient vanishes. Neither, on its own, proves that a maximum was
+ * reached: see {@link Termination} for the case where the gradient vanishes
+ * along a ray on which the parameters run away.
  * 
  * @author Aron Culotta <a HREF="mailto:culotta@cs.umass.edu">culotta@cs.umass.edu</a>
  */
@@ -34,7 +42,8 @@ public final class LimitedMemoryBFGS implements Optimizer {
     /** Number of corrections kept for the inverse Hessian. */
     private static final int DEFAULT_M = 4;
 
-    private boolean converged = false;
+    private Termination termination = Termination.NOT_STARTED;
+    private double gradientNorm = Double.NaN;
     private final Optimizable.ByGradientValue optimizable;
     private final int maxIterations;
     // xxx need a more principled stopping point
@@ -183,7 +192,41 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
     @Override
     public boolean isConverged() {
-        return converged;
+        return termination.isConvergence();
+    }
+
+    /**
+     * Why the last search stopped.
+     * <p>
+     * {@link #isConverged()} is {@code termination.isConvergence()} and cannot
+     * distinguish a maximum from a stopping rule that fired on a flat
+     * objective. {@link Termination#isStationary()} can, and
+     * {@link #getGradientNorm()} quantifies it.
+     *
+     * @return the outcome of the last run, or {@link Termination#NOT_STARTED}
+     *         if {@code optimize} was never called
+     * @since 1.5.2
+     */
+    public Termination getTermination() {
+        return termination;
+    }
+
+    /**
+     * Euclidean norm of the gradient where the last search stopped.
+     * <p>
+     * The value the stopping rule fired on, and the other half of what
+     * {@link #getTermination()} reports. A small norm is necessary for a
+     * maximum and not sufficient: an objective with no attained maximum drives
+     * it to zero as well, along a ray on which the parameters grow. The way to
+     * tell the two apart is to tighten the tolerances and see whether the
+     * parameters move.
+     *
+     * @return the gradient norm at the exit, or {@code NaN} if
+     *         {@code optimize} was never called
+     * @since 1.5.2
+     */
+    public double getGradientNorm() {
+        return gradientNorm;
     }
 
     public void setTolerance(double newtol) {
@@ -244,7 +287,8 @@ public final class LimitedMemoryBFGS implements Optimizer {
             if (VectorOps.absNormalize(direction) == 0) {
                 logger.info("L-BFGS initial gradient is zero; saying converged");
                 g = null;
-                converged = true;
+                gradientNorm = 0.0;
+                termination = Termination.ZERO_GRADIENT;
                 return true;
             }
 
@@ -269,12 +313,13 @@ public final class LimitedMemoryBFGS implements Optimizer {
                 // near the maximum as often as it is a real failure, and the
                 // line search has already put the parameters back on the last
                 // good point, so report it rather than discard the result.
+                gradientNorm = VectorOps.twoNorm(g);
                 g = null; // reset search
                 step = 1.0;
                 logger.warning("L-BFGS could not step in the current direction "
                         + "on the initial jump. Stopping at the current parameters, "
                         + "which are not known to be optimal.");
-                converged = false;
+                termination = Termination.LINE_SEARCH_STALLED;
                 return false;
             }
 
@@ -393,12 +438,13 @@ public final class LimitedMemoryBFGS implements Optimizer {
             step = lineMaximizer.optimize(direction, step);
 
             if (step == 0.0) { // could not step in this direction.
+                gradientNorm = VectorOps.twoNorm(g);
                 g = null; // reset search
                 step = 1.0;
                 logger.warning("L-BFGS could not step in the current direction "
                         + "after " + iterations + " iterations. Stopping at the "
                         + "current parameters, which are not known to be optimal.");
-                converged = false;
+                termination = Termination.LINE_SEARCH_STALLED;
                 return false;
             }
             optimizable.getParameters(parameters);
@@ -411,28 +457,33 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             double newValue = optimizable.getValue();
 
+            // The gradient norm is taken before the tests rather than between
+            // them, because it is what tells the caller whether the exit below
+            // is a maximum or a stopping rule that happened to fire first.
+            double gg = VectorOps.twoNorm(g);
+            gradientNorm = gg;
+
             // Test for terminations
             if (2.0 * Math.abs(newValue - value) <= tolerance
                     * (Math.abs(newValue) + Math.abs(value) + eps)) {
                 logger.info("Exiting L-BFGS on termination #1:\nvalue difference below tolerance (oldValue: "
                         + value + " newValue: " + newValue);
-                converged = true;
+                termination = Termination.VALUE_TOLERANCE;
                 return true;
             }
-            double gg = VectorOps.twoNorm(g);
             if (gg < gradientTolerance) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Exiting L-BFGS on termination #2: \ngradient="
                             + gg + " < " + gradientTolerance);
                 }
-                converged = true;
+                termination = Termination.GRADIENT_TOLERANCE;
                 return true;
             }
             if (gg == 0.0) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Exiting L-BFGS on termination #3: \ngradient==0.0");
                 }
-                converged = true;
+                termination = Termination.ZERO_GRADIENT;
                 return true;
             }
             if (logger.isLoggable(Level.FINE)) {
@@ -446,7 +497,7 @@ public final class LimitedMemoryBFGS implements Optimizer {
                 logger.warning("Too many iterations in L-BFGS (" + maxIterations
                         + "). Stopping with the current parameters, which are "
                         + "not known to be optimal.");
-                converged = false;
+                termination = Termination.ITERATION_LIMIT;
                 return false;
             }
 
@@ -457,10 +508,13 @@ public final class LimitedMemoryBFGS implements Optimizer {
                 }
                 // the evaluator aborted the search; that is not convergence,
                 // and the returned false already said so
-                converged = false;
+                termination = Termination.EVALUATOR_ABORTED;
                 return false;
             }
         }
+        // the loop used up the iterations this call was given, which leaves the
+        // search unfinished rather than converged
+        termination = Termination.PARTIAL_RUN;
         return false;
     }
 
