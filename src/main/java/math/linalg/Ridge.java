@@ -1,5 +1,7 @@
 package math.linalg;
 
+import java.util.Locale;
+
 /**
  * Ridge regression, the least squares fit under an L2 penalty on the
  * coefficients:
@@ -70,8 +72,8 @@ public final class Ridge {
 
         @Override
         public String toString() {
-            return String.format("Ridge(lambda=%.6g): R^2 = %.6f, effective df = %.3f, %d coefficients", lambda,
-                    rSquared, effectiveDf, beta.length);
+            return String.format(Locale.ROOT, "Ridge(lambda=%.6g): R^2 = %.6f, effective df = %.3f, %d coefficients",
+                    lambda, rSquared, effectiveDf, beta.length);
         }
     }
 

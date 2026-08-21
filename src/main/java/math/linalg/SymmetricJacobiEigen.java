@@ -1,5 +1,6 @@
 package math.linalg;
 
+import java.util.Locale;
 import java.util.stream.IntStream;
 
 /**
@@ -499,16 +500,16 @@ public final class SymmetricJacobiEigen {
         for (int i = 0; i < n; i++) { trace += A[i * n + i]; sumLambda += r.lambda[i]; }
 
         System.out.println("=== " + label + " ===");
-        System.out.printf("  time                     = %.2f ms%n", ms);
-        System.out.printf("  converged                = %b%n", r.converged);
-        System.out.printf("  max|A - V L V^T|         = %.3e%n", recErr);
-        System.out.printf("  max|A v - lambda v|      = %.3e%n", resErr);
-        System.out.printf("  max|V^T V - I|           = %.3e%n", vErr);
-        System.out.printf("  |trace - sum(lambda)|    = %.3e%n", Math.abs(trace - sumLambda));
+        System.out.printf(Locale.ROOT, "  time                     = %.2f ms%n", ms);
+        System.out.printf(Locale.ROOT, "  converged                = %b%n", r.converged);
+        System.out.printf(Locale.ROOT, "  max|A - V L V^T|         = %.3e%n", recErr);
+        System.out.printf(Locale.ROOT, "  max|A v - lambda v|      = %.3e%n", resErr);
+        System.out.printf(Locale.ROOT, "  max|V^T V - I|           = %.3e%n", vErr);
+        System.out.printf(Locale.ROOT, "  |trace - sum(lambda)|    = %.3e%n", Math.abs(trace - sumLambda));
         int show = Math.min(6, n);
         System.out.print  ("  lambda[0.." + (show - 1) + "]          = [");
         for (int j = 0; j < show; j++)
-            System.out.printf("%s%.5g", j == 0 ? "" : ", ", r.lambda[j]);
+            System.out.printf(Locale.ROOT, "%s%.5g", j == 0 ? "" : ", ", r.lambda[j]);
         System.out.println(n > show ? ", ...]" : "]");
         boolean ok = recErr < 1e-9 && resErr < 1e-9 && vErr < 1e-9;
         System.out.println("  " + (ok ? ">>> OK" : ">>> FAILED") + "\n");

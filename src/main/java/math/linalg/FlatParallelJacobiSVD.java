@@ -1,6 +1,7 @@
 package math.linalg;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
@@ -377,15 +378,15 @@ public final class FlatParallelJacobiSVD {
         double vErr   = orthonormalityError(r.V, n, n);
 
         System.out.println("=== " + label + " ===");
-        System.out.printf("  time                     = %.2f ms%n", ms);
-        System.out.printf("  converged                = %b%n", r.converged);
-        System.out.printf("  max|A - U S V^T|         = %.3e%n", recErr);
-        System.out.printf("  max|U^T U - I|           = %.3e%n", uErr);
-        System.out.printf("  max|V^T V - I|           = %.3e%n", vErr);
+        System.out.printf(Locale.ROOT, "  time                     = %.2f ms%n", ms);
+        System.out.printf(Locale.ROOT, "  converged                = %b%n", r.converged);
+        System.out.printf(Locale.ROOT, "  max|A - U S V^T|         = %.3e%n", recErr);
+        System.out.printf(Locale.ROOT, "  max|U^T U - I|           = %.3e%n", uErr);
+        System.out.printf(Locale.ROOT, "  max|V^T V - I|           = %.3e%n", vErr);
         int show = Math.min(6, n);
         System.out.print  ("  sigma[0.." + (show - 1) + "]           = [");
         for (int j = 0; j < show; j++)
-            System.out.printf("%s%.5g", j == 0 ? "" : ", ", r.sigma[j]);
+            System.out.printf(Locale.ROOT, "%s%.5g", j == 0 ? "" : ", ", r.sigma[j]);
         System.out.println(n > show ? ", ...]" : "]");
         boolean ok = recErr < 1e-9 && uErr < 1e-9 && vErr < 1e-9;
         System.out.println("  " + (ok ? ">>> OK" : ">>> FAILED") + "\n");

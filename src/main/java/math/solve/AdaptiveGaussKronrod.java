@@ -1,5 +1,6 @@
 package math.solve;
 
+import java.util.Locale;
 import java.util.stream.IntStream;
 import math.fun.DBiFunction;
 import math.fun.DFunction;
@@ -65,7 +66,7 @@ public class AdaptiveGaussKronrod {
 
         @Override
         public String toString() {
-            return String.format("Value: %.8f (approx. Error: %.2e)", value, approximatedErrorEstimate);
+            return String.format(Locale.ROOT, "Value: %.8f (approx. Error: %.2e)", value, approximatedErrorEstimate);
         }
     }
 

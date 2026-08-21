@@ -1,5 +1,7 @@
 package math.linalg;
 
+import java.util.Locale;
+
 /**
  * Principal Component Analysis on a <b>covariance matrix</b> (or a correlation,
  * kernel or graph Laplacian matrix), built on {@link SymmetricJacobiEigen}.
@@ -402,12 +404,12 @@ public final class CovariancePCA {
         for (double r : cpca.getExplainedVarianceRatio()) ratioSum += r;
 
         System.out.println("=== Streamed covariance vs. raw data (500 x 8, 3 components) ===");
-        System.out.printf("  max|component_cov - component_raw|  = %.3e%n", compErr);
-        System.out.printf("  max rel. diff of explained variance = %.3e%n", varErr);
-        System.out.printf("  max rel. diff of the mean vector    = %.3e%n", meanErr);
-        System.out.printf("  max |C C^T - I|                     = %.3e%n", orthoErr);
-        System.out.printf("  max |var(whitened) - 1|             = %.3e%n", whitenErr);
-        System.out.printf("  explained variance ratio (sum)      = %.5f%n", ratioSum);
+        System.out.printf(Locale.ROOT, "  max|component_cov - component_raw|  = %.3e%n", compErr);
+        System.out.printf(Locale.ROOT, "  max rel. diff of explained variance = %.3e%n", varErr);
+        System.out.printf(Locale.ROOT, "  max rel. diff of the mean vector    = %.3e%n", meanErr);
+        System.out.printf(Locale.ROOT, "  max |C C^T - I|                     = %.3e%n", orthoErr);
+        System.out.printf(Locale.ROOT, "  max |var(whitened) - 1|             = %.3e%n", whitenErr);
+        System.out.printf(Locale.ROOT, "  explained variance ratio (sum)      = %.5f%n", ratioSum);
         System.out.println();
 
         return compErr < 1e-6 && varErr < 1e-9 && meanErr < 1e-12
@@ -428,10 +430,10 @@ public final class CovariancePCA {
 
         double orthoErr = orthonormalityError(pca.getComponents());
         System.out.println("=== Correlation matrix input (300 x 6, 2 components) ===");
-        System.out.printf("  |sum(lambda) - n|                   = %.3e%n", Math.abs(sum - n));
-        System.out.printf("  |trace - n|                         = %.3e%n",
+        System.out.printf(Locale.ROOT, "  |sum(lambda) - n|                   = %.3e%n", Math.abs(sum - n));
+        System.out.printf(Locale.ROOT, "  |trace - n|                         = %.3e%n",
                 Math.abs(pca.getTotalVariance() - n));
-        System.out.printf("  max |C C^T - I|                     = %.3e%n", orthoErr);
+        System.out.printf(Locale.ROOT, "  max |C C^T - I|                     = %.3e%n", orthoErr);
         System.out.println();
 
         return Math.abs(sum - n) < 1e-12 * n && orthoErr < 1e-12;
@@ -472,10 +474,10 @@ public final class CovariancePCA {
         }
 
         System.out.println("=== Rank deficient covariance (200 x 4, rank 3) ===");
-        System.out.printf("  lambda_min / lambda_max             = %.3e%n", minLambda / maxLambda);
-        System.out.printf("  1 / sqrt(|lambda_min|)              = %.3e%n",
+        System.out.printf(Locale.ROOT, "  lambda_min / lambda_max             = %.3e%n", minLambda / maxLambda);
+        System.out.printf(Locale.ROOT, "  1 / sqrt(|lambda_min|)              = %.3e%n",
                 1.0 / Math.sqrt(Math.abs(minLambda)));
-        System.out.printf("  max |C C^T - I|                     = %.3e%n", orthoErr);
+        System.out.printf(Locale.ROOT, "  max |C C^T - I|                     = %.3e%n", orthoErr);
         System.out.println("  whitening of an exact zero refused  = " + refused);
         System.out.println();
 

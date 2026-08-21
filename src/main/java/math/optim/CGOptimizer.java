@@ -14,6 +14,8 @@
 package math.optim;
 
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 
 import math.fun.DiffDFunction;
 import math.fun.DiffDMultiFunction;
@@ -38,7 +40,7 @@ import math.fun.DMultiFunctionEval;
  */
 public final class CGOptimizer {
 
-    private static final DecimalFormat NF = new DecimalFormat("0.000E0");
+    private static final DecimalFormat NF = new DecimalFormat("0.000E0", DecimalFormatSymbols.getInstance(Locale.ROOT));
 
     private static final boolean SIMPLE_GD = false;
     private static final boolean CHECK_SIMPLE_GD_CONVERGENCE = true;
@@ -215,7 +217,7 @@ public final class CGOptimizer {
             double fp2 = function.apply(p2);
 
             if (!silent) {
-                System.err.printf(" %s (delta: %s)\n", NF.format(fp2),
+                System.err.printf(Locale.ROOT, " %s (delta: %s)\n", NF.format(fp2),
                         NF.format(fp - fp2));
             }
 

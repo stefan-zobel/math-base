@@ -1,5 +1,6 @@
 package math.solve;
 
+import java.util.Locale;
 import java.util.stream.IntStream;
 import math.fun.DBiFunction;
 import math.fun.DFunction;
@@ -76,7 +77,7 @@ public final class ClenshawCurtis {
 
         @Override
         public String toString() {
-            return String.format("Value: %.8f (approx. Error: %.2e, %d points/axis, converged: %b)", value,
+            return String.format(Locale.ROOT, "Value: %.8f (approx. Error: %.2e, %d points/axis, converged: %b)", value,
                     approximatedErrorEstimate, points, converged);
         }
     }

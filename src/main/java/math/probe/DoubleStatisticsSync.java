@@ -1,5 +1,6 @@
 package math.probe;
 
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -218,7 +219,7 @@ public class DoubleStatisticsSync implements DoubleStatistics {
      */
     @Override
     public synchronized String toString() {
-        return String.format("%s{count=%d, sum=%f, min=%f, average=%f, max=%f, stddev=%f}",
+        return String.format(Locale.ROOT, "%s{count=%d, sum=%f, min=%f, average=%f, max=%f, stddev=%f}",
                 this.getClass().getSimpleName(), getCount(), getSum(), getMin(), getAverage(), getMax(),
                 getStandardDeviation());
     }

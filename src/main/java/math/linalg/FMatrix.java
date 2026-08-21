@@ -16,6 +16,7 @@
 package math.linalg;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 import math.gemm.Sgemm;
 import math.gemm.Trans;
@@ -316,14 +317,14 @@ public class FMatrix {
         String format = "%.12E";
         int col;
         for (col = 0; col < _cols; ++col) {
-            buf.append(String.format(format, m.getUnsafe(row, col)));
+            buf.append(String.format(Locale.ROOT, format, m.getUnsafe(row, col)));
             if (col < _cols - 1) {
                 buf.append(", ");
             }
         }
         if (col == 5 && _cols < m.numColumns()) {
             buf.append(", ......, ");
-            buf.append(String.format(format, m.getUnsafe(row, m.numColumns() - 1)));
+            buf.append(String.format(Locale.ROOT, format, m.getUnsafe(row, m.numColumns() - 1)));
         }
         buf.append(System.lineSeparator());
     }

@@ -24,6 +24,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.ConcurrentModificationException;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Spliterator;
@@ -1924,7 +1925,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
             final int start = offset;
             final int end = start + size;
             for (int i = start; i < end; ++i) {
-                buf.append(String.format(FORMAT_D, es[i]));
+                buf.append(String.format(Locale.ROOT, FORMAT_D, es[i]));
                 if (i < end - 1) {
                     buf.append(", ");
                 }
@@ -2677,7 +2678,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         final double[] es = elementData;
         final int end = size;
         for (int i = 0; i < end; ++i) {
-            buf.append(String.format(FORMAT_D, es[i]));
+            buf.append(String.format(Locale.ROOT, FORMAT_D, es[i]));
             if (i < end - 1) {
                 buf.append(", ");
             }
@@ -2687,7 +2688,8 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
     static void checkIndex(int index, int length) {
         if (index < 0 || index >= length) {
-            throw new IndexOutOfBoundsException(String.format("Index %d out-of-bounds for length %d", index, length));
+            throw new IndexOutOfBoundsException(
+                    String.format(Locale.ROOT, "Index %d out-of-bounds for length %d", index, length));
         }
     }
 

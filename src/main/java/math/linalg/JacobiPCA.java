@@ -1,5 +1,7 @@
 package math.linalg;
 
+import java.util.Locale;
+
 /**
  * Principal Component Analysis built on {@link FlatParallelJacobiSVD}, without any
  * external dependency.
@@ -313,13 +315,13 @@ public final class JacobiPCA {
         double[][] y = pca.pca(data, noDims);
 
         System.out.println("=== " + label + " ===");
-        System.out.printf("  projected shape          = %d x %d%n", y.length, y[0].length);
+        System.out.printf(Locale.ROOT, "  projected shape          = %d x %d%n", y.length, y[0].length);
         double[] sv = pca.getSingularValues();
         System.out.print  ("  singular values          = [");
         for (int k = 0; k < sv.length; k++)
-            System.out.printf("%s%.5g", k == 0 ? "" : ", ", sv[k]);
+            System.out.printf(Locale.ROOT, "%s%.5g", k == 0 ? "" : ", ", sv[k]);
         System.out.println("]");
-        System.out.printf("  components orthonormal    = %.3e (max |C C^T - I|)%n",
+        System.out.printf(Locale.ROOT, "  components orthonormal    = %.3e (max |C C^T - I|)%n",
                 componentOrthoError(pca.getComponents()));
         // components must be sorted by singular value (variance) descending
         boolean desc = true;

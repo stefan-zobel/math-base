@@ -1,5 +1,7 @@
 package math.linalg;
 
+import java.util.Locale;
+
 import math.rng.SplitMix64;
 
 /**
@@ -93,8 +95,9 @@ public final class Lasso {
 
         @Override
         public String toString() {
-            return String.format("Lasso(lambda=%.6g, alpha=%.3f): R^2 = %.6f, %d of %d coefficients non-zero", lambda,
-                    alpha, rSquared, nonZeros, beta.length);
+            return String.format(Locale.ROOT,
+                    "Lasso(lambda=%.6g, alpha=%.3f): R^2 = %.6f, %d of %d coefficients non-zero", lambda, alpha,
+                    rSquared, nonZeros, beta.length);
         }
     }
 
@@ -125,8 +128,9 @@ public final class Lasso {
 
         @Override
         public String toString() {
-            return String.format("Lasso.Path(alpha=%.3f): %d penalties from %.6g down to %.6g, up to %d non-zeros",
-                    alpha, lambdas.length, lambdas[0], lambdas[lambdas.length - 1], nonZeros[nonZeros.length - 1]);
+            return String.format(Locale.ROOT,
+                    "Lasso.Path(alpha=%.3f): %d penalties from %.6g down to %.6g, up to %d non-zeros", alpha,
+                    lambdas.length, lambdas[0], lambdas[lambdas.length - 1], nonZeros[nonZeros.length - 1]);
         }
     }
 
@@ -161,8 +165,9 @@ public final class Lasso {
 
         @Override
         public String toString() {
-            return String.format("Lasso.CvResult(%d folds): lambdaMin = %.6g (%d non-zeros), lambda1se = %.6g", folds,
-                    lambdaMin, best.nonZeros, lambda1se);
+            return String.format(Locale.ROOT,
+                    "Lasso.CvResult(%d folds): lambdaMin = %.6g (%d non-zeros), lambda1se = %.6g", folds, lambdaMin,
+                    best.nonZeros, lambda1se);
         }
     }
 

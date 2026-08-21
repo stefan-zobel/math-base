@@ -1,6 +1,7 @@
 package math.probe;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.stream.IntStream;
 import math.cern.Arithmetic;
 import math.cern.ProbabilityFuncs;
@@ -300,14 +301,14 @@ public final class Bootstrap {
         StringBuilder sb = new StringBuilder();
         sb.append("Bootstrap Summary (").append(bootResults.length).append(" iterations)\n");
         sb.append("--------------------------------------------------\n");
-        sb.append(String.format("Observed Statistic : %.8f\n", observedStatistic));
-        sb.append(String.format("Bootstrap Mean     : %.8f\n", mean));
-        sb.append(String.format("Bootstrap StdError : %.8f\n", stdErr));
-        sb.append(String.format("Bias               : %.8f\n", mean - observedStatistic));
+        sb.append(String.format(Locale.ROOT, "Observed Statistic : %.8f\n", observedStatistic));
+        sb.append(String.format(Locale.ROOT, "Bootstrap Mean     : %.8f\n", mean));
+        sb.append(String.format(Locale.ROOT, "Bootstrap StdError : %.8f\n", stdErr));
+        sb.append(String.format(Locale.ROOT, "Bias               : %.8f\n", mean - observedStatistic));
         sb.append("--------------------------------------------------\n");
-        sb.append(String.format("%d%% Confidence Intervals:\n", (int) (confidenceLevel * 100)));
-        sb.append(String.format("  Percentile       : [%.8f, %.8f]\n", ciPercentile[0], ciPercentile[1]));
-        sb.append(String.format("  BCa (corrected)  : [%.8f, %.8f]\n", ciBCa[0], ciBCa[1]));
+        sb.append(String.format(Locale.ROOT, "%d%% Confidence Intervals:\n", (int) (confidenceLevel * 100)));
+        sb.append(String.format(Locale.ROOT, "  Percentile       : [%.8f, %.8f]\n", ciPercentile[0], ciPercentile[1]));
+        sb.append(String.format(Locale.ROOT, "  BCa (corrected)  : [%.8f, %.8f]\n", ciBCa[0], ciBCa[1]));
 
         // --- Warning for the case of instability ---
         if (Math.abs(ciBCa[0] - ciBCa[1]) < 1e-12) {
@@ -322,7 +323,7 @@ public final class Bootstrap {
 
     @Override
     public String toString() {
-        return String.format("Bootstrap(n=%d, iterations=%d, observed=%.4f)", 
+        return String.format(Locale.ROOT, "Bootstrap(n=%d, iterations=%d, observed=%.4f)", 
                              originalSample.length, bootResults.length, observedStatistic);
     }
 }

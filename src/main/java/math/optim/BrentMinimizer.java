@@ -1,5 +1,7 @@
 package math.optim;
 
+import java.util.Locale;
+
 import math.MathConsts;
 import math.fun.DFunction;
 import math.fun.DiffDFunction;
@@ -89,7 +91,8 @@ public final class BrentMinimizer {
 
         @Override
         public String toString() {
-            return String.format("Bracket(%.6g, %.6g, %.6g)%s", a, b, c, bracketed ? "" : " NOT BRACKETED");
+            return String.format(Locale.ROOT, "Bracket(%.6g, %.6g, %.6g)%s", a, b, c,
+                    bracketed ? "" : " NOT BRACKETED");
         }
     }
 
@@ -117,7 +120,7 @@ public final class BrentMinimizer {
 
         @Override
         public String toString() {
-            return String.format("Result(x=%.10g, f=%.10g, %d iterations)%s", x, value, iterations,
+            return String.format(Locale.ROOT, "Result(x=%.10g, f=%.10g, %d iterations)%s", x, value, iterations,
                     converged ? "" : " NOT CONVERGED");
         }
     }

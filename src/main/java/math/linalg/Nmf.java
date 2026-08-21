@@ -1,6 +1,7 @@
 package math.linalg;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 import math.gemm.Dgemm;
 import math.gemm.Trans;
@@ -1003,9 +1004,9 @@ public final class Nmf {
         System.out.println("Nmf self-check, X = " + m + "x" + n + " of exact rank " + k);
         System.out.println("  NNDSVD, tol 1e-8 : " + exact);
         System.out.println("  defaults         : " + plain);
-        System.out.printf("  most negative entry            : %.3e%n", negative);
-        System.out.printf("  worst | ||W_r|| - 1 |          : %.3e%n", worstNorm);
-        System.out.printf("  reconstruction error           : %.3e%n", roundTrip);
+        System.out.printf(Locale.ROOT, "  most negative entry            : %.3e%n", negative);
+        System.out.printf(Locale.ROOT, "  worst | ||W_r|| - 1 |          : %.3e%n", worstNorm);
+        System.out.printf(Locale.ROOT, "  reconstruction error           : %.3e%n", roundTrip);
         System.out.println("  component energies descending  : " + descending);
 
         boolean ok = negative == 0.0 && worstNorm < 1.0e-12 && descending && roundTrip < 1.0e-8
