@@ -23,8 +23,8 @@ package math.fit;
  * measured to leave the range by 11% over a monotone step. The price is
  * smoothness -- the second derivative jumps at the knots, so the interpolant is
  * only once continuously differentiable -- and somewhat less accuracy between
- * the knots on smooth data.
- * <p>
+ * the knots on smooth data. For data with a few outliers rather than a shape
+ * to preserve, {@link AkimaInterpolator} is the local alternative.
  */
 public final class KrugerInterpolator {
 
@@ -120,25 +120,8 @@ public final class KrugerInterpolator {
             dy[i] = values[i + 1] - values[i];
         }
 
-        double[] f1 = slopes(dx, dy);
-
-        // The piece over [x_i, x_i+1] is the cubic that matches the value and
-        // the slope at both of its ends, written in the local coordinate
-        // t = x - x_i. Writing it in x instead, as the paper does, cancels the
-        // abscissa away: on knots spread over six orders of magnitude that
-        // costs every digit of the result.
-        double[][] polynomials = new double[n][];
-        for (int i = 0; i < n; i++) {
-            double h = dx[i];
-            double s = dy[i] / h;
-            double coefficients[] = new double[4];
-            coefficients[0] = values[i];
-            coefficients[1] = f1[i];
-            coefficients[2] = (3.0 * s - 2.0 * f1[i] - f1[i + 1]) / h;
-            coefficients[3] = (f1[i] + f1[i + 1] - 2.0 * s) / (h * h);
-            polynomials[i] = coefficients;
-        }
-
-        return polynomials;
+        // the slope rule is the whole difference between this scheme and the
+        // others that work this way; the assembly is shared
+        return CubicSpline.hermite(points, values, slopes(dx, dy));
     }
 }

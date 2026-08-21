@@ -217,6 +217,40 @@ public final class CubicSpline implements DiffDFunction {
     }
 
     /**
+     * The coefficients of the piecewise cubic that matches the given values
+     * and slopes at every knot, which is what every scheme in this package
+     * that works by a slope rule needs once it has chosen its slopes. The
+     * piece over {@code [x_i, x_i+1]} is the unique cubic through the two end
+     * values with the two end slopes, written in the local coordinate
+     * {@code t = x - x_i}. Writing it in {@code x} instead cancels the
+     * abscissa away: on knots spread over six orders of magnitude that costs
+     * every digit of the result.
+     *
+     * @param points
+     *            the knots, strictly increasing
+     * @param values
+     *            the values at the knots
+     * @param slopes
+     *            the first derivative at each knot, same length
+     * @return one array of {@code {a, b, c, d}} per segment
+     */
+    static double[][] hermite(double[] points, double[] values, double[] slopes) {
+        final int n = points.length - 1;
+        double[][] polynomials = new double[n][];
+        for (int i = 0; i < n; i++) {
+            double h = points[i + 1] - points[i];
+            double s = (values[i + 1] - values[i]) / h;
+            double coefficients[] = new double[4];
+            coefficients[0] = values[i];
+            coefficients[1] = slopes[i];
+            coefficients[2] = (3.0 * s - 2.0 * slopes[i] - slopes[i + 1]) / h;
+            coefficients[3] = (slopes[i] + slopes[i + 1] - 2.0 * s) / (h * h);
+            polynomials[i] = coefficients;
+        }
+        return polynomials;
+    }
+
+    /**
      * The precondition of the constructor, checked at the boundary of the
      * package: two arrays of equal length, at least two knots, everything
      * finite, and the knots strictly increasing.

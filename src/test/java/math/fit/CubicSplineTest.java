@@ -55,14 +55,19 @@ public class CubicSplineTest {
         return new double[][] { x, y };
     }
 
-    /** Both builders over the same data, so the shared machinery is exercised twice. */
+    /** Every builder over the same data, so the shared machinery is exercised by each. */
     private static CubicSpline[] both(double[][] data) {
         return new CubicSpline[] { SplineInterpolator.interpolate(data[0], data[1]),
-                KrugerInterpolator.interpolate(data[0], data[1]) };
+                KrugerInterpolator.interpolate(data[0], data[1]),
+                AkimaInterpolator.interpolate(data[0], data[1]),
+                AkimaInterpolator.interpolate(data[0], data[1], AkimaInterpolator.Variant.MODIFIED) };
     }
 
+    private static final String[] NAMES = { "natural spline", "Kruger spline", "Akima spline",
+            "modified Akima spline" };
+
     private static String name(int i) {
-        return i == 0 ? "natural spline" : "Kruger spline";
+        return NAMES[i];
     }
 
     // the piece that owns a segment, re-derived from the published coefficients

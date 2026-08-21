@@ -14,12 +14,15 @@
 /**
  * Routines for function fitting and data interpolation.
  * <p>
- * Both interpolators here produce a {@link math.fit.CubicSpline}, which
+ * All three interpolators here produce a {@link math.fit.CubicSpline}, which
  * evaluates the value, the first and second derivative and the definite
  * integral in closed form. Choose {@link math.fit.SplineInterpolator} for
- * smooth data, where its two continuous derivatives make it the more accurate
- * of the two, and {@link math.fit.KrugerInterpolator} where the shape of the
- * data has to be preserved, since the natural spline can leave the range of
- * the values and the constrained one cannot.
+ * smooth data, where its two continuous derivatives make it the smoothest and,
+ * on coarse grids, the most accurate; {@link math.fit.KrugerInterpolator}
+ * where the shape of the data has to be preserved, since it is the only one of
+ * the three that cannot leave the range of the values; and
+ * {@link math.fit.AkimaInterpolator} for data with a few outliers, since it is
+ * the only one whose slopes are local, so a single bad value disturbs six
+ * segments rather than every segment there is.
  */
 package math.fit;
