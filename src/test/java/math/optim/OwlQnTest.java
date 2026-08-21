@@ -1,6 +1,7 @@
 package math.optim;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -460,5 +461,71 @@ public class OwlQnTest {
         double[] inside = new double[w.length];
         f.getParameters(inside);
         assertEquals(0.0, maxDeviation(w, inside), 0.0);
+    }
+
+    /** Nothing has happened yet, and the class says so. */
+    @Test
+    public void testTerminationBeforeTheFirstRun() {
+        DMatrix[] problem = standardizedProblem(11L);
+        OrthantWiseLimitedMemoryBFGS owlqn = new OrthantWiseLimitedMemoryBFGS(
+                new LeastSquares(problem[0], problem[1]), 0.1);
+
+        assertEquals(Termination.NOT_STARTED, owlqn.getTermination());
+        assertFalse(owlqn.isConverged());
+        assertTrue(Double.isNaN(owlqn.getGradientNorm()));
+    }
+
+    /**
+     * The rule that stopped the search, and the pseudo gradient it fired on.
+     * The pseudo gradient is the quantity that vanishes at an L1 solution, so a
+     * value-tolerance exit with a large one means the coefficients are not yet
+     * the answer -- which is the ordinary outcome at the default tolerances.
+     */
+    @Test
+    public void testEachStoppingRuleNamesItself() {
+        DMatrix[] problem = standardizedProblem(13L);
+
+        OrthantWiseLimitedMemoryBFGS ordinary = new OrthantWiseLimitedMemoryBFGS(
+                new LeastSquares(problem[0], problem[1]), 0.1);
+        assertTrue(ordinary.optimize());
+        assertTrue("an ordinary run stops on one of the tolerances",
+                ordinary.getTermination() == Termination.VALUE_TOLERANCE
+                        || ordinary.getTermination() == Termination.GRADIENT_TOLERANCE);
+        assertTrue(ordinary.getTermination().isConvergence());
+        assertTrue("pseudo gradient " + ordinary.getGradientNorm(), ordinary.getGradientNorm() >= 0.0);
+
+        OrthantWiseLimitedMemoryBFGS budgeted = new OrthantWiseLimitedMemoryBFGS(
+                new LeastSquares(problem[0], problem[1]), 0.1, 2, 1.0e-14, 1.0e-14, 4);
+        assertFalse(budgeted.optimize());
+        assertEquals(Termination.ITERATION_LIMIT, budgeted.getTermination());
+        assertFalse(budgeted.isConverged());
+
+        OrthantWiseLimitedMemoryBFGS partial = new OrthantWiseLimitedMemoryBFGS(
+                new LeastSquares(problem[0], problem[1]), 0.1);
+        assertFalse("one iteration of many is not a result", partial.optimize(1));
+        assertEquals(Termination.PARTIAL_RUN, partial.getTermination());
+    }
+
+    /**
+     * A penalty heavy enough to zero every coefficient leaves the pseudo
+     * gradient at exactly zero, which is the optimality condition itself rather
+     * than a tolerance being met.
+     */
+    @Test
+    public void testACollapsedSolutionIsReportedAsStationary() {
+        DMatrix[] problem = standardizedProblem(17L);
+        LeastSquares f = new LeastSquares(problem[0], problem[1]);
+        OrthantWiseLimitedMemoryBFGS owlqn = new OrthantWiseLimitedMemoryBFGS(f, 1.0e9);
+
+        assertTrue(owlqn.optimize());
+        assertEquals(Termination.GRADIENT_TOLERANCE, owlqn.getTermination());
+        assertTrue(owlqn.getTermination().isStationary());
+        assertEquals(0.0, owlqn.getGradientNorm(), 0.0);
+
+        double[] w = new double[problem[0].numColumns()];
+        f.getParameters(w);
+        for (int i = 0; i < w.length; ++i) {
+            assertEquals("w[" + i + "] must be exactly zero", 0.0, w[i], 0.0);
+        }
     }
 }

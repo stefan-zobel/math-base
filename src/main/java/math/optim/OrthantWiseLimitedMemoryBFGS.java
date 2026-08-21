@@ -19,6 +19,15 @@ import math.linalg.VectorOps;
  * Jianfeng Gao in ICML 2007 for details. This code is an adaptation of the
  * freely-available C++ code on Galen's webpage.
  * 
+ * <p>
+ * Like {@link LimitedMemoryBFGS} this class maximizes, and it adds the L1
+ * penalty itself: the objective handed to it is the smooth part alone, as a
+ * log-likelihood. {@link #getTermination()} says which rule stopped the
+ * search and {@link #getGradientNorm()} gives the norm of the <em>pseudo</em>
+ * gradient it fired on, which is the quantity that vanishes at an L1 solution;
+ * the ordinary gradient does not, since on the active set it equals the L1
+ * weight times the sign of the coordinate.
+ *
  * @author Kedar Bellare
  */
 public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
@@ -34,7 +43,8 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
     /** Number of corrections kept for the inverse Hessian. */
     private static final int DEFAULT_M = 4;
 
-    private boolean converged = false;
+    private Termination termination = Termination.NOT_STARTED;
+    private double gradientNorm = Double.NaN;
     private Optimizable.ByGradientValue optimizable;
     // name of optimizable for value output
 //    private String optName;
@@ -196,7 +206,32 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
     @Override
     public boolean isConverged() {
-        return converged;
+        return termination.isConvergence();
+    }
+
+    /**
+     * Why the last search stopped.
+     *
+     * @return the outcome of the last run, or {@link Termination#NOT_STARTED}
+     *         if {@code optimize} was never called
+     * @since 1.5.2
+     */
+    public Termination getTermination() {
+        return termination;
+    }
+
+    /**
+     * Euclidean norm of the <em>pseudo</em> gradient where the last search
+     * stopped, that is of the steepest descent direction this method builds
+     * from the gradient and the L1 weight. It is the quantity whose vanishing
+     * is the optimality condition of the penalized problem.
+     *
+     * @return the pseudo gradient norm at the exit, or {@code NaN} if
+     *         {@code optimize} was never called
+     * @since 1.5.2
+     */
+    public double getGradientNorm() {
+        return gradientNorm;
     }
 
     public int getIteration() {
@@ -227,10 +262,11 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
             // the point where the solution collapses to zero; it must not be
             // mistaken for the non-ascent direction of a wrong gradient.
             double pseudoGradientNorm = VectorOps.twoNorm(steepestDescentDirection);
+            gradientNorm = pseudoGradientNorm;
             if (pseudoGradientNorm <= gradientTolerance) {
                 logger.fine("Exiting OWL-BFGS: pseudo gradient norm "
                         + pseudoGradientNorm + " <= " + gradientTolerance);
-                converged = true;
+                termination = Termination.GRADIENT_TOLERANCE;
                 return true;
             }
 
@@ -255,7 +291,7 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
                 logger.warning("Line search in OWL-BFGS could not find a lower value in "
                         + MAX_BACKTRACKS + " backtracking steps. "
                         + "Stopping at the last accepted parameters.");
-                converged = false;
+                termination = Termination.LINE_SEARCH_STALLED;
                 return false;
             }
 
@@ -264,10 +300,14 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
             // check for termination conditions
             if (checkValueTerminationCondition()) {
+                // report the pseudo gradient at the point actually reached rather
+                // than the one formed at the top of this iteration
+                makeSteepestDescDir();
+                gradientNorm = VectorOps.twoNorm(steepestDescentDirection);
 //                logger.info("Exiting OWL-BFGS on termination #1:");
 //                logger.info("value difference below tolerance (oldValue: "
 //                        + oldValue + " newValue: " + value);
-                converged = true;
+                termination = Termination.VALUE_TOLERANCE;
                 return true;
             }
 
@@ -284,11 +324,14 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
                 logger.warning("Too many iterations in OWL-BFGS (" + maxIterations
                         + "). Stopping with the current parameters, which are "
                         + "not known to be optimal.");
-                converged = false;
+                termination = Termination.ITERATION_LIMIT;
                 return false;
             }
         }
 
+        // the loop used up the iterations this call was given, which leaves the
+        // search unfinished rather than converged
+        termination = Termination.PARTIAL_RUN;
         return false;
     }
 
