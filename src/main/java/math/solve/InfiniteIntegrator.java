@@ -20,9 +20,11 @@ import math.fun.DTriFunction;
  * exactly. A normal of unit width centered at a hundred, left to itself, would
  * come back as {@code 6e-101}, and one of width ten centered at three hundred as
  * {@code 3e-60}, where both ought to be one -- those are the values the bare
- * substitution produces, and what the guard below now refuses to hand out. The
- * one-sided forms substitute {@code x = a + t / (1 - t)} and fail the same way
- * when the mass lies far from the finite end.
+ * substitution produces, and neither is handed out any more: in one dimension
+ * both now come back as one, from the fallback described below, and where that
+ * fallback cannot answer either the call is refused. The one-sided forms
+ * substitute {@code x = a + t / (1 - t)} and fail the same way when the mass
+ * lies far from the finite end.
  * <p>
  * The multidimensional forms fail sooner, because they are allowed less
  * recursion per axis: {@code integrate2DSmart} spends a {@code maxDepth} of ten
@@ -37,8 +39,19 @@ import math.fun.DTriFunction;
  * -- the largest {@code |f|} the substitution actually evaluated is recorded and
  * compared against a direct probe of the integrand. If the substitution never
  * came within a millionth of what the probe found, it looked in the wrong
- * place, and an {@link ArithmeticException} names where the mass is and what to
- * do instead.
+ * place.
+ * <p>
+ * In one dimension that is not the end of it. The probe knows <em>where</em>
+ * the mass is, and splitting the domain there is exactly what the refusal used
+ * to tell the caller to do; so the split is made here instead and both halves
+ * go to {@link DoubleExponential}, whose nodes crowd towards the finite end of
+ * each half - which is now the peak itself. The result is used only if both
+ * halves report convergence, which is also the check on the probe: handed a
+ * split point a hundred widths off the mass, that rule declines rather than
+ * agrees. When it declines, an {@link ArithmeticException} names where the mass
+ * is and what to do instead, as before. In two and three dimensions there is no
+ * such fallback, because the rule exists in one dimension only, and the refusal
+ * is the whole of the answer there.
  * <p>
  * The probe walks a geometric ladder of magnitudes outwards from whichever end
  * of an axis is finite, or from the origin when neither is; an axis bounded on
@@ -65,8 +78,13 @@ import math.fun.DTriFunction;
  * anywhere -- an integrand that cancels to zero, the zero function, an integral
  * that genuinely is {@code 1e-200} and heavy tails all pass untouched:
  * <ul>
- *   <li><b>1D</b>: 7 of 7 known failures refused, 0 of 9 legitimate integrals
- *       disturbed, about 1,200 evaluations of the integrand per call.</li>
+ *   <li><b>1D</b>: of 9 known failures, 8 are now <em>answered</em> to nine
+ *       digits or better by the fallback and the ninth - an oscillation riding
+ *       on mass that sits far out, which no double-exponential node set
+ *       resolves - is refused. None is returned wrong. 0 of 9 legitimate
+ *       integrals disturbed. The probe costs about 1,200 evaluations of the
+ *       integrand per call, and the fallback a few hundred to a few thousand
+ *       more, on the path that was about to refuse.</li>
  *   <li><b>2D</b>: 9 of 11 refused, 0 of 6 disturbed, about 50,000
  *       evaluations.</li>
  *   <li><b>3D</b>: 5 of 6 refused, 0 of 4 disturbed, about 410,000
@@ -80,8 +98,15 @@ import math.fun.DTriFunction;
  * silent zero remains. Detection by sampling has that limit in principle, and
  * it bites sooner in more dimensions because the integrand is a product: the
  * rung nearest the mass is off by the same relative amount on every axis at
- * once. The real cure is to center the substitution on the integrand, which is
- * a change to the method rather than a guard on it.
+ * once. Nothing here can help that, since the fallback is reached only through
+ * a probe that found something: what the probe cannot see, the fallback is
+ * never asked about.
+ * <p>
+ * The cure for the rest is to center the substitution on the integrand rather
+ * than to guard it, and in one dimension splitting at the peak is that cure --
+ * an exp-sinh rule anchored at the peak is a substitution centered on the
+ * integrand. In two and three dimensions it remains a change to the method that
+ * has not been made.
  */
 public class InfiniteIntegrator {
 
@@ -212,8 +237,10 @@ public class InfiniteIntegrator {
      * {@code [-inf, b]} and, as a fallback, an ordinary finite interval.
      * <p>
      * For the three infinite cases the result is checked against a direct probe
-     * of the integrand and refused if the substitution never sampled the region
-     * that carries the mass; see the class comment.
+     * of the integrand. If the substitution never sampled the region that
+     * carries the mass, the domain is split where the probe found it and both
+     * halves are integrated by {@link DoubleExponential} instead; only if that
+     * declines to converge is the call refused. See the class comment.
      *
      * @param setup
      *            the Gauss-Kronrod rule to use
@@ -228,7 +255,8 @@ public class InfiniteIntegrator {
      * @return the approximated integral
      * @throws ArithmeticException
      *             if the substitution demonstrably never sampled the region
-     *             that carries the integrand
+     *             that carries the integrand and the double-exponential
+     *             fallback could not resolve it either
      */
     public static double integrate1DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
                                                double a, double b, double epsTol) {
@@ -252,8 +280,7 @@ public class InfiniteIntegrator {
             };
             // We integrate the transformed function strictly from -1 to 1
             double result = MetaIntegrator.integrate1DSmart(setup, transformed, -1.0, 1.0, epsTol);
-            refuseIfMissed1D(f, seen, a, b);
-            return result;
+            return verify1D(f, seen, a, b, result, epsTol);
         }
 
         // CASE B: Semi-infinite upward [a, +inf]
@@ -269,8 +296,7 @@ public class InfiniteIntegrator {
                 return seen.record(f.apply(x)) * derivative;
             };
             double result = MetaIntegrator.integrate1DSmart(setup, transformed, 0.0, 1.0, epsTol);
-            refuseIfMissed1D(f, seen, a, b);
-            return result;
+            return verify1D(f, seen, a, b, result, epsTol);
         }
 
         // CASE C: Semi-infinite downward [-inf, b]
@@ -286,8 +312,7 @@ public class InfiniteIntegrator {
                 return seen.record(f.apply(x)) * derivative;
             };
             double result = MetaIntegrator.integrate1DSmart(setup, transformed, 0.0, 1.0, epsTol);
-            refuseIfMissed1D(f, seen, a, b);
-            return result;
+            return verify1D(f, seen, a, b, result, epsTol);
         }
 
         // CASE D: Ordinary finite integral [a, b]
@@ -675,17 +700,48 @@ public class InfiniteIntegrator {
     // =========================================================================
 
     /**
-     * Throws when the substitution never came near the part of the domain that
-     * carries the integrand. A probe that finds nothing at all does not accuse:
-     * an integrand negligible everywhere the ladder reaches is entitled to
-     * integrate to zero.
+     * Returns the substitution's own result when the probe agrees that it
+     * looked in the right place, the double-exponential rule's result when it
+     * did not but that rule can supply one, and throws otherwise. A probe that
+     * finds nothing at all does not accuse: an integrand negligible everywhere
+     * the ladder reaches is entitled to integrate to zero.
      */
-    private static void refuseIfMissed1D(DFunction f, Watch seen, double a, double b) {
+    private static double verify1D(DFunction f, Watch seen, double a, double b, double result, double epsTol) {
         Peak probed = probe(f, a, b);
         if (probed.value <= 0.0 || seen.value() >= MISS_FACTOR * probed.value) {
-            return;
+            return result;
+        }
+        // The substitution looked in the wrong place, and the message below
+        // would tell the caller to split the range where the mass is. The
+        // probe knows where that is, so do it here instead: split there and
+        // hand both halves to DoubleExponential, whose nodes crowd towards the
+        // finite end of each - which is now the peak itself.
+        double rescued = rescue1D(f, a, b, probed.x, epsTol);
+        if (!Double.isNaN(rescued)) {
+            return rescued;
         }
         throw missed("[" + limit(a) + ", " + limit(b) + "]", seen.value(), probed.value, point(probed.x));
+    }
+
+    /**
+     * The integral over {@code [a, cut]} plus the one over {@code [cut, b]}, or
+     * {@code NaN} when either half declines to converge - which is what happens
+     * when {@code cut} is not in fact where the mass is, so the two flags
+     * together are the check on the probe as well as on the rule.
+     */
+    private static double rescue1D(DFunction f, double a, double b, double cut, double epsTol) {
+        if (!(cut > a) || !(cut < b)) {
+            return Double.NaN;
+        }
+        DoubleExponential.IntegralResult lower = DoubleExponential.integrate1D(f, a, cut, epsTol);
+        if (!lower.converged) {
+            return Double.NaN;
+        }
+        DoubleExponential.IntegralResult upper = DoubleExponential.integrate1D(f, cut, b, epsTol);
+        if (!upper.converged) {
+            return Double.NaN;
+        }
+        return lower.value + upper.value;
     }
 
     /** Is this coordinate far from the point its substitution is centered on? */

@@ -627,48 +627,57 @@ public class ContinuousDistributionTest {
      * width, not on the distance alone: a Cauchy centered at a thousand is
      * integrated exactly, a normal of unit width at a hundred is not.
      * <p>
-     * What it must never do is return the near-zero quietly, and it no longer
-     * does: it refuses, and names the place it should have looked.
+     * What it must never do is return the near-zero quietly. It no longer does:
+     * the probe names the place it should have looked, the line is split there,
+     * and the double-exponential rule integrates both halves. The refusal is
+     * kept for the cases that rule cannot resolve either.
      */
     @Test
-    public void theDoublyInfiniteRouteHoldsForHeavyTailsAndRefusesThinOnesFarOut() {
+    public void theDoublyInfiniteRouteHoldsForHeavyTailsAndNowRecoversThinOnesFarOut() {
         assertEquals("a Cauchy is integrated wherever it sits", 1.0, wholeLine(new Cauchy(1000.0, 1.0)), 1.0e-8);
         assertEquals("so is a Student t", 1.0, wholeLine(new StudentT(3.0)), 1.0e-9);
         assertEquals("a normal at the origin is fine", 1.0, wholeLine(new Normal(0.0, 1.0)), 1.0e-9);
         assertEquals("and still fine at thirty", 1.0, wholeLine(new Normal(30.0, 1.0)), 1.0e-9);
         assertEquals("scale delays it rather than preventing it", 1.0, wholeLine(new Normal(100.0, 10.0)), 1.0e-9);
 
-        refused(new Normal(100.0, 1.0), 100.0);
-        refused(new Normal(137.0, 1.0), 137.0);
-        refused(new Normal(300.0, 10.0), 300.0);
-        refused(new Normal(-300.0, 1.0), -300.0);
+        // These four used to be refused. The algebraic substitution misses them,
+        // and the refusal named the point where the mass sits and told the
+        // caller to split the range there. That split is now made for the
+        // caller, both halves going to the double-exponential rule, whose nodes
+        // crowd towards the finite end of each half - which is the peak itself.
+        recovered(new Normal(100.0, 1.0));
+        recovered(new Normal(137.0, 1.0));
+        recovered(new Normal(300.0, 10.0));
+        recovered(new Normal(-300.0, 1.0));
+    }
+
+    @Test
+    public void theRefusalSurvivesWhereTheFallbackCannotAnswerEither() {
+        // The fallback is trusted only when it reports convergence, so an
+        // integrand it cannot resolve leaves the refusal standing. A fast
+        // oscillation riding on mass that sits far out is such a case: the
+        // probe finds the mass, the substitution never sampled it, and no
+        // double-exponential node set resolves the oscillation.
+        final DFunction bell = density(new Normal(200.0, 1.0));
+        DFunction f = x -> bell.apply(x) * (1.0 + 0.9 * Math.sin(1.0e4 * x));
+        try {
+            wholeLine(f);
+            org.junit.Assert.fail("an unresolvable oscillation far from the origin must still be refused");
+        } catch (ArithmeticException expected) {
+            assertTrue("the refusal must still say what went wrong: " + expected.getMessage(),
+                    expected.getMessage().contains("never sampled the integrand where its mass lies"));
+        }
     }
 
     /**
-     * The refusal has to name where the mass is, and the remedy it proposes has
-     * to work: splitting the line at the reported place recovers the integral
-     * exactly. A message that cannot be acted on is only a louder silence.
+     * A density the substitution alone misses, which has to come back as one
+     * anyway. The remedy the refusal used to propose - split the line where the
+     * mass is - is now applied for the caller, so what was the message is now
+     * the answer.
      */
-    private static void refused(ContinuousDistribution d, double where) {
-        try {
-            wholeLine(d);
-            org.junit.Assert.fail("the substitution missed " + d + " and should have refused");
-        } catch (ArithmeticException expected) {
-            String message = expected.getMessage();
-            assertTrue("the refusal must say what went wrong: " + message,
-                    message.contains("never sampled the integrand where its mass lies"));
-
-            double reported = Double.parseDouble(message.substring(message.indexOf("|f(") + 3,
-                    message.indexOf(")|")));
-            assertEquals("the refusal must point at the mass", where, reported, 0.1 * Math.abs(where));
-
-            double lower = InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(d),
-                    Double.NEGATIVE_INFINITY, reported, TOL);
-            double upper = InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(d), reported,
-                    Double.POSITIVE_INFINITY, TOL);
-            assertEquals("splitting where the refusal points must recover the integral", 1.0, lower + upper,
-                    1.0e-9);
-        }
+    private static void recovered(ContinuousDistribution d) {
+        assertEquals("the substitution misses " + d + " and the fallback has to catch it", 1.0, wholeLine(d),
+                1.0e-9);
     }
 
     /**
@@ -714,21 +723,20 @@ public class ContinuousDistributionTest {
     }
 
     /**
-     * The one-sided forms share the fault and share the refusal: mass far from
-     * the finite end is missed the same way.
+     * The one-sided forms share the fault and share the remedy: mass far from
+     * the finite end is missed the same way, and recovered the same way.
      */
     @Test
-    public void theOneSidedFormsRefuseTheSameWay() {
+    public void theOneSidedFormsRecoverTheSameWay() {
         Normal far = new Normal(300.0, 1.0);
-        try {
-            InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(far), 0.0,
-                    Double.POSITIVE_INFINITY, TOL);
-            org.junit.Assert.fail("the one-sided substitution missed the mass and should have refused");
-        } catch (ArithmeticException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("0.00000"));
-        }
-        assertEquals("cutting close to the mass is all it takes", 1.0, InfiniteIntegrator.integrate1DInfinite(
-                G7_K15.POINTS_15, density(far), 290.0, Double.POSITIVE_INFINITY, TOL), 1.0e-9);
+        assertEquals("the one-sided substitution misses the mass and the fallback catches it", 1.0,
+                InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(far), 0.0,
+                        Double.POSITIVE_INFINITY, TOL),
+                1.0e-9);
+        assertEquals("and cutting close to the mass by hand is all it ever took", 1.0,
+                InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(far), 290.0,
+                        Double.POSITIVE_INFINITY, TOL),
+                1.0e-9);
     }
 
     private static double wholeLine(ContinuousDistribution d) {
