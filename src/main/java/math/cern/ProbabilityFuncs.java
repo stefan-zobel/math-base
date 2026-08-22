@@ -521,7 +521,26 @@ public final class ProbabilityFuncs {
         if (x < 0.0) {
             return 0.0;
         }
-        return GammaFun.incompleteGamma(alpha, beta * x);
+        return GammaFun.incompleteGamma(alpha, saturate(beta * x));
+    }
+
+    /**
+     * Caps a product at {@code Double.MAX_VALUE} instead of letting it overflow
+     * to infinity. The continued fraction in
+     * {@link GammaFun#incompleteGammaComplement(double, double)} evaluates
+     * {@code a * log(x) - x}, which is {@code inf - inf} at an infinite
+     * argument and poisons the whole result with {@code NaN}; at
+     * {@code Double.MAX_VALUE} that term underflows the exponent range instead
+     * and the integral comes back as the one it mathematically is. The test is
+     * written as {@code > Double.MAX_VALUE} rather than {@code isInfinite} so
+     * that {@code NaN} passes through untouched.
+     *
+     * @param y
+     *            the product to cap
+     * @return {@code y}, or {@code Double.MAX_VALUE} if {@code y} overflowed
+     */
+    private static double saturate(double y) {
+        return (y > Double.MAX_VALUE) ? Double.MAX_VALUE : y;
     }
 
     /**
@@ -555,7 +574,7 @@ public final class ProbabilityFuncs {
         if (x < 0.0) {
             return 0.0;
         }
-        return GammaFun.incompleteGammaComplement(b, a * x);
+        return GammaFun.incompleteGammaComplement(b, saturate(a * x));
     }
 
     /**
