@@ -142,7 +142,12 @@ public final class ACFTest {
 
     @Test
     public void testUniformRandom() {
-        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        // The seed is fixed. Unseeded this drew a fresh sample every run, so
+        // the test was not reproducible -- it was not flaky, though, and the
+        // sweep is what says so: over 5000 seeds the worst of the eleven lags
+        // has a median of 0.034 and a maximum of 0.076 against the bound of
+        // 0.1, and not one seed failed. This one sits at 0.350 of the bound.
+        PseudoRandom rng = DefaultRng.newPseudoRandom(20260823005L);
         double[] uniform = rng.doubles(3000, -1000.0, 1000.0).toArray();
         double[] acf = ACF.acf(uniform);
 

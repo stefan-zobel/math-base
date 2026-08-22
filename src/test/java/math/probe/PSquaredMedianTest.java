@@ -46,7 +46,12 @@ public class PSquaredMedianTest {
         double lambda = 0.5;
         double theoreticalMedian = Math.log(2) / lambda; // approx 1.386
 
-        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        // The seed is fixed, and this is the one of the four that was really
+        // failing: unseeded, over 5000 seeds the deviation has a median of
+        // 0.0138 and a maximum of 0.0828 against this tolerance of 0.0693, and
+        // 3 of the 5000 exceed it -- roughly one run in 1700, asserted as a
+        // certainty. The seed used here sits at 0.190 of the tolerance.
+        PseudoRandom rng = DefaultRng.newPseudoRandom(20260823193L);
         int samples = 10_000;
         DoubleStream stream = rng.exponential(samples, lambda);
         stream.forEach(d -> p2.accept(d));
@@ -68,7 +73,14 @@ public class PSquaredMedianTest {
         final int iterations = 100;
         double totalError = 0.0;
 
-        PseudoRandom rng = DefaultRng.getGlobalPseudoRandom();
+        // The seed is fixed. Averaging 100 blocks leaves this one tight around
+        // zero, and symmetrically so: over 3000 seeds the mean signed error
+        // runs from -0.007385 to +0.007384 against the bound of 0.015, no seed
+        // failing on either side. That symmetry is why the bound below is
+        // two-sided -- the one-sided form constrained half of it and let the
+        // other half through. This seed sits at 0.002 of the bound, the widest
+        // of the sweep at 0.49.
+        PseudoRandom rng = DefaultRng.newPseudoRandom(20260823136L);
         int samples = 10_000;
 
         for (int j = 0; j < iterations; j++) {
@@ -78,8 +90,11 @@ public class PSquaredMedianTest {
 
             totalError += (p2Test.getMedian() - theoreticalMedian);
         }
-        System.out.println("Average Error: " + (totalError / iterations));
-        assertTrue("Average Error <= 0.015", (totalError / iterations) <= 0.015);
+        double averageError = totalError / iterations;
+        System.out.println("Average Error: " + averageError);
+        // two-sided: the bias runs either way, so a bound on the signed value
+        // alone would let a negative bias of any size through
+        assertTrue("abs(Average Error) <= 0.015, was " + averageError, Math.abs(averageError) <= 0.015);
     }
 
     /**
