@@ -1,5 +1,5 @@
 /**
- * Worked examples: five published datasets, each taken apart with the pieces
+ * Worked examples: six published datasets, each taken apart with the pieces
  * this library provides.
  * <p>
  * Every subpackage holds the same three files -- {@code Datasets} with the
@@ -30,6 +30,12 @@
  * Gutenberg-Richter exponent: a magnitude column that mixes scales, quantized
  * data that changes what a quantile means, and an extrapolation with no way of
  * knowing where its model stops.</li>
+ * <li>{@link math.demo.sthelens.SurfaceDemo} -- a lidar grid over the crater of
+ * Mount St. Helens, thinned to a coarser survey and put back six ways through
+ * {@code fit}. Bilinear interpolation cannot return a value outside the four
+ * samples around it, which sounds like safety; the mountain leaves that range
+ * twice as often as the bicubic surface does, and where the bicubic surface
+ * leaves it, it is the nearer of the two.</li>
  * </ul>
  */
 package math.demo;
