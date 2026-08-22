@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Stefan Zobel
+ * Copyright 2018, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,9 +59,26 @@ public class Weibull implements ContinuousDistribution {
         if (x < 0.0) {
             return 0.0;
         }
+        if (x == 0.0) {
+            // the shape alone decides the left end: a pole below one, the rate
+            // at one, and zero above it. Computed, x^(k-1) * x^k reads
+            // infinity * zero here.
+            if (shape_k < 1.0) {
+                return Double.POSITIVE_INFINITY;
+            }
+            return (shape_k == 1.0) ? shape_dividedby_scale : 0.0;
+        }
+        if (x == Double.POSITIVE_INFINITY) {
+            return 0.0;
+        }
         double xscale = x / scale_lambda;
         double xscalepow = Math.pow(xscale, shape_k - 1);
         double xscalepowshape = xscalepow * xscale;
+        if (xscalepowshape > Double.MAX_VALUE) {
+            // the exponential has underflowed and the power in front of it has
+            // overflowed; the exponential wins, so the density is zero
+            return 0.0;
+        }
         return shape_dividedby_scale * xscalepow * Math.exp(-xscalepowshape);
     }
 
@@ -87,12 +104,17 @@ public class Weibull implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return 0.0;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.MAX_VALUE;
+            return supportUpperBound();
         }
         return scale_lambda * Math.pow(-Math.log1p(-probability), inverse_shape);
+    }
+
+    @Override
+    public double supportLowerBound() {
+        return 0.0;
     }
 
     /**

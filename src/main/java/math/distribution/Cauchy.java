@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Stefan Zobel
+ * Copyright 2017, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,10 +57,10 @@ public class Cauchy implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return Double.NEGATIVE_INFINITY;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.POSITIVE_INFINITY;
+            return supportUpperBound();
         }
         return loc + scale * Math.tan(Math.PI * (probability - 0.5));
     }

@@ -365,6 +365,8 @@ public class ContinuousDistributionTest {
             assertTrue(row + ": the window holds more than all of the mass", mass <= 1.0 + 1.0e-12);
             assertEquals(row + ": the distribution function must vanish at the bottom of the range", 0.0,
                     row.d.cdf(-Double.MAX_VALUE), 1.0e-300);
+            assertEquals(row + ": the distribution function must reach one at the top of the range", 1.0,
+                    row.d.cdf(Double.MAX_VALUE), 0.0);
 
             double previous = -1.0;
             for (int k = 0; k <= 40; ++k) {
@@ -379,27 +381,34 @@ public class ContinuousDistributionTest {
     }
 
     /**
-     * The usable range of the distribution function. Every one of these is
-     * correct and monotone as far out as {@code 1e15} and far beyond, but
-     * {@code Gamma} and {@code FisherF} return {@code NaN} rather than one at
-     * {@code Double.POSITIVE_INFINITY}, and both -- along with {@code Gamma} at
-     * {@code 1e308} -- do the same within a factor of two of
-     * {@code Double.MAX_VALUE}. That is a gap in the contract at the very top
-     * of the double range rather than a numerical defect, and this test guards
-     * the range that callers actually use without freezing the edge as it
-     * stands.
+     * The usable range of the distribution function, which is now the whole
+     * one. Every row is correct and monotone from {@code 1e3} up to
+     * {@code Double.POSITIVE_INFINITY} inclusive.
+     * <p>
+     * This test used to stop at {@code 1e15} on purpose, because {@code Gamma}
+     * and {@code FisherF} returned {@code NaN} rather than one at infinity and
+     * within a factor of two of {@code Double.MAX_VALUE} -- the rate or the
+     * numerator degrees of freedom made the product inside them overflow before
+     * the argument itself did. {@code ContinuousDistributionContractTest} states
+     * that rule over every implementation; what is left here is that the table
+     * of this file obeys it too, monotonically, all the way out.
      */
     @Test
     public void theDistributionFunctionIsUsableAcrossTheWholeOrdinaryRange() {
+        double[] xs = new double[] { 1.0e3, 1.0e15, 1.0e308, Double.MAX_VALUE, Double.POSITIVE_INFINITY };
         List<Row> rows = rows();
         for (int i = 0; i < rows.size(); ++i) {
             Row row = rows.get(i);
-            double near = row.d.cdf(1.0e3);
-            double far = row.d.cdf(1.0e15);
-            assertTrue(row + ": the distribution function is not a number at 1e3", !Double.isNaN(near));
-            assertTrue(row + ": the distribution function is not a number at 1e15", !Double.isNaN(far));
-            assertTrue(row + ": the distribution function decreased between 1e3 and 1e15", far >= near);
-            assertTrue(row + ": the distribution function exceeds one at 1e15", far <= 1.0);
+            double previous = -1.0;
+            for (int k = 0; k < xs.length; ++k) {
+                double c = row.d.cdf(xs[k]);
+                assertTrue(row + ": the distribution function is not a number at " + xs[k], !Double.isNaN(c));
+                assertTrue(row + ": the distribution function decreased below " + xs[k], c >= previous);
+                assertTrue(row + ": the distribution function exceeds one at " + xs[k], c <= 1.0);
+                previous = c;
+            }
+            assertEquals(row + ": the distribution function must reach one at infinity", 1.0,
+                    row.d.cdf(Double.POSITIVE_INFINITY), 0.0);
         }
     }
 

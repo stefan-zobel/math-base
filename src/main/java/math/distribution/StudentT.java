@@ -57,10 +57,10 @@ public class StudentT implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return Double.NEGATIVE_INFINITY;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.POSITIVE_INFINITY;
+            return supportUpperBound();
         }
         // Start at 0, not at mean(): the mean does not exist for df <= 1 and is
         // reported as NaN there, which poisoned every iteration below and made

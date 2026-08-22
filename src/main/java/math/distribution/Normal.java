@@ -83,10 +83,10 @@ public class Normal implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return Double.NEGATIVE_INFINITY;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.POSITIVE_INFINITY;
+            return supportUpperBound();
         }
         return mean + stdDev * ProbabilityFuncs.normalInverse(probability);
     }

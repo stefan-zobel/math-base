@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ public class Gamma implements ContinuousDistribution {
     @Override
     public double pdf(final double x) {
         if (x < 0.0) {
-            throw new IllegalArgumentException("x < 0.0");
+            return 0.0;
         }
         if (x == 0.0) {
             if (shape_k == 1.0) {
@@ -87,8 +87,16 @@ public class Gamma implements ContinuousDistribution {
             return rate_beta * Math.exp(-rate_beta * x);
         }
 
-        return rate_beta
-                * Math.exp((shape_k - 1.0) * Math.log(rate_beta * x) - (rate_beta * x) - FastGamma.logGamma(shape_k));
+        // rate_beta * x overflows for a large rate and a large x, and the
+        // exponent below then reads inf - inf. Capping it at the top of the
+        // range keeps the density the zero it is out there, and answers
+        // x == Double.POSITIVE_INFINITY by the same route.
+        double y = rate_beta * x;
+        if (y > Double.MAX_VALUE) {
+            y = Double.MAX_VALUE;
+        }
+
+        return rate_beta * Math.exp((shape_k - 1.0) * Math.log(y) - y - FastGamma.logGamma(shape_k));
     }
 
     @Override
@@ -114,12 +122,17 @@ public class Gamma implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return 0.0;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.MAX_VALUE;
+            return supportUpperBound();
         }
         return findRoot(probability, mean(), 0.0, Double.MAX_VALUE);
+    }
+
+    @Override
+    public double supportLowerBound() {
+        return 0.0;
     }
 
     /**

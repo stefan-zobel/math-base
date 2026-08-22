@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Stefan Zobel
+ * Copyright 2017, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,11 @@ public class Uniform implements ContinuousDistribution {
 
     @Override
     public double pdf(double x) {
+        if (Double.isNaN(x)) {
+            // neither comparison below holds for NaN, so without this the
+            // density of a point that is not one would come back as 1 / (b - a)
+            return Double.NaN;
+        }
         if (x < a || x > b) {
             return 0.0;
         }
@@ -61,12 +66,22 @@ public class Uniform implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return a;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return b;
+            return supportUpperBound();
         }
         return a + probability * (b - a);
+    }
+
+    @Override
+    public double supportLowerBound() {
+        return a;
+    }
+
+    @Override
+    public double supportUpperBound() {
+        return b;
     }
 
     @Override

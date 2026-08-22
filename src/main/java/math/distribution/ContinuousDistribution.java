@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,12 @@ package math.distribution;
 
 /**
  * A continuous distribution.
+ * <p>
+ * {@link #pdf(double)} and {@link #cdf(double)} are total in their argument:
+ * every {@code double} has an answer, the constructor is the only place that
+ * rejects anything, and {@code Double.NaN} is the sole input that produces
+ * {@code Double.NaN}. This is the continuous counterpart of the rule
+ * {@link DiscreteDistribution} states for its own support.
  */
 public interface ContinuousDistribution {
 
@@ -27,7 +33,11 @@ public interface ContinuousDistribution {
      * exist at {@code x}, then an appropriate replacement should be returned,
      * e.g. {@code Double.POSITIVE_INFINITY}, {@code Double.NaN}, or the limit
      * inferior or limit superior of the difference quotient.
-     * 
+     * <p>
+     * Outside of {@link #supportLowerBound()} and {@link #supportUpperBound()}
+     * the density is {@code 0.0}, and so it is at either infinity. Only
+     * {@code Double.NaN} yields {@code Double.NaN}.
+     *
      * @param x
      *            the point at which the PDF is evaluated
      * @return the value of the probability density function at point {@code x}
@@ -39,7 +49,12 @@ public interface ContinuousDistribution {
      * this distribution, this method returns {@code P(X <= x)}. In other words,
      * this method represents the (cumulative) distribution function (CDF) for
      * this distribution.
-     * 
+     * <p>
+     * It is {@code 0.0} at {@link #supportLowerBound()} and at
+     * {@code Double.NEGATIVE_INFINITY}, {@code 1.0} at
+     * {@link #supportUpperBound()} and at {@code Double.POSITIVE_INFINITY},
+     * and {@code Double.NaN} only for {@code Double.NaN}.
+     *
      * @param x
      *            the point at which the CDF is evaluated
      * @return the probability that a random variable with this distribution
@@ -50,7 +65,10 @@ public interface ContinuousDistribution {
     /**
      * The inverse of {@link #cdf(double)}, i.e. a method that returns the value
      * X for which P(x&lt;=X) = {@code probability}.
-     * 
+     * <p>
+     * A probability at or below zero returns {@link #supportLowerBound()} and
+     * one at or above one returns {@link #supportUpperBound()}.
+     *
      * @param probability
      *            the probability for which the inverse CDF is evaluated
      * @return the value X for which P(x&lt;=X) = {@code probability}.
@@ -72,6 +90,33 @@ public interface ContinuousDistribution {
      *         not defined
      */
     double variance();
+
+    /**
+     * Returns the smallest value the support of this distribution contains, or
+     * {@code Double.NEGATIVE_INFINITY} if the support is unbounded below.
+     * <p>
+     * The bound is the closed hull of the support. It says where the mass ends,
+     * not what the density does there: {@link LogNormal} has a density of
+     * {@code 0.0} at its own bound, while {@code Beta(0.5, 0.5)} has a pole at
+     * both of its.
+     *
+     * @return the lower end of the support (inclusive)
+     * @since 1.5.2
+     */
+    default double supportLowerBound() {
+        return Double.NEGATIVE_INFINITY;
+    }
+
+    /**
+     * Returns the largest value the support of this distribution contains, or
+     * {@code Double.POSITIVE_INFINITY} if the support is unbounded above.
+     *
+     * @return the upper end of the support (inclusive)
+     * @since 1.5.2
+     */
+    default double supportUpperBound() {
+        return Double.POSITIVE_INFINITY;
+    }
 
     /**
      * For a random variable {@code X} whose values are distributed according to

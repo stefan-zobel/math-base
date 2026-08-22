@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,14 +60,18 @@ public class Exponential implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return 0.0;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.MAX_VALUE;
+            return supportUpperBound();
         }
         return -Math.log1p(-probability) / lambda;
     }
 
+    @Override
+    public double supportLowerBound() {
+        return 0.0;
+    }
     @Override
     public double mean() {
         return 1.0 / lambda;

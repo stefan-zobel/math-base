@@ -69,7 +69,14 @@ public class FisherF implements ContinuousDistribution {
         // Compare your result with the density of the F(x; d1, d2)
         // - both are identical! This proves that the following is
         // the correct transformation:
-        return (((w * d1) * w) * beta.pdf(1.0 - w)) / d2;
+        final double scaled = (w * d1) * w;
+        if (scaled == 0.0) {
+            // The prefactor has underflowed. For d2 == 1 the Beta density has
+            // a pole at one, so the product would read 0 * infinity; the
+            // exponent of w wins it and the density is zero this far out.
+            return 0.0;
+        }
+        return (scaled * beta.pdf(1.0 - w)) / d2;
     }
 
     @Override
@@ -78,6 +85,11 @@ public class FisherF implements ContinuousDistribution {
             return 0.0;
         }
         final double z = d1 * x;
+        if (z > Double.MAX_VALUE) {
+            // d1 * x overflowed, so z / (d2 + z) would read inf / inf. The
+            // ratio is one out there, and so is the distribution function.
+            return 1.0;
+        }
         final double y = z / (d2 + z);
         return beta.cdf(y);
     }
@@ -85,10 +97,10 @@ public class FisherF implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return 0.0;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.POSITIVE_INFINITY;
+            return supportUpperBound();
         }
         return findRoot(probability, startingPoint(probability), 0.0, Double.MAX_VALUE);
     }
@@ -134,6 +146,11 @@ public class FisherF implements ContinuousDistribution {
         }
         final double z = d2 - 2.0;
         return 2.0 * d2 * d2 * (d1 + z) / (d1 * z * z * (d2 - 4.0));
+    }
+
+    @Override
+    public double supportLowerBound() {
+        return 0.0;
     }
 
     public int getNumeratorDegreesOfFreedom() {

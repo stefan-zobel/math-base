@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, 2023 Stefan Zobel
+ * Copyright 2015, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,14 +57,18 @@ public class LogNormal implements ContinuousDistribution {
     @Override
     public double inverseCdf(double probability) {
         if (probability <= 0.0) {
-            return 0.0;
+            return supportLowerBound();
         }
         if (probability >= 1.0) {
-            return Double.POSITIVE_INFINITY;
+            return supportUpperBound();
         }
         return Math.exp(mu + sigma * ProbabilityFuncs.normalInverse(probability));
     }
 
+    @Override
+    public double supportLowerBound() {
+        return 0.0;
+    }
     @Override
     public double mean() {
         return (Math.exp(mu + (sigma * sigma) / 2.0));
