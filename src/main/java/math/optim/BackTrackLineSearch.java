@@ -92,7 +92,7 @@ final class BackTrackLineSearch {
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("ENTERING BACKTRACK\n");
             logger.fine("Entering BackTrackLnSrch, value=" + fold
-                    + ",\ndirection.oneNorm:" + VectorOps.oneNorm(line)
+                    + ",\ndirection.oneNorm:" + VectorOps.absNorm(line)
                     + "  direction.infNorm:" + VectorOps.infinityNorm(line));
         }
         // an assertion is a no-op in the shipped artifact, where a NaN
@@ -145,13 +145,13 @@ final class BackTrackLineSearch {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("BackTrack loop iteration " + iteration + ": alam="
                         + alam + " oldAlam=" + oldAlam);
-                logger.fine("before step, x.1norm: " + VectorOps.oneNorm(x)
+                logger.fine("before step, x.1norm: " + VectorOps.absNorm(x)
                         + "\nalam: " + alam + "\noldAlam: " + oldAlam);
             }
             assert (alam != oldAlam) : "alam == oldAlam";
             VectorOps.plusEquals(x, line, alam - oldAlam); // step
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("after step, x.1norm: " + VectorOps.oneNorm(x));
+                logger.fine("after step, x.1norm: " + VectorOps.absNorm(x));
             }
 
             // check for convergence

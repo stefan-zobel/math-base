@@ -409,21 +409,25 @@ public class MinpackTest {
     /**
      * {@code enorm_f77} carries its own three-accumulator scaling, and the
      * expected values here are stated in closed form rather than taken from
-     * another implementation, because the obvious candidate for one is wrong:
-     * {@link VectorOps#twoNorm} accumulates the squares directly, so it
-     * overflows to infinity above about {@code 1e154} and underflows to zero
-     * below about {@code 1e-162}. On the vectors that stay in range the two
-     * agree, and on the ones that do not, {@code enorm_f77} is the one telling
-     * the truth. Asserted in both directions so the day {@code twoNorm} is
-     * rewritten in the BLAS {@code dnrm2} style this test notices.
+     * another implementation.
+     * <p>
+     * This test used to assert the opposite of what it asserts now, and it is
+     * the reason the change was noticed. {@link VectorOps#twoNorm} accumulated
+     * the squares directly, so it overflowed above about {@code 1e154} and
+     * underflowed below about {@code 1e-162}; three of the six vectors below
+     * were listed as out of its range and it was asserted to fail on them,
+     * "so the day {@code twoNorm} is rewritten in the BLAS {@code dnrm2} style
+     * this test notices". That day came. The two are now independent
+     * implementations of the same quantity -- three accumulators split by
+     * magnitude here, one scaling pass by a power of two there -- and they are
+     * held to agreeing on every vector.
      */
     @Test
-    public void testEnormIsCorrectWhereTheNaiveNormOverflows() {
+    public void testEnormAgreesWithTwoNormAtEveryMagnitude() {
         double root3 = Math.sqrt(3.0);
         double[][] vectors = { { 3.0, 4.0 }, { 1.0e300, 1.0e300, 1.0e300 }, { 1.0e-300, 1.0e-300, 1.0e-300 },
                 { 0.0, 0.0, 0.0 }, { 1.0e300, 1.0e-300, 1.0 }, { -3.0, 0.0, 4.0 } };
         double[] expected = { 5.0, root3 * 1.0e300, root3 * 1.0e-300, 0.0, 1.0e300, 5.0 };
-        boolean[] withinNaiveRange = { true, false, false, true, false, true };
 
         for (int k = 0; k < vectors.length; k++) {
             double[] v = vectors[k];
@@ -433,13 +437,9 @@ public class MinpackTest {
             double enorm = Minpack_f77.enorm_f77(v.length, oneBased);
             assertEquals("vector " + k, expected[k], enorm, 1.0e-14 * Math.max(expected[k], Double.MIN_NORMAL));
 
-            double naive = VectorOps.twoNorm(v);
-            if (withinNaiveRange[k]) {
-                assertEquals("vector " + k + ": both agree in range", enorm, naive, 1.0e-14 * Math.max(enorm, 1.0));
-            } else {
-                assertTrue("vector " + k + ": twoNorm is expected to fail here, and returned " + naive,
-                        naive == 0.0 || Double.isInfinite(naive));
-            }
+            double twoNorm = VectorOps.twoNorm(v);
+            assertEquals("vector " + k + ": the two implementations must agree", enorm, twoNorm,
+                    1.0e-14 * Math.max(enorm, Double.MIN_NORMAL));
         }
     }
 

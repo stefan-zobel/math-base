@@ -12,6 +12,19 @@ package math.linalg;
  */
 public final class VectorOps {
 
+    /**
+     * {@code sqrt(Double.MAX_VALUE)}. Squares of magnitudes at or below this
+     * cannot overflow, so {@link #twoNorm(double[])} may sum them directly.
+     */
+    private static final double SQRT_MAX_VALUE = Math.sqrt(Double.MAX_VALUE);
+
+    /**
+     * {@code sqrt(Double.MIN_NORMAL)}. Squares of magnitudes at or above this
+     * stay normal, so summing them directly loses no precision to gradual
+     * underflow.
+     */
+    private static final double SQRT_MIN_NORMAL = Math.sqrt(Double.MIN_NORMAL);
+
     public static boolean isVectorized() {
         return false;
     }
@@ -71,6 +84,20 @@ public final class VectorOps {
         }
     }
 
+    /**
+     * The inner product {@code sum m1_i * m2_i}, over as many elements as
+     * {@code m1} holds.
+     * <p>
+     * The products are accumulated as they come, so unlike
+     * {@link #twoNorm(double[])} this can overflow for operands whose product
+     * leaves the normal range.
+     *
+     * @param m1
+     *            The first array, and the one whose length is used
+     * @param m2
+     *            The second array, at least as long as {@code m1}
+     * @return the inner product, {@code 0.0} for empty arrays
+     */
     public static double dotProduct(double[] m1, double[] m2) {
         double ret = 0.0;
         for (int i = 0; i < m1.length; i++) {
@@ -79,6 +106,13 @@ public final class VectorOps {
         return ret;
     }
 
+    /**
+     * The one-norm {@code sum |m_i|}, the sum of the absolute values.
+     *
+     * @param m
+     *            The array
+     * @return the one-norm, {@code 0.0} for an empty array
+     */
     public static double absNorm(double[] m) {
         double ret = 0.0;
         for (int i = 0; i < m.length; i++) {
@@ -87,15 +121,97 @@ public final class VectorOps {
         return ret;
     }
 
+    /**
+     * The Euclidean norm {@code sqrt(sum m_i^2)}, computed so that it neither
+     * overflows for a large vector nor underflows for a small one.
+     * <p>
+     * The magnitude of the largest element decides. Where its square can be
+     * formed and summed without leaving the normal range -- which is every
+     * vector this library is likely to see -- the squares are summed directly
+     * and the answer is the one the straightforward loop gives. Otherwise the
+     * elements are scaled by a power of two, which is exact, and the result is
+     * scaled back. Accumulating the squares unscaled instead returns
+     * {@code Infinity} from about {@code 8.4e152} upwards and {@code 0.0}
+     * below about {@code 1.1e-162}, with the accuracy already degrading an
+     * order of magnitude before that.
+     *
+     * @param m
+     *            The array
+     * @return the Euclidean norm, {@code 0.0} for an empty array,
+     *         {@code Double.NaN} if any element is {@code NaN}
+     */
     public static double twoNorm(double[] m) {
-        double ret = 0.0;
-        for (int i = 0; i < m.length; i++) {
-            ret += m[i] * m[i];
+        double max = maxAbs(m);
+        if (max == 0.0) {
+            return 0.0;
         }
-        return Math.sqrt(ret);
+        if (max >= SQRT_MIN_NORMAL && max * Math.sqrt(m.length) <= SQRT_MAX_VALUE) {
+            return Math.sqrt(sumOfSquares(m));
+        }
+        // NaN and infinite input reach this branch as well and carry through
+        // it unchanged: the scaling is a multiplication by a power of two
+        int exponent = Math.getExponent(max);
+        double scale = Math.scalb(1.0, -exponent);
+        return Math.scalb(Math.sqrt(sumOfScaledSquares(m, scale)), exponent);
     }
 
+    /**
+     * The largest absolute value in the array, {@code 0.0} for an empty one and
+     * {@code NaN} if any element is {@code NaN}.
+     */
+    private static double maxAbs(double[] m) {
+        double max = 0.0;
+        for (int i = 0; i < m.length; i++) {
+            max = Math.max(max, Math.abs(m[i]));
+        }
+        return max;
+    }
+
+    /** {@code sum m_i^2}, the loop {@link #twoNorm(double[])} used to be. */
+    private static double sumOfSquares(double[] m) {
+        double sum = 0.0;
+        for (int i = 0; i < m.length; i++) {
+            sum += m[i] * m[i];
+        }
+        return sum;
+    }
+
+    /** {@code sum (scale * m_i)^2}, for a {@code scale} that is a power of two. */
+    private static double sumOfScaledSquares(double[] m, double scale) {
+        double sum = 0.0;
+        for (int i = 0; i < m.length; i++) {
+            double scaled = m[i] * scale;
+            sum += scaled * scaled;
+        }
+        return sum;
+    }
+
+    /**
+     * The signed sum {@code sum m_i}.
+     *
+     * @param m
+     *            The array
+     * @return the sum of the elements, {@code 0.0} for an empty array
+     * @deprecated the name says norm but the absolute values are not taken, so
+     *             this returns {@code -1.0} for {@code (3, -4, 5, -5)} where
+     *             the one-norm is {@code 17}. Use {@link #absNorm(double[])}
+     *             for the one-norm, or {@link #sum(double[])} for the signed
+     *             sum this actually computes.
+     */
+    @Deprecated
     public static double oneNorm(double[] m) {
+        return sum(m);
+    }
+
+    /**
+     * The signed sum {@code sum m_i}.
+     *
+     * @param m
+     *            The array
+     * @return the sum of the elements, {@code 0.0} for an empty array
+     * @since 1.5.2
+     */
+    public static double sum(double[] m) {
         double ret = 0.0;
         for (int i = 0; i < m.length; i++) {
             ret += m[i];
@@ -103,14 +219,16 @@ public final class VectorOps {
         return ret;
     }
 
+    /**
+     * The maximum norm {@code max |m_i|}.
+     *
+     * @param m
+     *            The array
+     * @return the maximum norm, {@code 0.0} for an empty array,
+     *         {@code Double.NaN} if any element is {@code NaN}
+     */
     public static double infinityNorm(double[] m) {
-        double ret = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < m.length; i++) {
-            if (Math.abs(m[i]) > ret) {
-                ret = Math.abs(m[i]);
-            }
-        }
-        return ret;
+        return maxAbs(m);
     }
 
     public static double absNormalize(double[] m) {

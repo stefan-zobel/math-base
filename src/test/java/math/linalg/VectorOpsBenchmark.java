@@ -89,4 +89,34 @@ public class VectorOpsBenchmark {
     public void benchmarkPlusEqualsWithFactor() {
         VectorOps.plusEquals(arrayC, arrayD, 2.0);
     }
+
+    @Benchmark
+    public double benchmarkTwoNorm() {
+        return VectorOps.twoNorm(arrayA);
+    }
+
+    /**
+     * The single-pass loop {@code twoNorm} used to be, kept here as the
+     * baseline the second pass is paid against. It overflows above about
+     * {@code 8.4e152} and underflows below about {@code 1.1e-162}, which is
+     * why it is no longer what {@code twoNorm} does.
+     * <p>
+     * On Java 8 this is the exact comparison, both sides scalar. On Java 25 it
+     * is not, because {@code twoNorm} is vectorized there and this loop is
+     * not; read the cost of the second pass off {@link #benchmarkInfinityNorm}
+     * instead, which is that first pass on its own.
+     */
+    @Benchmark
+    public double benchmarkTwoNormSinglePass() {
+        double sum = 0.0;
+        for (int i = 0; i < arrayA.length; i++) {
+            sum += arrayA[i] * arrayA[i];
+        }
+        return Math.sqrt(sum);
+    }
+
+    @Benchmark
+    public double benchmarkInfinityNorm() {
+        return VectorOps.infinityNorm(arrayA);
+    }
 }
