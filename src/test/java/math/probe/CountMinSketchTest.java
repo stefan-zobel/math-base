@@ -42,4 +42,62 @@ public class CountMinSketchTest {
             System.out.println(user + " -> " + cms.estimateCount(user));
         }
     }
+
+    /**
+     * Two sketches built with the same seed have to answer identically. Without
+     * a seed they do not: the hash functions are drawn afresh for every
+     * instance, so two runs of the same program report different estimates,
+     * which is right for an adversarial setting and unusable in a pipeline that
+     * has to reproduce its output.
+     */
+    @Test
+    public void testTheSameSeedGivesTheSameAnswers() {
+        CountMinSketch<String> first = new CountMinSketch<>(4, 128, 10, 20260822L);
+        CountMinSketch<String> second = new CountMinSketch<>(4, 128, 10, 20260822L);
+        CountMinSketch<String> other = new CountMinSketch<>(4, 128, 10, 20260823L);
+
+        long lcg = 7L;
+        for (int i = 0; i < 20_000; i++) {
+            lcg = lcg * 6364136223846793005L + 1442695040888963407L;
+            String key = "k" + (int) (((lcg >>> 11) * 0x1.0p-53) * 500.0);
+            first.add(key);
+            second.add(key);
+            other.add(key);
+        }
+
+        boolean anyDifference = false;
+        for (int i = 0; i < 500; i++) {
+            String key = "k" + i;
+            assertEquals("key " + key, first.estimateCount(key), second.estimateCount(key));
+            anyDifference |= first.estimateCount(key) != other.estimateCount(key);
+        }
+        assertEquals(first.getTotalCount(), second.getTotalCount());
+        assertEquals(first.getTopK(), second.getTopK());
+        assertTrue("a different seed must give at least one different estimate", anyDifference);
+    }
+
+    /** Whatever the seed, the sketch may overcount and may never undercount. */
+    @Test
+    public void testItNeverUndercounts() {
+        CountMinSketch<String> cms = new CountMinSketch<>(3, 64, 5, 99L);
+        java.util.HashMap<String, Integer> exact = new java.util.HashMap<>();
+
+        long lcg = 11L;
+        for (int i = 0; i < 5_000; i++) {
+            lcg = lcg * 6364136223846793005L + 1442695040888963407L;
+            String key = "k" + (int) (((lcg >>> 11) * 0x1.0p-53) * 300.0);
+            cms.add(key);
+            Integer had = exact.get(key);
+            exact.put(key, Integer.valueOf(had == null ? 1 : had.intValue() + 1));
+        }
+
+        long worstOver = 0L;
+        for (java.util.Map.Entry<String, Integer> entry : exact.entrySet()) {
+            long estimate = cms.estimateCount(entry.getKey());
+            assertTrue(entry.getKey() + " was undercounted", estimate >= entry.getValue().intValue());
+            worstOver = Math.max(worstOver, estimate - entry.getValue().intValue());
+        }
+        assertTrue("a narrow sketch on 300 keys has to collide somewhere", worstOver > 0L);
+        assertEquals(5_000L, cms.getTotalCount());
+    }
 }

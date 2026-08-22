@@ -23,6 +23,7 @@ import java.util.PriorityQueue;
 
 import math.rng.BitMix;
 import math.rng.Seed;
+import math.rng.SplitMix64;
 import math.rng.SplitMix64Seed;
 
 /**
@@ -64,13 +65,40 @@ public final class CountMinSketch<T> {
      *            the number of top elements to keep statistics for
      */
     public CountMinSketch(int depth, int width, int topK) {
+        this(depth, width, topK, SplitMix64Seed.seed());
+    }
+
+    /**
+     * Creates a sketch whose hash functions are derived from {@code seed}, so
+     * that two sketches built with the same seed answer identically.
+     * <p>
+     * The constructors above take a fresh random seed for every instance, which
+     * is the right default -- it is what keeps an adversary from choosing keys
+     * that collide. It also means that two runs of the same program report
+     * different estimates, which a pipeline that has to reproduce its output
+     * cannot use, and which no test can pin down. Pass a seed when the answer
+     * has to be repeatable, exactly as {@code Bootstrap}, {@code TruncatedPCA}
+     * and {@code Lasso.cv} allow.
+     *
+     * @param depth
+     *            Number of hash functions (rows)
+     * @param width
+     *            Size of the counter arrays (columns)
+     * @param topK
+     *            the number of top elements to keep statistics for
+     * @param seed
+     *            the seed the hash functions are derived from
+     * @since 1.5.2
+     */
+    public CountMinSketch(int depth, int width, int topK, long seed) {
         this.rows = depth;
         this.cols = width;
         this.k = topK;
         this.table = new long[checkArrayLength(depth, width)];
         this.hashSeeds = new long[depth];
+        SplitMix64 rng = new SplitMix64(seed);
         for (int i = 0; i < depth; ++i) {
-            hashSeeds[i] = SplitMix64Seed.seed();
+            hashSeeds[i] = rng.nextLong();
         }
         // the heap stores the keys ordered by their estimated frequency
         this.minHeap = new PriorityQueue<>(Comparator.comparingLong(this::estimateCount));
