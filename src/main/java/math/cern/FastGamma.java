@@ -72,7 +72,7 @@ public final class FastGamma {
         }
 
         final double r = 1.0 / (x * x);
-        double g = c1 + r * (c2 + r * (c3 + r * (c4 + r * (c5 + r + c6))));
+        double g = c1 + r * (c2 + r * (c3 + r * (c4 + r * (c5 + r * c6))));
         g = (x - 0.5) * Math.log(x) - x + c0 + g / x;
         if (z == 1.0) {
             return g;
