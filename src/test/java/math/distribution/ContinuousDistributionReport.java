@@ -154,32 +154,65 @@ public final class ContinuousDistributionReport {
         System.out.println("  a coarse step when the window has to run to a million to hold a heavy tail.");
 
         System.out.println();
-        System.out.println("=== depth against cost, on a density with nothing wrong with it");
-        System.out.println("    the second moment of a chi square on thirty degrees of freedom, over [0, 500]");
+        System.out.println("=== tolerance and depth against cost, on a density with nothing wrong with it");
+        System.out.println("    the second moment of a chi square on thirty degrees of freedom, over [0, 500],");
+        System.out.println("    whose exact value is 60. Digits first, evaluations under them.");
         final ContinuousDistribution chi = new ChiSquare(30.0);
-        System.out.println(String.format(L, "  %-10s %10s %18s", "maxDepth", "digits", "evaluations"));
+        final long[] calls = new long[1];
+        DFunction integrand = new DFunction() {
+            @Override
+            public double apply(double x) {
+                calls[0]++;
+                double c = x - 30.0;
+                return c * c * chi.pdf(x);
+            }
+        };
+        double[] tolerances = { 1.0e-10, 1.0e-12, 1.0e-13 };
         int[] depths = { 14, 18, 22, 26 };
-        for (int i = 0; i < depths.length; ++i) {
-            final long[] calls = new long[1];
-            double got = AdaptiveGaussKronrod.integrate1DAdaptive(G7_K15.POINTS_15, new DFunction() {
-                @Override
-                public double apply(double x) {
-                    calls[0]++;
-                    double c = x - 30.0;
-                    return c * c * chi.pdf(x);
-                }
-            }, 0.0, 500.0, 1.0e-13, depths[i]);
-            System.out.println(String.format(L, "  %-10d %10.1f %18d", Integer.valueOf(depths[i]),
-                    Double.valueOf(ContinuousDistributionTest.relDigits(got, chi.variance())),
-                    Long.valueOf(calls[0])));
+        System.out.print(String.format(L, "  %-12s", "tolerance"));
+        for (int j = 0; j < depths.length; ++j) {
+            System.out.print(String.format(L, " %18s", "depth " + depths[j]));
         }
         System.out.println();
-        System.out.println("  The same value, for as much work as one cares to spend. The error target is");
-        System.out.println("  halved at every level, so it is divided evenly over the panels wherever they");
-        System.out.println("  fall; panels that carry real mass cannot meet a share that small, and the rule");
-        System.out.println("  bisects the whole support down to the limit. Raising the tolerance does not");
-        System.out.println("  help, because both tolerances tried are equally out of reach. The cure is a");
-        System.out.println("  window drawn tightly around the mass, not a deeper recursion.");
+        for (int i = 0; i < tolerances.length; ++i) {
+            StringBuilder digits = new StringBuilder(String.format(L, "  %-12.0e", Double.valueOf(tolerances[i])));
+            StringBuilder cost = new StringBuilder(String.format(L, "  %-12s", ""));
+            for (int j = 0; j < depths.length; ++j) {
+                calls[0] = 0;
+                double got = AdaptiveGaussKronrod.integrate1DAdaptive(G7_K15.POINTS_15, integrand, 0.0, 500.0,
+                        tolerances[i], depths[j]);
+                digits.append(String.format(L, " %18.1f",
+                        Double.valueOf(ContinuousDistributionTest.relDigits(got, chi.variance()))));
+                cost.append(String.format(L, " %18d", Long.valueOf(calls[0])));
+            }
+            System.out.println(digits);
+            System.out.println(cost);
+        }
+        System.out.println();
+        System.out.println("  The accuracy is the same everywhere in that grid. The cost is not, and the");
+        System.out.println("  tolerance decides it: between 1e-12 and 1e-13 the work jumps by a factor of");
+        System.out.println("  twenty-four, and only past that edge does maxDepth start to matter at all.");
+        System.out.println();
+        System.out.println("  A panel is accepted when |K - G| falls under its share of the budget, and the");
+        System.out.println("  budget is halved at every level. Once a panel is small enough for the integrand");
+        System.out.println("  to look like a polynomial on it -- around the seventh level here -- |K - G| is");
+        System.out.println("  no longer approximation error but round-off, and round-off is proportional to");
+        System.out.println("  what the panel holds. Halving the panel halves what it holds and halves its");
+        System.out.println("  share of the budget in the same breath, so the ratio between them is frozen:");
+        System.out.println("  measured on the panel over the peak it sits between 2 and 20 from the seventh");
+        System.out.println("  level to the twenty-fourth and never trends downwards. If that ratio is above");
+        System.out.println("  one, no amount of depth will ever bring it under, and the rule bisects to the");
+        System.out.println("  limit; if it is below one, the panel is accepted immediately and depth costs");
+        System.out.println("  nothing. Which side it falls on is fixed by the tolerance against the size of");
+        System.out.println("  the integral, and not by maxDepth at all.");
+        System.out.println();
+        System.out.println("  Here 1e-13 on an integral of 60 asks for about seven units in the last place,");
+        System.out.println("  and the panels over the peak carry some fifteen times an average panel's share");
+        System.out.println("  of the mass, so their round-off lands a few times above what they are allowed.");
+        System.out.println("  Ask for 1e-12 and the same 14.7 digits arrive in 750 evaluations. The number to");
+        System.out.println("  take away is that a tolerance below roughly 1e-14 times the value of the");
+        System.out.println("  integral cannot be met by double arithmetic, and asking for it anyway buys");
+        System.out.println("  nothing while costing everything.");
 
         System.out.println();
         System.out.println("=== what this says");

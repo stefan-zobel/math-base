@@ -22,11 +22,17 @@ import math.solve.RootFinder;
  * identities that nothing in this repository checked before: the two packages
  * had no relationship at all.
  * <p>
- * <b>Why this is not a distribution checking itself.</b> For eight of the
+ * <b>Why this is not a distribution checking itself.</b> For seven of the
  * eleven the distribution function routes through the Colt ports in
- * {@code math.cern} while the density is an elementary closed form written in
- * the class itself. Integrating the one and comparing it against the other puts
- * two different pieces of code on the two sides.
+ * {@code math.cern} -- {@code Normal}, {@code Beta}, {@code Gamma},
+ * {@code LogNormal}, {@code StudentT}, and {@code ChiSquare} and
+ * {@code FisherF} by delegation -- while the density is an elementary closed
+ * form written in the class itself. Integrating the one and comparing it
+ * against the other puts two different pieces of code on the two sides. The
+ * other four -- {@code Weibull}, {@code Cauchy}, {@code Uniform},
+ * {@code Exponential} -- are elementary on both sides and in the same file, so
+ * there this checks the relationship between density and distribution function
+ * rather than two independent implementations of it.
  * <p>
  * <b>The floors were measured, not chosen.</b> Each row carries what this
  * library achieved when the sweep was written, rounded down by roughly half a
@@ -617,25 +623,120 @@ public class ContinuousDistributionTest {
      * The doubly infinite substitution {@code x = t / (1 - t^2)} maps the line
      * onto {@code [-1, 1]} and pushes mass far from the origin into a spike
      * against the endpoints. Whether the subdivision finds that spike turns on
-     * how heavy the tail is, not on the distance alone: a Cauchy centered at a
-     * thousand is integrated exactly, a normal centred at a hundred returns
-     * zero, and so does a normal of scale ten centered at three hundred. The
-     * failure is silent, with no exception and no estimate to consult, which is
-     * why it is worth a test that states where the method may be trusted.
+     * how heavy the tail is and on how far the mass sits measured in its own
+     * width, not on the distance alone: a Cauchy centered at a thousand is
+     * integrated exactly, a normal of unit width at a hundred is not.
+     * <p>
+     * What it must never do is return the near-zero quietly, and it no longer
+     * does: it refuses, and names the place it should have looked.
      */
     @Test
-    public void theDoublyInfiniteRouteHoldsForHeavyTailsAndFailsForThinOnesFarOut() {
+    public void theDoublyInfiniteRouteHoldsForHeavyTailsAndRefusesThinOnesFarOut() {
         assertEquals("a Cauchy is integrated wherever it sits", 1.0, wholeLine(new Cauchy(1000.0, 1.0)), 1.0e-8);
         assertEquals("so is a Student t", 1.0, wholeLine(new StudentT(3.0)), 1.0e-9);
         assertEquals("a normal at the origin is fine", 1.0, wholeLine(new Normal(0.0, 1.0)), 1.0e-9);
         assertEquals("and still fine at thirty", 1.0, wholeLine(new Normal(30.0, 1.0)), 1.0e-9);
-        assertTrue("but at a hundred essentially all of the mass is lost", wholeLine(new Normal(100.0, 1.0)) < 1.0e-50);
         assertEquals("scale delays it rather than preventing it", 1.0, wholeLine(new Normal(100.0, 10.0)), 1.0e-9);
-        assertTrue("and at three hundred that one is lost too", wholeLine(new Normal(300.0, 10.0)) < 1.0e-50);
+
+        refused(new Normal(100.0, 1.0), 100.0);
+        refused(new Normal(137.0, 1.0), 137.0);
+        refused(new Normal(300.0, 10.0), 300.0);
+        refused(new Normal(-300.0, 1.0), -300.0);
+    }
+
+    /**
+     * The refusal has to name where the mass is, and the remedy it proposes has
+     * to work: splitting the line at the reported place recovers the integral
+     * exactly. A message that cannot be acted on is only a louder silence.
+     */
+    private static void refused(ContinuousDistribution d, double where) {
+        try {
+            wholeLine(d);
+            org.junit.Assert.fail("the substitution missed " + d + " and should have refused");
+        } catch (ArithmeticException expected) {
+            String message = expected.getMessage();
+            assertTrue("the refusal must say what went wrong: " + message,
+                    message.contains("never sampled the integrand where its mass lies"));
+
+            double reported = Double.parseDouble(message.substring(message.indexOf("|f(") + 3,
+                    message.indexOf(")|")));
+            assertEquals("the refusal must point at the mass", where, reported, 0.1 * Math.abs(where));
+
+            double lower = InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(d),
+                    Double.NEGATIVE_INFINITY, reported, TOL);
+            double upper = InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(d), reported,
+                    Double.POSITIVE_INFINITY, TOL);
+            assertEquals("splitting where the refusal points must recover the integral", 1.0, lower + upper,
+                    1.0e-9);
+        }
+    }
+
+    /**
+     * The other half of a check like this, and the half that decides whether it
+     * is worth having: it must not cry wolf. An integral that is genuinely zero
+     * by cancellation, an integrand that is zero everywhere, one that is merely
+     * very small, and heavy tails all have to pass untouched.
+     */
+    @Test
+    public void theRefusalDoesNotFireOnIntegralsThatAreHonestlySmall() {
+        final Normal standard = new Normal(0.0, 1.0);
+        assertEquals("an odd integrand cancels to zero and is sampled where it is large", 0.0,
+                wholeLine(new DFunction() {
+                    @Override
+                    public double apply(double x) {
+                        return x * standard.pdf(x);
+                    }
+                }), 1.0e-12);
+        assertEquals("the zero function integrates to zero", 0.0, wholeLine(new DFunction() {
+            @Override
+            public double apply(double x) {
+                return 0.0;
+            }
+        }), 0.0);
+        assertEquals("a genuinely tiny integral is not a missed one", 1.0e-200, wholeLine(new DFunction() {
+            @Override
+            public double apply(double x) {
+                return 1.0e-200 * standard.pdf(x);
+            }
+        }), 1.0e-208);
+        assertEquals("heavy tails are fine", Math.PI, wholeLine(new DFunction() {
+            @Override
+            public double apply(double x) {
+                return 1.0 / (1.0 + x * x);
+            }
+        }), 1.0e-9);
+        assertEquals("and so is a slowly decaying one", 2.0, wholeLine(new DFunction() {
+            @Override
+            public double apply(double x) {
+                return Math.exp(-Math.abs(x));
+            }
+        }), 1.0e-9);
+    }
+
+    /**
+     * The one-sided forms share the fault and share the refusal: mass far from
+     * the finite end is missed the same way.
+     */
+    @Test
+    public void theOneSidedFormsRefuseTheSameWay() {
+        Normal far = new Normal(300.0, 1.0);
+        try {
+            InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(far), 0.0,
+                    Double.POSITIVE_INFINITY, TOL);
+            org.junit.Assert.fail("the one-sided substitution missed the mass and should have refused");
+        } catch (ArithmeticException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("0.00000"));
+        }
+        assertEquals("cutting close to the mass is all it takes", 1.0, InfiniteIntegrator.integrate1DInfinite(
+                G7_K15.POINTS_15, density(far), 290.0, Double.POSITIVE_INFINITY, TOL), 1.0e-9);
     }
 
     private static double wholeLine(ContinuousDistribution d) {
-        return InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(d), Double.NEGATIVE_INFINITY,
+        return wholeLine(density(d));
+    }
+
+    private static double wholeLine(DFunction f) {
+        return InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, f, Double.NEGATIVE_INFINITY,
                 Double.POSITIVE_INFINITY, TOL);
     }
 

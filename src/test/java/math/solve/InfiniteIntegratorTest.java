@@ -3,6 +3,8 @@ package math.solve;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import math.fun.DFunction;
 import math.fun.DBiFunction;
@@ -208,5 +210,161 @@ public class InfiniteIntegratorTest {
 
         assertEquals("3D mixed infinite/finite bounds (CASE B x CASE A x CASE B) failed",
                      exactValue, result, SPATIAL_TOLERANCE);
+    }
+
+    // =========================================================================
+    // THE GUARD AGAINST A SUBSTITUTION THAT MISSED THE INTEGRAND
+    // =========================================================================
+
+    /** A unit-height Gaussian blob centered at (cx, cy), of total mass one. */
+    private static DBiFunction blob2D(final double cx, final double cy, final double sigma) {
+        return (x, y) -> {
+            double dx = (x - cx) / sigma;
+            double dy = (y - cy) / sigma;
+            return Math.exp(-0.5 * (dx * dx + dy * dy)) / (2.0 * Math.PI * sigma * sigma);
+        };
+    }
+
+    /** The same in three dimensions, centered on the diagonal. */
+    private static DTriFunction blob3D(final double c, final double sigma) {
+        return (x, y, z) -> {
+            double dx = (x - c) / sigma;
+            double dy = (y - c) / sigma;
+            double dz = (z - c) / sigma;
+            double norm = Math.pow(2.0 * Math.PI, 1.5) * sigma * sigma * sigma;
+            return Math.exp(-0.5 * (dx * dx + dy * dy + dz * dz)) / norm;
+        };
+    }
+
+    private static double wholePlane(DBiFunction f) {
+        return InfiniteIntegrator.integrate2DInfinite(ruleSetup, f, Double.NEGATIVE_INFINITY,
+                Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 1.0e-13);
+    }
+
+    private static double wholeSpace(DTriFunction f) {
+        return InfiniteIntegrator.integrate3DInfinite(ruleSetup, f, Double.NEGATIVE_INFINITY,
+                Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 1.0e-13);
+    }
+
+    /** The point a refusal names, taken back out of its message. */
+    private static double[] namedPoint(String message) {
+        int open = message.indexOf("|f(");
+        int close;
+        if (open >= 0) {
+            open += 3;
+            close = message.indexOf(")|", open);
+        } else {
+            open = message.indexOf("splitting at (") + "splitting at (".length();
+            close = message.indexOf(")", open);
+        }
+        String[] parts = message.substring(open, close).split(",");
+        double[] point = new double[parts.length];
+        for (int i = 0; i < parts.length; ++i) {
+            point[i] = Double.parseDouble(parts[i].trim());
+        }
+        return point;
+    }
+
+    /**
+     * Mass far from the origin arrives as a spike against the edge of the
+     * transformed square and the subdivision never resolves it. The result used
+     * to come back as a plausible-looking near-zero; it is now refused, and the
+     * refusal names the place. Splitting the plane there has to recover the
+     * integral, or the advice would be worthless.
+     */
+    @Test
+    public void the2DFormRefusesMassItNeverSampled() {
+        double[][] centres = { { 100.0, 100.0 }, { 137.0, 42.0 }, { -200.0, 60.0 }, { 300.0, 40.0 } };
+        for (double[] centre : centres) {
+            DBiFunction f = blob2D(centre[0], centre[1], centre[1] == 40.0 ? 10.0 : 1.0);
+            String where = "blob at (" + centre[0] + ", " + centre[1] + ")";
+            try {
+                wholePlane(f);
+                fail(where + ": the substitution missed the mass and should have refused");
+            } catch (ArithmeticException expected) {
+                double[] named = namedPoint(expected.getMessage());
+                assertEquals(where + ": the refusal must point at the mass in x", centre[0], named[0],
+                        0.05 * Math.abs(centre[0]));
+                assertEquals(where + ": and in y", centre[1], named[1], 0.05 * Math.abs(centre[1]));
+
+                double split = 0.0;
+                for (int quadrant = 0; quadrant < 4; ++quadrant) {
+                    double lowX = ((quadrant & 1) == 0) ? named[0] : Double.NEGATIVE_INFINITY;
+                    double highX = ((quadrant & 1) == 0) ? Double.POSITIVE_INFINITY : named[0];
+                    double lowY = ((quadrant & 2) == 0) ? named[1] : Double.NEGATIVE_INFINITY;
+                    double highY = ((quadrant & 2) == 0) ? Double.POSITIVE_INFINITY : named[1];
+                    split += InfiniteIntegrator.integrate2DInfinite(ruleSetup, f, lowX, highX, lowY, highY,
+                            1.0e-13);
+                }
+                assertEquals(where + ": splitting where the refusal points must recover the integral", 1.0,
+                        split, 1.0e-6);
+            }
+        }
+    }
+
+    /**
+     * The harder half. At ten widths out the substitution does sample the mass,
+     * so no probe can tell that anything went wrong -- and the answer is still
+     * four parts in a thousand off. Splitting at the located peak is what
+     * exposes it.
+     */
+    @Test
+    public void the2DFormRefusesWhatItSampledButCouldNotResolve() {
+        try {
+            wholePlane(blob2D(10.0, 10.0, 1.0));
+            fail("the substitution resolved the blob badly and should have refused");
+        } catch (ArithmeticException expected) {
+            String message = expected.getMessage();
+            assertTrue("the refusal must distinguish this from a missed spike: " + message,
+                    message.contains("sampled the integrand but did not resolve it"));
+            double[] named = namedPoint(message);
+            assertEquals("it must still name the mass", 10.0, named[0], 0.5);
+            assertEquals("it must still name the mass", 10.0, named[1], 0.5);
+        }
+    }
+
+    /**
+     * The half that decides whether the guard is worth having: it must not cry
+     * wolf. An integral that cancels to zero, one that is zero everywhere, one
+     * that is merely very small, and heavy tails all have to pass untouched.
+     */
+    @Test
+    public void the2DGuardDoesNotCryWolf() {
+        assertEquals("a blob at the origin", 1.0, wholePlane(blob2D(0.0, 0.0, 1.0)), 1.0e-6);
+        assertEquals("a blob three widths out", 1.0, wholePlane(blob2D(3.0, 3.0, 1.0)), 1.0e-6);
+        assertEquals("an odd integrand cancels", 0.0, wholePlane((x, y) -> x * blob2D(0.0, 0.0, 1.0).apply(x, y)),
+                1.0e-9);
+        assertEquals("the zero function", 0.0, wholePlane((x, y) -> 0.0), 0.0);
+        assertEquals("a genuinely tiny integral", 1.0e-200,
+                wholePlane((x, y) -> 1.0e-200 * blob2D(0.0, 0.0, 1.0).apply(x, y)), 1.0e-205);
+        assertEquals("heavy tails on both axes", Math.PI * Math.PI,
+                wholePlane((x, y) -> 1.0 / ((1.0 + x * x) * (1.0 + y * y))), 1.0e-6);
+    }
+
+    /** The three dimensional form carries the same guard, and needs it sooner. */
+    @Test
+    public void the3DFormRefusesMassItCannotResolve() {
+        double[][] cases = { { 30.0, 1.0 }, { 100.0, 10.0 } };
+        for (double[] c : cases) {
+            try {
+                wholeSpace(blob3D(c[0], c[1]));
+                fail("blob3D(" + c[0] + ", " + c[1] + "): should have refused");
+            } catch (ArithmeticException expected) {
+                double[] named = namedPoint(expected.getMessage());
+                assertEquals("the refusal must point at the mass", c[0], named[0], 0.05 * c[0]);
+                assertEquals("on every axis", c[0], named[2], 0.05 * c[0]);
+            }
+        }
+    }
+
+    /** And it must leave the well behaved three dimensional cases alone. */
+    @Test
+    public void the3DGuardDoesNotCryWolf() {
+        assertEquals("a blob at the origin", 1.0, wholeSpace(blob3D(0.0, 1.0)), 1.0e-5);
+        assertEquals("a blob three widths out", 1.0, wholeSpace(blob3D(3.0, 1.0)), 1.0e-5);
+        assertEquals("the zero function", 0.0, wholeSpace((x, y, z) -> 0.0), 0.0);
+        assertEquals("an odd integrand cancels", 0.0,
+                wholeSpace((x, y, z) -> x * blob3D(0.0, 1.0).apply(x, y, z)), 1.0e-9);
     }
 }
