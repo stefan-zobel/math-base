@@ -79,6 +79,9 @@ public class LSSummary {
     // df for t-distribution
     private int degreesOfFreedom;
 
+    // condition number of the design the fit went through
+    private double conditionNumber;
+
     public LSSummary(double alpha, DMatrix designMatrix, DMatrix regressand) {
         this.alpha = alpha;
         this.designMatrix = designMatrix;
@@ -153,6 +156,28 @@ public class LSSummary {
         for (int i = 0; i < w.length; ++i) {
             weights.add(w[i]);
         }
+    }
+
+    /**
+     * Condition number {@code sigma[0] / sigma[p-1]} of the design the fit went
+     * through, which for a weighted fit is the row-scaled design
+     * {@code sqrt(W) X} rather than {@code X} itself.
+     * <p>
+     * It says how much of the answer to believe: an error of one part in
+     * {@code 1e16} in the data can move the coefficients by this many parts in
+     * {@code 1e16}, so a condition number of {@code 1e10} leaves roughly six
+     * digits. It is the number a caller needs beside a fit that was only
+     * reached by loosening the rank tolerance.
+     *
+     * @return the condition number of the design
+     * @since 1.5.2
+     */
+    public double getConditionNumber() {
+        return conditionNumber;
+    }
+
+    void setConditionNumber(double conditionNumber) {
+        this.conditionNumber = conditionNumber;
     }
 
     public double getRSquared() {
@@ -239,6 +264,7 @@ public class LSSummary {
     public String toString() {
         return "Summary [alpha=" + alpha + ", numCoefficients=" + getCoefficientsCount() + ",\n coefficients="
                 + coefficients + ",\n yBar=" + yBar + ", rSquared=" + rSquared + ", sigmaHatSquared=" + sigmaHatSquared
+                + ", conditionNumber=" + conditionNumber
                 + ",\n varCovMatrix=" + varCovMatrix + ", coefficientStandardErrors=" + coefficientStandardErrors
                 + ",\n pValues=" + pValues + ",\n confidenceIntervals=" + confidenceIntervals + ",\n degreesOfFreedom="
                 + degreesOfFreedom + "]";

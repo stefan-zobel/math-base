@@ -183,6 +183,59 @@ public class SvdLeastSquaresTest {
         assertEquals("the fourth singular value must be the negligible one", 3, at);
     }
 
+    /**
+     * The tolerance is a fraction of the largest singular value, so the verdict
+     * is scale free, and the one-argument form is the two-argument form at the
+     * customary tolerance rather than a second rule.
+     */
+    @Test
+    public void theRankCriterionIsRelativeAndLivesInOnePlace() {
+        int n = 20;
+        double[] a = design(n, 2, 53L);
+        FlatParallelJacobiSVD.Result svd = new FlatParallelJacobiSVD().decompose(a.clone(), n, 3);
+
+        assertEquals("the two forms are one rule", SvdLeastSquares.rankDeficientAt(svd),
+                SvdLeastSquares.rankDeficientAt(svd, SvdLeastSquares.defaultRankTolerance(svd)));
+        assertEquals("max(m, n) * eps", Math.max(n, 3) * 1.11022302462515654042e-16,
+                SvdLeastSquares.defaultRankTolerance(svd), 0.0);
+
+        // scaling the matrix moves every singular value by the same factor, so
+        // neither the verdict nor the condition number can move
+        double[] scaled = a.clone();
+        for (int i = 0; i < scaled.length; ++i) {
+            scaled[i] *= 1024.0;
+        }
+        FlatParallelJacobiSVD.Result big = new FlatParallelJacobiSVD().decompose(scaled, n, 3);
+        assertEquals(-1, SvdLeastSquares.rankDeficientAt(big));
+        assertEquals(SvdLeastSquares.conditionNumber(svd), SvdLeastSquares.conditionNumber(big),
+                1.0e-12 * SvdLeastSquares.conditionNumber(svd));
+
+        // a tolerance above the smallest relative singular value rejects, one
+        // below it accepts, and the turning point is where the arithmetic says
+        double smallestRelative = svd.sigma[2] / svd.sigma[0];
+        assertEquals(2, SvdLeastSquares.rankDeficientAt(svd, 0.5 * (smallestRelative + 1.0)));
+        assertEquals(-1, SvdLeastSquares.rankDeficientAt(svd, 0.5 * smallestRelative));
+        assertEquals("a tolerance of zero accepts anything that is not exactly singular", -1,
+                SvdLeastSquares.rankDeficientAt(svd, 0.0));
+    }
+
+    /** The condition number is the ratio the decomposition already carries. */
+    @Test
+    public void theConditionNumberIsTheRatioOfTheExtremeSingularValues() {
+        int n = 20;
+        double[] a = design(n, 2, 59L);
+        FlatParallelJacobiSVD.Result svd = new FlatParallelJacobiSVD().decompose(a.clone(), n, 3);
+        assertEquals(svd.sigma[0] / svd.sigma[2], SvdLeastSquares.conditionNumber(svd), 0.0);
+        assertTrue("a condition number is never below one", SvdLeastSquares.conditionNumber(svd) >= 1.0);
+
+        double[] repeated = new double[n * 4];
+        System.arraycopy(a, 0, repeated, 0, n * 3);
+        System.arraycopy(a, n, repeated, n * 3, n);
+        FlatParallelJacobiSVD.Result deficient = new FlatParallelJacobiSVD().decompose(repeated, n, 4);
+        assertTrue("an exactly singular design has no finite condition number",
+                SvdLeastSquares.conditionNumber(deficient) > 1.0e15);
+    }
+
     /** Where the ordinary solve is unbounded, the truncated one stays finite. */
     @Test
     public void truncationSurvivesARankDeficientDesign() {
@@ -249,6 +302,28 @@ public class SvdLeastSquaresTest {
             fail("expected IllegalArgumentException for a negative penalty");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage(), expected.getMessage().contains("lambda"));
+        }
+        try {
+            SvdLeastSquares.conditionNumber(null);
+            fail("expected IllegalArgumentException for a null decomposition");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("svd"));
+        }
+        try {
+            SvdLeastSquares.defaultRankTolerance(null);
+            fail("expected IllegalArgumentException for a null decomposition");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("svd"));
+        }
+        // the tolerance is a fraction of the largest singular value
+        double[] rejected = { -1.0e-16, -1.0, 1.0, 2.0, Double.NaN, Double.POSITIVE_INFINITY };
+        for (int i = 0; i < rejected.length; ++i) {
+            try {
+                SvdLeastSquares.rankDeficientAt(svd, rejected[i]);
+                fail("expected IllegalArgumentException for a tolerance of " + rejected[i]);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().contains("[0, 1)"));
+            }
         }
     }
 

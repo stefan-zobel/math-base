@@ -561,6 +561,46 @@ public class WlsTest {
         }
     }
 
+    /**
+     * The same code path as the four-argument form, and the tolerance applies
+     * to the scaled design {@code sqrt(W) X} rather than to {@code X}, which is
+     * the matrix the fit goes through and the one the weights make worse.
+     */
+    @Test
+    public void testTheRankToleranceOverloadChangesNothingAtTheDefault() {
+        Lcg rng = new Lcg(733L);
+        DMatrix X = design(30, 3, rng);
+        DMatrix y = response(X, new double[] { 1.0, -2.0, 0.5 }, 0.1, rng);
+        double[] w = new double[30];
+        for (int i = 0; i < w.length; i++) {
+            w[i] = 1.0 + i;
+        }
+
+        LSSummary a = Wls.estimate(ALPHA, X, y, w);
+        LSSummary b = Wls.estimate(ALPHA, X, y, w, OLS.defaultRankTolerance(X));
+        for (int j = 0; j < X.numColumns(); j++) {
+            assertEquals("beta " + j, a.getBeta().get(j), b.getBeta().get(j), 0.0);
+            assertEquals("standard error " + j, a.getCoefficientStandardErrors().get(j),
+                    b.getCoefficientStandardErrors().get(j), 0.0);
+        }
+        assertEquals(a.getRSquared(), b.getRSquared(), 0.0);
+        assertEquals(a.getConditionNumber(), b.getConditionNumber(), 0.0);
+
+        // and it is the conditioning of the scaled design that is reported:
+        // weights this spread cannot leave it where the unweighted one was
+        double unweighted = OLS.estimate(ALPHA, X, y).getConditionNumber();
+        assertTrue("the weights left the conditioning untouched, which they cannot have",
+                Math.abs(a.getConditionNumber() - unweighted) > 1.0e-6 * unweighted);
+
+        assertTrue("the scaled design is not conditioned as this test assumes", a.getConditionNumber() > 2.0);
+        try {
+            Wls.estimate(ALPHA, X, y, w, 0.5);
+            fail("a tolerance above the smallest relative singular value has to refuse");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("rank deficient"));
+        }
+    }
+
     @Test
     public void testTheInheritedChecksStillFire() {
         Lcg rng = new Lcg(6L);

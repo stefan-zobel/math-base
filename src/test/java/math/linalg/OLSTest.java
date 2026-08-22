@@ -177,6 +177,99 @@ public class OLSTest {
         }
     }
 
+    /**
+     * The overload that takes the tolerance is the same code path as the one
+     * that does not: at the tolerance the default uses, every number in the
+     * summary comes back with the same bits.
+     */
+    @Test
+    public void testTheRankToleranceOverloadChangesNothingAtTheDefault() {
+        Lcg rng = new Lcg(97L);
+        DMatrix X = design(40, 4, rng);
+        DMatrix y = response(X, new double[] { 2.0, -1.0, 0.5, 3.0 }, 0.1, rng);
+
+        LSSummary a = OLS.estimate(ALPHA, X, y);
+        LSSummary b = OLS.estimate(ALPHA, X, y, OLS.defaultRankTolerance(X));
+        for (int j = 0; j < X.numColumns(); j++) {
+            assertEquals("beta " + j, a.getBeta().get(j), b.getBeta().get(j), 0.0);
+            assertEquals("standard error " + j, a.getCoefficientStandardErrors().get(j),
+                    b.getCoefficientStandardErrors().get(j), 0.0);
+            assertEquals("t value " + j, a.getTValues().get(j), b.getTValues().get(j), 0.0);
+            assertEquals("p value " + j, a.getPValues().get(j), b.getPValues().get(j), 0.0);
+        }
+        assertEquals(a.getRSquared(), b.getRSquared(), 0.0);
+        assertEquals(a.getSigmaHatSquared(), b.getSigmaHatSquared(), 0.0);
+        assertEquals(a.getConditionNumber(), b.getConditionNumber(), 0.0);
+    }
+
+    /**
+     * The knob turns both ways. A tolerance far above the design's smallest
+     * relative singular value refuses a design the default accepts, which is
+     * what says the number is being used rather than ignored.
+     */
+    @Test
+    public void testALooseRankToleranceRefusesAnOtherwiseUsableDesign() {
+        Lcg rng = new Lcg(23L);
+        DMatrix X = design(40, 4, rng);
+        DMatrix y = response(X, new double[] { 1.0, 1.0, 1.0, 1.0 }, 0.1, rng);
+
+        LSSummary fit = OLS.estimate(ALPHA, X, y);
+        double smallestRelative = 1.0 / fit.getConditionNumber();
+        assertTrue("this design is supposed to be well conditioned", smallestRelative > 1.0e-6);
+        assertTrue("and its smallest relative singular value below the tolerance used here",
+                smallestRelative < 0.5);
+
+        try {
+            OLS.estimate(ALPHA, X, y, 0.5);
+            fail("a tolerance above the smallest relative singular value has to refuse");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("rank deficient"));
+        }
+    }
+
+    /**
+     * And a tolerance of zero, the loosest there is, still refuses a design
+     * that is exactly singular -- there is no answer to reach there, and the
+     * message says so rather than pointing at a tolerance that would help.
+     */
+    @Test
+    public void testZeroRankToleranceStillRefusesADuplicatedColumn() {
+        Lcg rng = new Lcg(51L);
+        DMatrix X = new DMatrix(30, 3);
+        DMatrix y = new DMatrix(30, 1);
+        for (int i = 0; i < 30; i++) {
+            double x = rng.next();
+            X.set(i, 0, 1.0);
+            X.set(i, 1, x);
+            X.set(i, 2, x);
+            y.set(i, 0, 1.0 + x);
+        }
+
+        try {
+            OLS.estimate(ALPHA, X, y, 0.0);
+            fail("an exactly singular design has to be rejected at any tolerance");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("exactly singular"));
+        }
+    }
+
+    /** The condition number the summary reports is the one the design has. */
+    @Test
+    public void testTheSummaryReportsTheConditionNumberOfTheDesign() {
+        Lcg rng = new Lcg(1009L);
+        DMatrix X = design(50, 5, rng);
+        DMatrix y = response(X, new double[] { 1.0, 2.0, 3.0, 4.0, 5.0 }, 0.05, rng);
+
+        FlatParallelJacobiSVD.Result svd = new FlatParallelJacobiSVD().decompose(X.copy().getArrayUnsafe(),
+                X.numRows(), X.numColumns());
+        double expected = svd.sigma[0] / svd.sigma[X.numColumns() - 1];
+        assertEquals(expected, OLS.estimate(ALPHA, X, y).getConditionNumber(), 0.0);
+
+        // scaling the whole design leaves the conditioning where it was
+        DMatrix scaled = X.copy().scaleInplace(1.0e6);
+        assertEquals(expected, OLS.estimate(ALPHA, scaled, y).getConditionNumber(), 1.0e-9 * expected);
+    }
+
     @Test
     public void testPValueDoesNotCancelToZero() {
         // Written as 2 * (1 - cdf(|t|)) the p value underflows to exactly 0.0

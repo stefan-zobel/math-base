@@ -60,10 +60,48 @@ public final class Wls {
      * @return the summary of the fit
      * @throws IllegalArgumentException
      *             if the dimensions do not match, if {@code alpha} is outside
-     *             {@code (0, 1)}, if there are not more rows than columns, or
-     *             if a weight is missing, not finite or not positive
+     *             {@code (0, 1)}, if there are not more rows than columns, if a
+     *             weight is missing, not finite or not positive, or if the
+     *             scaled design is rank deficient at the customary tolerance
      */
     public static LSSummary estimate(double alpha, DMatrix X, DMatrix y, double[] weights) {
+        return estimate(alpha, X, y, weights, OLS.defaultRankTolerance(X));
+    }
+
+    /**
+     * Fits {@code y} on {@code X} under the given weights, deciding for itself
+     * what counts as rank deficient.
+     * <p>
+     * The tolerance applies to the singular values of the <em>scaled</em>
+     * design {@code sqrt(W) X}, which is the matrix the fit goes through and
+     * the one whose conditioning the weights drive up. See
+     * {@link OLS#estimate(double, DMatrix, DMatrix, double)} for what the
+     * tolerance means and what taking it into one's own hands implies.
+     *
+     * @param alpha
+     *            significance level for the confidence intervals, strictly
+     *            between 0 and 1
+     * @param X
+     *            the design matrix, {@code n x p} with {@code n > p}
+     * @param y
+     *            the regressand, {@code n x 1}
+     * @param weights
+     *            one weight per observation, length {@code n}, each finite and
+     *            strictly positive
+     * @param rankTolerance
+     *            a singular value of {@code sqrt(W) X} at or below this
+     *            multiple of the largest one makes the design unusable; finite
+     *            and in {@code [0, 1)}
+     * @return the summary of the fit
+     * @throws IllegalArgumentException
+     *             if the dimensions do not match, if {@code alpha} is outside
+     *             {@code (0, 1)}, if there are not more rows than columns, if a
+     *             weight is missing, not finite or not positive, if
+     *             {@code rankTolerance} is outside {@code [0, 1)}, or if the
+     *             scaled design is rank deficient at {@code rankTolerance}
+     * @since 1.5.2
+     */
+    public static LSSummary estimate(double alpha, DMatrix X, DMatrix y, double[] weights, double rankTolerance) {
         if (X == null || y == null) {
             throw new IllegalArgumentException("null argument");
         }
@@ -89,7 +127,7 @@ public final class Wls {
                 throw new IllegalArgumentException("weights[" + i + "] is negative : " + w);
             }
         }
-        return LeastSquaresFit.estimate(alpha, X, y, weights);
+        return LeastSquaresFit.estimate(alpha, X, y, weights, rankTolerance);
     }
 
     private Wls() {

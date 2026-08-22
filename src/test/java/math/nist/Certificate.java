@@ -45,26 +45,30 @@ public final class Certificate {
                     set.parameters);
             double condition = svd.sigma[0] / svd.sigma[svd.n - 1];
 
+            // a design the default tolerance declines is fitted again with the
+            // tolerance in the caller's hands, and the row says which it was
+            LSSummary fit;
+            String marker;
             try {
-                LSSummary fit = OLS.estimate(0.05, matrix(set), column(set.response()));
-                double beta = Digits.worstOf(fit.getBeta().toArray(), set.certifiedBeta());
-                double sd = Digits.worstOf(fit.getCoefficientStandardErrors().toArray(),
-                        set.certifiedStandardDeviation());
-                double residual = Digits.of(Math.sqrt(fit.getSigmaHatSquared()), set.residualStandardDeviation);
-                double rSquared = Digits.of(fit.getRSquared(), set.rSquared);
+                fit = OLS.estimate(0.05, matrix(set), column(set.response()));
+                marker = "";
+            } catch (IllegalArgumentException refused) {
+                fit = OLS.estimate(0.05, matrix(set), column(set.response()), 0.0);
+                marker = " *";
+            }
+            double beta = Digits.worstOf(fit.getBeta().toArray(), set.certifiedBeta());
+            double sd = Digits.worstOf(fit.getCoefficientStandardErrors().toArray(),
+                    set.certifiedStandardDeviation());
+            double residual = Digits.of(Math.sqrt(fit.getSigmaHatSquared()), set.residualStandardDeviation);
+            double rSquared = Digits.of(fit.getRSquared(), set.rSquared);
 
-                System.out.println(String.format(L, "  %-10s %-10s %4d %4d %8.1f %8.1f %9.1f %8.1f %11.2e", set.name,
-                        set.difficulty, Integer.valueOf(set.observations), Integer.valueOf(set.parameters),
-                        Double.valueOf(beta), Double.valueOf(sd), Double.valueOf(residual),
-                        Double.valueOf(rSquared), Double.valueOf(condition)));
-                if (beta < worstLinear) {
-                    worstLinear = beta;
-                    worstLinearWhere = set.name + ", the parameters";
-                }
-            } catch (RuntimeException refused) {
-                System.out.println(String.format(L, "  %-10s %-10s %4d %4d %8s %8s %9s %8s %11.2e", set.name,
-                        set.difficulty, Integer.valueOf(set.observations), Integer.valueOf(set.parameters),
-                        "refused", "--", "--", "--", Double.valueOf(condition)));
+            System.out.println(String.format(L, "  %-10s %-10s %4d %4d %8.1f %8.1f %9.1f %8.1f %11.2e%s", set.name,
+                    set.difficulty, Integer.valueOf(set.observations), Integer.valueOf(set.parameters),
+                    Double.valueOf(beta), Double.valueOf(sd), Double.valueOf(residual), Double.valueOf(rSquared),
+                    Double.valueOf(condition), marker));
+            if (beta < worstLinear) {
+                worstLinear = beta;
+                worstLinearWhere = set.name + ", the parameters";
             }
         }
 
@@ -72,20 +76,22 @@ public final class Certificate {
         FlatParallelJacobiSVD.Result svd = new FlatParallelJacobiSVD().decompose(filip.design(), filip.observations,
                 filip.parameters);
         double[] direct = SvdLeastSquares.solve(svd, filip.response(), 0.0);
-        double tolerance = svd.sigma[0] * Math.max(filip.observations, filip.parameters) * 2.220446049250313e-16;
+        double tolerance = svd.sigma[0] * SvdLeastSquares.defaultRankTolerance(svd);
         double[] truncated = SvdLeastSquares.solveTruncated(svd, filip.response(), tolerance);
         System.out.println();
-        System.out.println("  Filip is the set that separates the packages, and it separates this one from");
-        System.out.println("  itself. OLS declines it: the smallest singular value falls under the rank");
-        System.out.println(String.format(L, "  criterion, %.2e against a tolerance of %.2e. Going straight to the",
+        System.out.println("  * Filip is the set that separates the packages, and it separates this one");
+        System.out.println("  from itself. The default rank criterion declines it: the smallest singular");
+        System.out.println(String.format(L, "  value is %.2e against a tolerance of %.2e, so the row above is",
                 Double.valueOf(svd.sigma[svd.n - 1]), Double.valueOf(tolerance)));
-        System.out.println(String.format(L,
-                "  decomposition instead reaches %.1f digits on all eleven coefficients, which is",
+        System.out.println("  the fit obtained by handing OLS a tolerance of zero -- accept anything that");
+        System.out.println("  is not exactly singular. Going straight to the decomposition reaches the");
+        System.out.println(String.format(L, "  same %.1f digits on all eleven coefficients, which is what double",
                 Double.valueOf(Digits.worstOf(direct, filip.certifiedBeta()))));
-        System.out.println("  what double precision has to give on a design conditioned like this. Asking");
-        System.out.println(String.format(L, "  for the truncated solution reaches %.1f: the tolerance discards the very",
+        System.out.println("  precision has to give on a design conditioned like this. The truncated");
+        System.out.println(String.format(L, "  solution reaches %.1f: that tolerance discards the very direction the",
                 Double.valueOf(Digits.worstOf(truncated, filip.certifiedBeta()))));
-        System.out.println("  direction the answer lives in. Ill conditioned is not rank deficient.");
+        System.out.println("  answer lives in. Ill conditioned is not rank deficient, and the difference");
+        System.out.println("  is a whole certified answer.");
 
         System.out.println();
         System.out.println("=== nonlinear least squares  (math.optim)");

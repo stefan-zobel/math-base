@@ -49,9 +49,12 @@ final class LeastSquaresFit {
      *            the weights, length {@code n} and all strictly positive, or
      *            {@code null} for the unweighted fit. The caller has already
      *            validated them.
+     * @param rankTolerance
+     *            a singular value at or below this multiple of {@code sigma[0]}
+     *            makes the design unusable; finite and in {@code [0, 1)}
      * @return the summary of the fit
      */
-    static LSSummary estimate(double alpha, DMatrix X, DMatrix y, double[] weights) {
+    static LSSummary estimate(double alpha, DMatrix X, DMatrix y, double[] weights, double rankTolerance) {
         if (X.numRows() != y.numRows()) {
             throw new IllegalArgumentException("X.numRows != y.numRows : " + X.numRows() + " != " + y.numRows());
         }
@@ -88,11 +91,21 @@ final class LeastSquaresFit {
         if (!svd.converged) {
             throw new RuntimeException("the singular value decomposition of X did not converge");
         }
-        int deficient = SvdLeastSquares.rankDeficientAt(svd);
+        int deficient = SvdLeastSquares.rankDeficientAt(svd, rankTolerance);
         if (deficient >= 0) {
-            throw new RuntimeException(
-                    "X is rank deficient: singular value " + deficient + " of " + p + " is negligible");
+            // the two cases read differently to the caller: at a tolerance of
+            // zero the design really is singular and there is nothing to go
+            // on, above it the design may only be ill conditioned
+            String remedy = (rankTolerance == 0.0)
+                    ? " That is exactly singular, so no tolerance reaches an answer; drop the dependent column."
+                    : " A design that is ill conditioned rather than rank deficient still has an answer through the"
+                            + " singular values; the overload taking a rankTolerance reaches it.";
+            throw new IllegalArgumentException("X is rank deficient at a rank tolerance of " + rankTolerance
+                    + ": singular value " + deficient + " of " + p + " is " + svd.sigma[deficient]
+                    + " against a largest one of " + svd.sigma[0] + ", so cond(X) = "
+                    + SvdLeastSquares.conditionNumber(svd) + "." + remedy);
         }
+        smmry.setConditionNumber(SvdLeastSquares.conditionNumber(svd));
         DMatrix beta = new DMatrix(p, 1, SvdLeastSquares.solve(svd, yw.getArrayUnsafe(), 0.0));
         smmry.setBeta(beta);
         // the fitted values live in the scale of the data, not of the weights

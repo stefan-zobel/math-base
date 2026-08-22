@@ -218,7 +218,8 @@ public final class SvdLeastSquares {
     /**
      * Index of the first singular value that falls below
      * {@code sigma[0] * max(m, n) * eps}, the customary numerical rank
-     * criterion.
+     * criterion. Equivalent to {@link #rankDeficientAt(FlatParallelJacobiSVD.Result, double)}
+     * at {@link #defaultRankTolerance(FlatParallelJacobiSVD.Result)}.
      *
      * @param svd
      *            decomposition of the design matrix
@@ -229,16 +230,94 @@ public final class SvdLeastSquares {
      */
     public static int rankDeficientAt(FlatParallelJacobiSVD.Result svd) {
         checkDecomposition(svd);
+        return rankDeficientAt(svd, defaultRankTolerance(svd));
+    }
+
+    /**
+     * Index of the first singular value that falls at or below
+     * {@code relativeTolerance * sigma[0]}.
+     * <p>
+     * The tolerance is relative to the largest singular value and therefore
+     * dimensionless: scaling the whole design matrix by a constant leaves the
+     * verdict where it was. {@code 0.0} accepts every design that is not
+     * exactly singular, which is the loosest defensible setting -- a singular
+     * value of exactly zero has to be refused here, because the ordinary least
+     * squares filter of {@link #solve} would silently hand back a truncated
+     * fit for it rather than fail.
+     * <p>
+     * The customary criterion, {@link #defaultRankTolerance}, calls a design
+     * rank deficient at the level where rounding alone could have produced the
+     * singular value. Between that and zero lie the designs that are ill
+     * conditioned rather than rank deficient, whose answers the singular value
+     * route still reaches.
+     *
+     * @param svd
+     *            decomposition of the design matrix
+     * @param relativeTolerance
+     *            a singular value is negligible when it is at or below this
+     *            multiple of {@code sigma[0]}; finite and in {@code [0, 1)}
+     * @return the index of the first negligible singular value, or {@code -1}
+     *         if the matrix has full numerical rank at this tolerance
+     * @throws IllegalArgumentException
+     *             if {@code svd} is null or {@code relativeTolerance} is not
+     *             finite or outside {@code [0, 1)}
+     * @since 1.5.2
+     */
+    public static int rankDeficientAt(FlatParallelJacobiSVD.Result svd, double relativeTolerance) {
+        checkDecomposition(svd);
+        checkRankTolerance(relativeTolerance);
         if (svd.n == 0) {
             return -1;
         }
-        double tol = svd.sigma[0] * Math.max(svd.m, svd.n) * MathConsts.MACH_EPS_DBL;
+        double tol = svd.sigma[0] * relativeTolerance;
         for (int i = 0; i < svd.n; i++) {
             if (svd.sigma[i] <= tol) {
                 return i;
             }
         }
         return -1;
+    }
+
+    /**
+     * The customary numerical rank tolerance {@code max(m, n) * eps}, relative
+     * to the largest singular value.
+     *
+     * @param svd
+     *            decomposition of the design matrix
+     * @return the tolerance {@link #rankDeficientAt(FlatParallelJacobiSVD.Result)} uses
+     * @throws IllegalArgumentException
+     *             if {@code svd} is null
+     * @since 1.5.2
+     */
+    public static double defaultRankTolerance(FlatParallelJacobiSVD.Result svd) {
+        checkDecomposition(svd);
+        return Math.max(svd.m, svd.n) * MathConsts.MACH_EPS_DBL;
+    }
+
+    /**
+     * Condition number {@code sigma[0] / sigma[n-1]} of the decomposed matrix,
+     * {@code Infinity} if the smallest singular value is zero.
+     *
+     * @param svd
+     *            decomposition of the design matrix
+     * @return the condition number, or {@code NaN} if there are no columns
+     * @throws IllegalArgumentException
+     *             if {@code svd} is null
+     * @since 1.5.2
+     */
+    public static double conditionNumber(FlatParallelJacobiSVD.Result svd) {
+        checkDecomposition(svd);
+        if (svd.n == 0) {
+            return Double.NaN;
+        }
+        return svd.sigma[0] / svd.sigma[svd.n - 1];
+    }
+
+    private static void checkRankTolerance(double relativeTolerance) {
+        if (!(relativeTolerance >= 0.0) || relativeTolerance >= 1.0) {
+            throw new IllegalArgumentException(
+                    "relativeTolerance must be in [0, 1) : " + relativeTolerance);
+        }
     }
 
     private static void checkDecomposition(FlatParallelJacobiSVD.Result svd) {
