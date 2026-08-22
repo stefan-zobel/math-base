@@ -90,7 +90,33 @@ public class FisherF implements ContinuousDistribution {
         if (probability >= 1.0) {
             return Double.POSITIVE_INFINITY;
         }
-        return findRoot(probability, mean(), 0.0, Double.MAX_VALUE);
+        return findRoot(probability, startingPoint(probability), 0.0, Double.MAX_VALUE);
+    }
+
+    /**
+     * A finite point for {@link #inverseCdf(double)} to start its search from.
+     * The mean serves whenever it exists, but for {@code d2 <= 2} it does not,
+     * and seeding the search with {@code NaN} made every quantile {@code NaN} --
+     * a quantile that exists refused because a moment that does not was asked
+     * for it. The fallback inverts the Beta relation that {@link #cdf(double)}
+     * is built on, which is exact apart from the cancellation in {@code 1 - y}
+     * far out in the upper tail; the search then removes that.
+     *
+     * @param probability
+     *            the probability whose quantile is being sought
+     * @return a finite starting point inside the support
+     */
+    private double startingPoint(double probability) {
+        double start = mean();
+        if (!Double.isNaN(start)) {
+            return start;
+        }
+        double y = beta.inverseCdf(probability);
+        if (y >= 1.0) {
+            return Double.MAX_VALUE;
+        }
+        start = (d2 * y) / (d1 * (1.0 - y));
+        return (start > 0.0) ? start : Double.MIN_NORMAL;
     }
 
     @Override
