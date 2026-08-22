@@ -1,139 +1,320 @@
 package math.linalg;
 
 /**
- * Centered and scaled copy of a design matrix and its response, the form every
- * penalized estimator in this package fits on.
+ * Centers each column of a table of observations on its mean and divides it by
+ * its standard deviation, the transform usually called the z-score.
  * <p>
- * Neither the ridge nor the lasso penalty is scale invariant, so the columns
- * have to be brought to a common scale before the penalty means the same thing
- * for each of them. Each column is centered on its mean and divided by its root
- * mean square; the response is centered. The intercept is therefore not part of
- * the fit and is recovered afterwards as {@code yBar - sum(beta_j * xBar_j)},
- * which keeps it out of the penalty where it belongs.
+ * The rows are observations and the columns are variables, the layout
+ * {@link CovariancePCA#transform(double[][])} and
+ * {@link math.probe.CovarianceAccumulator#addAll(double[][])} already use. It
+ * is a <em>fitted</em> transform: the mean and the scale are taken from the
+ * data handed to {@link #of(double[][])} and kept, so the same transform can be
+ * applied to rows it was not fitted on -- a hold-out set, or one observation
+ * arriving later -- and undone again with {@link #inverse(double[][])}.
+ * Re-standardizing each batch on its own would give each of them a different
+ * scale, which is the mistake this class exists to make hard.
  * <p>
- * After the transform every column satisfies {@code sum_i x_ij^2 == n}, which
- * is what lets the coordinate update in {@link CoordinateDescent} divide by
- * {@code n} instead of by a per column norm.
+ * Standardizing is what makes a scale-dependent method answer a question about
+ * shape rather than about units. A principal component analysis of a table
+ * whose columns are millimeters and kilograms is dominated by whichever column
+ * happens to carry the larger numbers; after this transform every column
+ * contributes its variance rather than its unit.
+ * <p>
+ * {@link #of(double[][])} divides by the sample standard deviation
+ * {@code sqrt(sum (x - xBar)^2 / (n - 1))} and {@link #ofPopulation(double[][])}
+ * by {@code sqrt(sum (x - xBar)^2 / n)}. Which of the two is wanted is a real
+ * question rather than a detail, so it is spelled in the method name; the same
+ * pair is named {@code variance()} and {@code populationCovariance()} on
+ * {@code CovarianceAccumulator}.
+ *
+ * @see <a href="https://en.wikipedia.org/wiki/Standard_score">Standard
+ *      score</a>
+ * @since 1.5.2
  */
-final class Standardization {
+public final class Standardization {
 
-    /** Number of rows actually used. */
-    final int n;
-    /** Number of columns. */
-    final int p;
-    /** Centred and scaled design, {@code n x p}, column-major. */
-    final double[] x;
-    /** Centred response, length {@code n}. */
-    final double[] y;
-    /** Column means of the original design, length {@code p}. */
-    final double[] xBar;
-    /** Column scales, {@code sqrt(sum (x_ij - xBar_j)^2 / n)}, length {@code p}. */
-    final double[] scale;
-    /** Mean of the original response. */
-    final double yBar;
+    /** Column means of the data this was fitted on. */
+    private final double[] mean;
 
-    private Standardization(int n, int p, double[] x, double[] y, double[] xBar, double[] scale, double yBar) {
-        this.n = n;
-        this.p = p;
-        this.x = x;
-        this.y = y;
-        this.xBar = xBar;
+    /** Column standard deviations, all strictly positive. */
+    private final double[] scale;
+
+    private Standardization(double[] mean, double[] scale) {
+        this.mean = mean;
         this.scale = scale;
-        this.yBar = yBar;
     }
 
     /**
-     * Transforms the given design and response.
+     * Fits the transform, dividing by the sample standard deviation.
      *
-     * @param xs
-     *            the design, {@code rows x p}, column-major; not modified
-     * @param ys
-     *            the response, length {@code rows}; not modified
-     * @param rows
-     *            the number of rows {@code xs} and {@code ys} hold
-     * @param p
-     *            the number of columns of {@code xs}
-     * @param use
-     *            the row indices to use, in the order given, or {@code null}
-     *            for all of them
-     * @return the transform, holding its own arrays
+     * @param samples
+     *            the observations, one per row, all rows of the same length;
+     *            not modified and not retained
+     * @return the fitted transform
      * @throws IllegalArgumentException
-     *             if a column is constant over the rows used
+     *             if {@code samples} is {@code null}, holds fewer than two
+     *             rows, has no columns, has rows of differing length, has a
+     *             column that is constant, or holds a value that is not finite
      */
-    static Standardization of(double[] xs, double[] ys, int rows, int p, int[] use) {
-        int n = (use == null) ? rows : use.length;
-        double[] x = new double[n * p];
-        double[] y = new double[n];
-        double[] xBar = new double[p];
-        double[] scale = new double[p];
+    public static Standardization of(double[][] samples) {
+        return fit(samples, false);
+    }
 
-        double yBar = 0.0;
-        for (int i = 0; i < n; i++) {
-            yBar += ys[(use == null) ? i : use[i]];
-        }
-        yBar /= n;
-        for (int i = 0; i < n; i++) {
-            y[i] = ys[(use == null) ? i : use[i]] - yBar;
-        }
+    /**
+     * Fits the transform, dividing by the population standard deviation.
+     * <p>
+     * This is the right divisor when the rows are the whole population rather
+     * than a sample drawn from one. It differs from {@link #of(double[][])} by
+     * the factor {@code sqrt((n - 1) / n)} in every column, so the two agree in
+     * the limit and differ by about half a per cent at {@code n = 100}.
+     *
+     * @param samples
+     *            the observations, one per row, all rows of the same length;
+     *            not modified and not retained
+     * @return the fitted transform
+     * @throws IllegalArgumentException
+     *             if {@code samples} is {@code null}, holds no rows, has no
+     *             columns, has rows of differing length, has a column that is
+     *             constant, or holds a value that is not finite
+     */
+    public static Standardization ofPopulation(double[][] samples) {
+        return fit(samples, true);
+    }
 
-        for (int j = 0; j < p; j++) {
-            int src = j * rows;
-            int dst = j * n;
-            double mean = 0.0;
-            for (int i = 0; i < n; i++) {
-                mean += xs[src + ((use == null) ? i : use[i])];
+    private static Standardization fit(double[][] samples, boolean population) {
+        if (samples == null) {
+            throw new IllegalArgumentException("samples is null");
+        }
+        int n = samples.length;
+        int minimum = population ? 1 : 2;
+        if (n < minimum) {
+            throw new IllegalArgumentException("need at least " + minimum + " row"
+                    + (minimum == 1 ? "" : "s") + " to fit "
+                    + (population ? "a population" : "a sample") + " standard deviation, have " + n);
+        }
+        if (samples[0] == null) {
+            throw new IllegalArgumentException("row 0 is null");
+        }
+        int p = samples[0].length;
+        if (p == 0) {
+            throw new IllegalArgumentException("samples has no columns");
+        }
+        for (int i = 1; i < n; i++) {
+            if (samples[i] == null) {
+                throw new IllegalArgumentException("row " + i + " is null");
             }
-            mean /= n;
+            if (samples[i].length != p) {
+                throw new IllegalArgumentException(
+                        "row " + i + " has " + samples[i].length + " columns, row 0 has " + p);
+            }
+        }
+
+        double[] mean = new double[p];
+        double[] scale = new double[p];
+        double divisor = population ? n : (n - 1);
+        // two passes per column, the mean first and the deviations from it
+        // afterwards, rather than one pass over the squares: the one-pass form
+        // subtracts two large numbers to get a small one and loses the answer
+        // when the mean is large beside the spread
+        for (int j = 0; j < p; j++) {
+            double sum = 0.0;
+            for (int i = 0; i < n; i++) {
+                sum += samples[i][j];
+            }
+            double m = sum / n;
             double ss = 0.0;
             for (int i = 0; i < n; i++) {
-                double centred = xs[src + ((use == null) ? i : use[i])] - mean;
-                x[dst + i] = centred;
-                ss += centred * centred;
+                double deviation = samples[i][j] - m;
+                ss += deviation * deviation;
             }
-            double s = Math.sqrt(ss / n);
-            if (s == 0.0) {
-                throw new IllegalArgumentException(
-                        "column " + j + " of X is constant; the intercept is fitted separately, "
-                                + "so a constant column carries no information");
+            double s = Math.sqrt(ss / divisor);
+            // a non-finite entry poisons the mean and then the deviations, so
+            // it arrives here as a NaN scale rather than as a zero one; saying
+            // "constant" about it would name the wrong problem
+            if (Double.isNaN(s)) {
+                throw new IllegalArgumentException("column " + j + " holds a value that is not"
+                        + " finite, so it has neither a mean nor a scale");
             }
-            xBar[j] = mean;
+            if (!(s > 0.0)) {
+                throw new IllegalArgumentException("column " + j + " is constant, so it has no scale"
+                        + " to standardize to; every value in it is " + samples[0][j]);
+            }
+            mean[j] = m;
             scale[j] = s;
-            for (int i = 0; i < n; i++) {
-                x[dst + i] /= s;
+        }
+        return new Standardization(mean, scale);
+    }
+
+    /**
+     * Centers and scales one variable, the whole of it, and hands back the
+     * z-scores.
+     * <p>
+     * The one-column case of {@link #of(double[][])}, for a caller who has a
+     * single variable rather than a table and does not need the transform
+     * afterwards. It divides by the sample standard deviation.
+     *
+     * @param v
+     *            the values; not modified
+     * @return a new array of the same length holding
+     *         {@code (v_i - mean) / sd}
+     * @throws IllegalArgumentException
+     *             if {@code v} is {@code null}, holds fewer than two values, is
+     *             constant, or holds a value that is not finite
+     */
+    public static double[] standardize(double[] v) {
+        if (v == null) {
+            throw new IllegalArgumentException("v is null");
+        }
+        if (v.length < 2) {
+            throw new IllegalArgumentException(
+                    "need at least 2 values to fit a sample standard deviation, have " + v.length);
+        }
+        int n = v.length;
+        double sum = 0.0;
+        for (int i = 0; i < n; i++) {
+            sum += v[i];
+        }
+        double mean = sum / n;
+        double ss = 0.0;
+        for (int i = 0; i < n; i++) {
+            double deviation = v[i] - mean;
+            ss += deviation * deviation;
+        }
+        double sd = Math.sqrt(ss / (n - 1));
+        if (Double.isNaN(sd)) {
+            throw new IllegalArgumentException(
+                    "the values hold one that is not finite, so they have neither a mean nor a scale");
+        }
+        if (!(sd > 0.0)) {
+            throw new IllegalArgumentException(
+                    "the values are constant, so they have no scale to standardize to; every one of"
+                            + " them is " + v[0]);
+        }
+        double[] z = new double[n];
+        for (int i = 0; i < n; i++) {
+            z[i] = (v[i] - mean) / sd;
+        }
+        return z;
+    }
+
+    /**
+     * The number of columns this transform was fitted on.
+     *
+     * @return the number of variables
+     */
+    public int dimension() {
+        return mean.length;
+    }
+
+    /**
+     * The column means that are subtracted.
+     *
+     * @return a new array of length {@link #dimension()}
+     */
+    public double[] mean() {
+        return mean.clone();
+    }
+
+    /**
+     * The column standard deviations that are divided by, at whichever divisor
+     * the transform was fitted with.
+     *
+     * @return a new array of length {@link #dimension()}, all entries strictly
+     *         positive
+     */
+    public double[] scale() {
+        return scale.clone();
+    }
+
+    /**
+     * Applies the transform to a block of observations.
+     *
+     * @param samples
+     *            the observations, one per row, each of length
+     *            {@link #dimension()}; not modified
+     * @return a new block of the same shape
+     * @throws IllegalArgumentException
+     *             if {@code samples} is {@code null} or holds a row that is
+     *             {@code null} or of the wrong length
+     */
+    public double[][] transform(double[][] samples) {
+        return map(samples, true);
+    }
+
+    /**
+     * Undoes the transform on a block of standardized observations.
+     *
+     * @param standardized
+     *            the standardized observations, one per row, each of length
+     *            {@link #dimension()}; not modified
+     * @return a new block of the same shape, in the original units
+     * @throws IllegalArgumentException
+     *             if {@code standardized} is {@code null} or holds a row that
+     *             is {@code null} or of the wrong length
+     */
+    public double[][] inverse(double[][] standardized) {
+        return map(standardized, false);
+    }
+
+    /**
+     * Applies the transform to one observation.
+     *
+     * @param sample
+     *            one observation of length {@link #dimension()}; not modified
+     * @return a new array of the same length
+     * @throws IllegalArgumentException
+     *             if {@code sample} is {@code null} or of the wrong length
+     */
+    public double[] transformRow(double[] sample) {
+        return mapRow(sample, true);
+    }
+
+    /**
+     * Undoes the transform on one standardized observation.
+     *
+     * @param standardized
+     *            one standardized observation of length {@link #dimension()};
+     *            not modified
+     * @return a new array of the same length, in the original units
+     * @throws IllegalArgumentException
+     *             if {@code standardized} is {@code null} or of the wrong
+     *             length
+     */
+    public double[] inverseRow(double[] standardized) {
+        return mapRow(standardized, false);
+    }
+
+    private double[][] map(double[][] rows, boolean forward) {
+        if (rows == null) {
+            throw new IllegalArgumentException("samples is null");
+        }
+        double[][] out = new double[rows.length][];
+        for (int i = 0; i < rows.length; i++) {
+            if (rows[i] == null) {
+                throw new IllegalArgumentException("row " + i + " is null");
             }
+            if (rows[i].length != mean.length) {
+                throw new IllegalArgumentException("row " + i + " has " + rows[i].length
+                        + " columns, this transform was fitted on " + mean.length);
+            }
+            out[i] = mapRow(rows[i], forward);
         }
-
-        return new Standardization(n, p, x, y, xBar, scale, yBar);
+        return out;
     }
 
-    /**
-     * Turns coefficients of the standardized problem back into coefficients of
-     * the original one.
-     *
-     * @param betaScaled
-     *            coefficients in the standardized scale, length {@code p}
-     * @return a new array of coefficients in the original scale
-     */
-    double[] unscale(double[] betaScaled) {
-        double[] beta = new double[p];
-        for (int j = 0; j < p; j++) {
-            beta[j] = betaScaled[j] / scale[j];
+    private double[] mapRow(double[] row, boolean forward) {
+        if (row == null) {
+            throw new IllegalArgumentException("sample is null");
         }
-        return beta;
-    }
-
-    /**
-     * The intercept belonging to coefficients in the original scale.
-     *
-     * @param beta
-     *            coefficients in the original scale, length {@code p}
-     * @return {@code yBar - sum(beta_j * xBar_j)}
-     */
-    double intercept(double[] beta) {
-        double intercept = yBar;
-        for (int j = 0; j < p; j++) {
-            intercept -= beta[j] * xBar[j];
+        int p = mean.length;
+        if (row.length != p) {
+            throw new IllegalArgumentException("sample has " + row.length
+                    + " columns, this transform was fitted on " + p);
         }
-        return intercept;
+        double[] out = new double[p];
+        for (int j = 0; j < p; j++) {
+            out[j] = forward ? (row[j] - mean[j]) / scale[j] : row[j] * scale[j] + mean[j];
+        }
+        return out;
     }
 }

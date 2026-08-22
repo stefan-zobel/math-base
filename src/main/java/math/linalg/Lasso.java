@@ -218,7 +218,7 @@ public final class Lasso {
 
         int n = X.numRows();
         int p = X.numColumns();
-        Standardization std = Standardization.of(X.getArrayUnsafe(), y.getArrayUnsafe(), n, p, null);
+        ScaledDesign std = ScaledDesign.of(X.getArrayUnsafe(), y.getArrayUnsafe(), n, p, null);
         CoordinateDescent.Fit fit = CoordinateDescent.solve(std, lambda, alpha, null, CoordinateDescent.DEFAULT_TOL,
                 CoordinateDescent.DEFAULT_MAX_SWEEPS);
         return result(X.getArrayUnsafe(), y.getArrayUnsafe(), n, p, std, fit.beta, lambda, alpha, fit.sweeps,
@@ -247,7 +247,7 @@ public final class Lasso {
     public static double lambdaMax(DMatrix X, DMatrix y, double alpha) {
         checkDimensions(X, y);
         checkAlpha(alpha, true);
-        Standardization std = Standardization.of(X.getArrayUnsafe(), y.getArrayUnsafe(), X.numRows(), X.numColumns(),
+        ScaledDesign std = ScaledDesign.of(X.getArrayUnsafe(), y.getArrayUnsafe(), X.numRows(), X.numColumns(),
                 null);
         return lambdaMax(std, alpha);
     }
@@ -304,7 +304,7 @@ public final class Lasso {
         int p = X.numColumns();
         double[] xs = X.getArrayUnsafe();
         double[] ys = y.getArrayUnsafe();
-        Standardization std = Standardization.of(xs, ys, n, p, null);
+        ScaledDesign std = ScaledDesign.of(xs, ys, n, p, null);
         double[] lambdas = grid(lambdaMax(std, alpha), nLambda, lambdaMinRatio);
         return path(std, lambdas, alpha);
     }
@@ -376,7 +376,7 @@ public final class Lasso {
 
         double[] xs = X.getArrayUnsafe();
         double[] ys = y.getArrayUnsafe();
-        Standardization all = Standardization.of(xs, ys, n, p, null);
+        ScaledDesign all = ScaledDesign.of(xs, ys, n, p, null);
         double[] lambdas = grid(lambdaMax(all, alpha), DEFAULT_PATH_LENGTH, defaultMinRatio(n, p));
         int nLambda = lambdas.length;
 
@@ -402,9 +402,9 @@ public final class Lasso {
                 }
             }
 
-            Standardization std;
+            ScaledDesign std;
             try {
-                std = Standardization.of(xs, ys, n, p, train);
+                std = ScaledDesign.of(xs, ys, n, p, train);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("fold " + k + " of " + folds + ": " + e.getMessage(), e);
             }
@@ -466,7 +466,7 @@ public final class Lasso {
     }
 
     /** Fits the given grid on already standardized data, warm starting down the path. */
-    private static Path path(Standardization std, double[] lambdas, double alpha) {
+    private static Path path(ScaledDesign std, double[] lambdas, double alpha) {
         int nLambda = lambdas.length;
         double[][] beta = new double[nLambda][];
         double[] intercepts = new double[nLambda];
@@ -488,7 +488,7 @@ public final class Lasso {
     }
 
     /** Builds the reported result from a fit on standardized data. */
-    private static Result result(double[] xs, double[] ys, int n, int p, Standardization std, double[] betaScaled,
+    private static Result result(double[] xs, double[] ys, int n, int p, ScaledDesign std, double[] betaScaled,
             double lambda, double alpha, int sweeps, boolean converged) {
         double[] beta = std.unscale(betaScaled);
         double intercept = std.intercept(beta);
@@ -525,7 +525,7 @@ public final class Lasso {
         return count;
     }
 
-    private static double lambdaMax(Standardization std, double alpha) {
+    private static double lambdaMax(ScaledDesign std, double alpha) {
         int n = std.n;
         double maxDot = 0.0;
         for (int j = 0; j < std.p; j++) {

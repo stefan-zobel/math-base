@@ -114,7 +114,7 @@ public final class Ridge {
         double[] xs = X.getArrayUnsafe();
         double[] ys = y.getArrayUnsafe();
 
-        Standardization std = Standardization.of(xs, ys, n, p, null);
+        ScaledDesign std = ScaledDesign.of(xs, ys, n, p, null);
         double yBar = std.yBar;
 
         // decomposeInPlace consumes std.x, which is ours and not needed afterwards

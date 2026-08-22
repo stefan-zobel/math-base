@@ -10,6 +10,7 @@ import math.linalg.CovariancePCA;
 import math.linalg.DMatrix;
 import math.linalg.JacobiPCA;
 import math.linalg.Lasso;
+import math.linalg.Standardization;
 import math.linalg.SymmetricJacobiEigen;
 import math.linalg.TruncatedPCA;
 import math.optim.LimitedMemoryBFGS;
@@ -163,19 +164,10 @@ public final class WineDemo {
         return new Description(min, max, mean, sd, Datasets.classCounts(), smallest, largest);
     }
 
-    /** The table with every column centred and scaled to unit variance. */
+    /** The table with every column centered and scaled to unit variance. */
     static double[][] standardized() {
         double[][] x = Datasets.features();
-        CovarianceAccumulator acc = new CovarianceAccumulator(P);
-        acc.addAll(x);
-        double[] mean = acc.mean();
-        double[] var = acc.variance();
-        for (int i = 0; i < x.length; ++i) {
-            for (int j = 0; j < P; ++j) {
-                x[i][j] = (x[i][j] - mean[j]) / Math.sqrt(var[j]);
-            }
-        }
-        return x;
+        return Standardization.of(x).transform(x);
     }
 
     // ----------------------------------------------------------- 2. and 3. PCA

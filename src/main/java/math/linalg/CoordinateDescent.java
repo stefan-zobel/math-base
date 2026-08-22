@@ -4,7 +4,7 @@ package math.linalg;
  * Cyclic coordinate descent for the elastic net, the engine behind
  * {@link Lasso}. Minimizes
  * {@code (1/(2n)) ||y - X b||^2 + lambda * (alpha ||b||_1 + ((1 - alpha)/2) ||b||^2)}
- * over a {@link Standardization}, where every column has
+ * over a {@link ScaledDesign}, where every column has
  * {@code sum_i x_ij^2 == n}. See
  * <a href="https://en.wikipedia.org/wiki/Coordinate_descent">coordinate
  * descent</a>.
@@ -71,7 +71,7 @@ final class CoordinateDescent {
      *            the sweep budget
      * @return the fit, see {@link Fit}
      */
-    static Fit solve(Standardization std, double lambda, double alpha, double[] warmStart, double tol, int maxSweeps) {
+    static Fit solve(ScaledDesign std, double lambda, double alpha, double[] warmStart, double tol, int maxSweeps) {
         int n = std.n;
         int p = std.p;
         double[] x = std.x;

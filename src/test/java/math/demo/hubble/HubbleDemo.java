@@ -7,6 +7,7 @@ import math.linalg.DMatrix;
 import math.linalg.FlatParallelJacobiSVD;
 import math.linalg.LSSummary;
 import math.linalg.OLS;
+import math.linalg.Standardization;
 import math.linalg.SvdLeastSquares;
 import math.probe.Bootstrap;
 import math.probe.SampleStatistic;
@@ -139,21 +140,7 @@ public final class HubbleDemo {
 
     /** Centered and scaled to unit variance. */
     static double[] standardized(double[] v) {
-        double mean = 0.0;
-        for (int i = 0; i < v.length; ++i) {
-            mean += v[i];
-        }
-        mean /= v.length;
-        double squares = 0.0;
-        for (int i = 0; i < v.length; ++i) {
-            squares += (v[i] - mean) * (v[i] - mean);
-        }
-        double sd = Math.sqrt(squares / (v.length - 1));
-        double[] z = new double[v.length];
-        for (int i = 0; i < v.length; ++i) {
-            z[i] = (v[i] - mean) / sd;
-        }
-        return z;
+        return Standardization.standardize(v);
     }
 
     static double standardDeviation(double[] v) {
