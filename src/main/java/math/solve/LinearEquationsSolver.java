@@ -175,32 +175,19 @@ public final class LinearEquationsSolver {
             // Dgels quick returns without factorizing, there is no diagonal
             return;
         }
-        double min = Double.MAX_VALUE;
-        double max = 0.0;
-        for (int i = 0; i < k; ++i) {
-            double d = Math.abs(factor[i + i * lda]);
-            // both comparisons below are false for a NaN, which would drop it
-            // out of the scan unnoticed and leave a finite looking ratio, so it
-            // has to be caught here
-            if (!Double.isFinite(d)) {
-                throw new RuntimeException("The decomposition of A is not finite: entry " + i + " on the diagonal"
-                        + " of the triangular factor is " + factor[i + i * lda]
-                        + ". Solution could not be computed.");
-            }
-            if (d < min) {
-                min = d;
-            }
-            if (d > max) {
-                max = d;
+        double ratio = diagonalRatio(factor, m, n, lda);
+        if (Double.isNaN(ratio)) {
+            // only reached on the failure path, so the second scan costs
+            // nothing that matters and it lets the message name the entry
+            for (int i = 0; i < k; ++i) {
+                if (!Double.isFinite(factor[i + i * lda])) {
+                    throw new RuntimeException("The decomposition of A is not finite: entry " + i + " on the diagonal"
+                            + " of the triangular factor is " + factor[i + i * lda]
+                            + ". Solution could not be computed.");
+                }
             }
         }
-        // the threshold scales with max(m, n) because the backward error of the
-        // factorization does, that being the noise floor the diagonal has to
-        // stand above. MACH_EPS_DBL is the unit roundoff u = eps/2, so this is
-        // half of the max(m, n) * eps that numpy and MATLAB use for the same
-        // purpose
-        double tol = Math.max(m, n) * MathConsts.MACH_EPS_DBL;
-        double ratio = min / max;
+        double tol = rankThreshold(m, n);
         // negated so that a NaN ratio is rejected as well. It arises from a NaN
         // in A, and from the all zero matrix, which Dgels short circuits before
         // factorizing and which therefore leaves min == max == 0
@@ -209,6 +196,76 @@ public final class LinearEquationsSolver {
                     + " factor is " + ratio + " times the largest, at or below the threshold " + tol
                     + ". Solution could not be computed.");
         }
+    }
+
+    /**
+     * The measurement {@link #checkFullRank} passes judgement on, without the
+     * judgement: the smallest entry on the diagonal of a triangular factor
+     * divided by the largest.
+     * <p>
+     * A caller that must not be thrown at reads it directly and decides for
+     * itself. {@code NonlinearEquationsSolver} is that caller: a Jacobian that
+     * has lost rank is the normal state of affairs near a hard root and has to
+     * be stepped around, not reported as a failure of whoever posed the
+     * problem.
+     *
+     * @param factor
+     *            the array the LAPACK routine overwrote with the triangular
+     *            factor, in column major order
+     * @param m
+     *            the number of rows of the factorized matrix
+     * @param n
+     *            the number of columns of the factorized matrix
+     * @param lda
+     *            the leading dimension of {@code factor}
+     * @return the ratio of the smallest diagonal entry to the largest in
+     *         absolute value, {@code Double.NaN} if any diagonal entry is not
+     *         finite, and {@code 1.0} for an empty diagonal, which is the case
+     *         the caller need not act on
+     */
+    static double diagonalRatio(double[] factor, int m, int n, int lda) {
+        int k = Math.min(m, n);
+        if (k == 0) {
+            return 1.0;
+        }
+        double min = Double.MAX_VALUE;
+        double max = 0.0;
+        for (int i = 0; i < k; ++i) {
+            double d = Math.abs(factor[i + i * lda]);
+            // both comparisons below are false for a NaN, which would drop it
+            // out of the scan unnoticed and leave a finite looking ratio, so it
+            // has to be caught here
+            if (!Double.isFinite(d)) {
+                return Double.NaN;
+            }
+            if (d < min) {
+                min = d;
+            }
+            if (d > max) {
+                max = d;
+            }
+        }
+        return min / max;
+    }
+
+    /**
+     * The value {@link #diagonalRatio} has to stay above for the factorization
+     * to count as full rank.
+     * <p>
+     * The threshold scales with {@code max(m, n)} because the backward error of
+     * the factorization does, that being the noise floor the diagonal has to
+     * stand above. {@link math.MathConsts#MACH_EPS_DBL} is the unit roundoff
+     * {@code u = eps/2}, so this is half of the {@code max(m, n) * eps} that
+     * numpy and MATLAB use for the same purpose.
+     *
+     * @param m
+     *            the number of rows of the factorized matrix
+     * @param n
+     *            the number of columns of the factorized matrix
+     * @return the smallest ratio that still counts as full rank
+     */
+    static double rankThreshold(int m, int n) {
+        return Math.max(m, n) * MathConsts.MACH_EPS_DBL;
     }
 
     /**
