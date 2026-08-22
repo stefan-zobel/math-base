@@ -299,7 +299,7 @@ public class WineDemoTest {
     }
 
     /**
-     * Both L1 engines answer in exact zeros. The ROADMAP had OWL-QN reaching
+     * Both L1 engines answer in exact zeros. Previously we had OWL-QN reaching
      * one only by accident of an orthant crossing; the crossing is the
      * mechanism, and the counts below are the same whether they are taken
      * exactly or with a cutoff.

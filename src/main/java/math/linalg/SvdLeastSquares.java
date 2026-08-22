@@ -12,8 +12,16 @@ import math.MathConsts;
  * costs more arithmetic and saves the squaring of the condition number:
  * {@code cond(X'X) == cond(X)^2}, so a design that is merely awkward becomes
  * unsolvable as soon as it is squared.
+ * <p>
+ * The decomposition is the caller's: hand in a
+ * {@link FlatParallelJacobiSVD.Result} of the design matrix and the methods
+ * here read it. That is what makes them reusable -- one decomposition serves a
+ * fit, its variances, its effective degrees of freedom and its rank check
+ * without being formed four times.
+ *
+ * @since 1.5.2
  */
-final class SvdLeastSquares {
+public final class SvdLeastSquares {
 
     /**
      * {@code beta = V diag(d_i / (d_i^2 + lambda)) U' y}. At {@code lambda == 0}
@@ -26,8 +34,14 @@ final class SvdLeastSquares {
      * @param lambda
      *            ridge penalty, {@code 0} for ordinary least squares
      * @return the coefficients, length {@code svd.n}
+     * @throws IllegalArgumentException
+     *             if {@code svd} or {@code y} is null, if {@code y} is not of
+     *             length {@code svd.m}, or if {@code lambda} is negative or not
+     *             finite
      */
-    static double[] solve(FlatParallelJacobiSVD.Result svd, double[] y, double lambda) {
+    public static double[] solve(FlatParallelJacobiSVD.Result svd, double[] y, double lambda) {
+        checkRegressand(svd, y);
+        checkPenalty(lambda, "lambda");
         int m = svd.m;
         int n = svd.n;
         // z_i = (d_i / (d_i^2 + lambda)) * (U' y)_i
@@ -68,8 +82,14 @@ final class SvdLeastSquares {
      *            singular values at or below this are discarded, customarily
      *            {@code sigma[0] * max(m, n) * eps}
      * @return the coefficients, length {@code svd.n}
+     * @throws IllegalArgumentException
+     *             if {@code svd} or {@code y} is null, if {@code y} is not of
+     *             length {@code svd.m}, or if {@code tol} is negative or not
+     *             finite
      */
-    static double[] solveTruncated(FlatParallelJacobiSVD.Result svd, double[] y, double tol) {
+    public static double[] solveTruncated(FlatParallelJacobiSVD.Result svd, double[] y, double tol) {
+        checkRegressand(svd, y);
+        checkPenalty(tol, "tol");
         int m = svd.m;
         int n = svd.n;
         double[] z = new double[n];
@@ -108,8 +128,13 @@ final class SvdLeastSquares {
      * @param lambda
      *            ridge penalty, {@code 0} for ordinary least squares
      * @return the diagonal, length {@code svd.n}
+     * @throws IllegalArgumentException
+     *             if {@code svd} is null or {@code lambda} is negative or not
+     *             finite
      */
-    static double[] varianceDiagonal(FlatParallelJacobiSVD.Result svd, double lambda) {
+    public static double[] varianceDiagonal(FlatParallelJacobiSVD.Result svd, double lambda) {
+        checkDecomposition(svd);
+        checkPenalty(lambda, "lambda");
         int n = svd.n;
         double[] f = new double[n];
         for (int i = 0; i < n; i++) {
@@ -138,8 +163,13 @@ final class SvdLeastSquares {
      * @param lambda
      *            ridge penalty, {@code 0} for ordinary least squares
      * @return an {@code n x n} matrix, column-major
+     * @throws IllegalArgumentException
+     *             if {@code svd} is null or {@code lambda} is negative or not
+     *             finite
      */
-    static double[] varianceMatrix(FlatParallelJacobiSVD.Result svd, double lambda) {
+    public static double[] varianceMatrix(FlatParallelJacobiSVD.Result svd, double lambda) {
+        checkDecomposition(svd);
+        checkPenalty(lambda, "lambda");
         int n = svd.n;
         double[] f = new double[n];
         for (int i = 0; i < n; i++) {
@@ -170,8 +200,13 @@ final class SvdLeastSquares {
      * @param lambda
      *            ridge penalty
      * @return the effective degrees of freedom
+     * @throws IllegalArgumentException
+     *             if {@code svd} is null or {@code lambda} is negative or not
+     *             finite
      */
-    static double effectiveDf(FlatParallelJacobiSVD.Result svd, double lambda) {
+    public static double effectiveDf(FlatParallelJacobiSVD.Result svd, double lambda) {
+        checkDecomposition(svd);
+        checkPenalty(lambda, "lambda");
         double df = 0.0;
         for (int i = 0; i < svd.n; i++) {
             double dd = svd.sigma[i] * svd.sigma[i];
@@ -189,8 +224,11 @@ final class SvdLeastSquares {
      *            decomposition of the design matrix
      * @return the index of the first negligible singular value, or {@code -1}
      *         if the matrix has full numerical rank
+     * @throws IllegalArgumentException
+     *             if {@code svd} is null
      */
-    static int rankDeficientAt(FlatParallelJacobiSVD.Result svd) {
+    public static int rankDeficientAt(FlatParallelJacobiSVD.Result svd) {
+        checkDecomposition(svd);
         if (svd.n == 0) {
             return -1;
         }
@@ -201,6 +239,28 @@ final class SvdLeastSquares {
             }
         }
         return -1;
+    }
+
+    private static void checkDecomposition(FlatParallelJacobiSVD.Result svd) {
+        if (svd == null) {
+            throw new IllegalArgumentException("svd is null");
+        }
+    }
+
+    private static void checkRegressand(FlatParallelJacobiSVD.Result svd, double[] y) {
+        checkDecomposition(svd);
+        if (y == null) {
+            throw new IllegalArgumentException("y is null");
+        }
+        if (y.length != svd.m) {
+            throw new IllegalArgumentException("y.length != svd.m : " + y.length + " != " + svd.m);
+        }
+    }
+
+    private static void checkPenalty(double value, String name) {
+        if (value < 0.0 || Double.isNaN(value) || Double.isInfinite(value)) {
+            throw new IllegalArgumentException(name + " must be finite and non-negative : " + value);
+        }
     }
 
     /** {@code d / (d^2 + lambda)}, the shrinkage applied to one singular value. */
