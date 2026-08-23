@@ -250,7 +250,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public long[] getSeed() {
-        return initialSeed;
+        return (initialSeed == null) ? null : initialSeed.clone();
     }
 
     @Override
