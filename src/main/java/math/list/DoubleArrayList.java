@@ -521,7 +521,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         }
         DForEachIterator oit = other.iterator();
         for (; from < to; from++) {
-            if (!oit.hasNext() || es[from] != oit.next()) {
+            // the bits, not the values: this is the comparison hashCode() is
+            // built on, and equal elements have to hash alike
+            if (!oit.hasNext() || Double.doubleToLongBits(es[from]) != Double.doubleToLongBits(oit.next())) {
                 return false;
             }
         }
@@ -539,7 +541,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
                 throw new ConcurrentModificationException();
             }
             for (int i = 0; i < s; i++) {
-                if (es[i] != otherEs[i]) {
+                // see equalsRange: the comparison has to be the one hashCode()
+                // is built on
+                if (Double.doubleToLongBits(es[i]) != Double.doubleToLongBits(otherEs[i])) {
                     equal = false;
                     break;
                 }

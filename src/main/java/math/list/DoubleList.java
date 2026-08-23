@@ -363,6 +363,13 @@ public interface DoubleList {
      * both lists have the same size, and all corresponding pairs of elements in
      * the two lists are <i>equal</i>. In other words, two DoubleList are
      * defined to be equal if they contain the same elements in the same order.
+     * <p>
+     * Two elements count as equal when {@link Double#doubleToLongBits(double)}
+     * returns the same value for both, so that {@code NaN} equals itself and
+     * {@code 0.0} does not equal {@code -0.0}. That is the rule
+     * {@link java.util.Arrays#equals(double[], double[])} follows, and the one
+     * {@link #hashCode()} is built on. It is deliberately not the {@code o == e}
+     * of {@link #contains(double)}, which compares values rather than bits.
      *
      * @param o
      *            the object to be compared for equality with this DoubleList
