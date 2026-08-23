@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2023 Stefan Zobel
+ * Copyright 2021, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -741,6 +741,56 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      * {@inheritDoc}
      */
     @Override
+    public boolean removeIf(DoublePredicate filter) {
+        return removeIf(filter, 0, size);
+    }
+
+    boolean removeIf(DoublePredicate filter, final int from, final int end) {
+        Objects.requireNonNull(filter, "filter");
+        final double[] es = elementData;
+        final int expectedModCount = modCount;
+        // nothing is written while the predicate keeps saying no, so a call
+        // that removes nothing leaves the array untouched
+        int r = from;
+        while (r < end && !filter.test(es[r])) {
+            ++r;
+        }
+        if (r == end) {
+            checkForComodification(expectedModCount);
+            return false;
+        }
+        int w = r;
+        boolean comodified = false;
+        try {
+            for (double e; ++r < end;) {
+                if (!filter.test(e = es[r])) {
+                    es[w++] = e;
+                }
+            }
+        } finally {
+            // a predicate that changed the list has already invalidated the
+            // compaction, and closing the gap with a stale size would throw
+            // over the real problem
+            comodified = modCount != expectedModCount;
+            if (!comodified) {
+                // whatever the predicate never got to counts as a survivor,
+                // the way batchRemove keeps the rest when contains() throws
+                System.arraycopy(es, r, es, w, end - r);
+                w += end - r;
+                modCount += end - w;
+                shiftTailOverGap(es, w, end);
+            }
+        }
+        if (comodified) {
+            throw new ConcurrentModificationException();
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public DoubleList shuffle() {
         shuffle(size, 0, elementData);
         return this;
@@ -1288,6 +1338,17 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public DoubleList filter(DoublePredicate predicate) {
             return DoubleArrayList.filter(size, offset, root.elementData, predicate);
+        }
+
+        @Override
+        public boolean removeIf(DoublePredicate filter) {
+            checkForComodification();
+            int oldSize = root.size;
+            boolean modified = root.removeIf(filter, offset, offset + size);
+            if (modified) {
+                updateSizeAndModCount(root.size - oldSize);
+            }
+            return modified;
         }
 
         @Override

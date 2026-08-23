@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2023 Stefan Zobel
+ * Copyright 2021, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -486,8 +486,50 @@ public interface DoubleList {
      *            a predicate to apply to each element to determine if it should
      *            be included
      * @return the new list
+     * @see #removeIf(DoublePredicate)
      */
     DoubleList filter(DoublePredicate predicate);
+
+    /**
+     * Removes all of the elements of this list that satisfy the given
+     * predicate. Errors or runtime exceptions thrown by the predicate are
+     * relayed to the caller.
+     * <p>
+     * Note that this is the opposite sense of
+     * {@link #filter(DoublePredicate)}, which returns a <em>new</em> list of
+     * the elements the predicate accepts and leaves this list alone.
+     * <p>
+     * This is the way to delete elements that {@link #remove(double)} cannot
+     * reach, since that method compares values: {@code removeIf(Double::isNaN)}
+     * strips every {@code NaN}, and a predicate on
+     * {@link Double#doubleToLongBits(double)} distinguishes {@code 0.0} from
+     * {@code -0.0}.
+     * <p>
+     * The behavior of this call is undefined if the predicate modifies this
+     * list; implementations may throw a
+     * {@link java.util.ConcurrentModificationException} when they detect it.
+     *
+     * @param filter
+     *            a predicate which returns {@code true} for elements to be
+     *            removed
+     * @return {@code true} if any elements were removed
+     * @throws NullPointerException
+     *             if the specified filter is null
+     * @see #filter(DoublePredicate)
+     * @since 1.5.2
+     */
+    default boolean removeIf(DoublePredicate filter) {
+        Objects.requireNonNull(filter, "filter");
+        boolean removed = false;
+        DListIterator it = listIterator();
+        while (it.hasNext()) {
+            if (filter.test(it.next())) {
+                it.remove();
+                removed = true;
+            }
+        }
+        return removed;
+    }
 
     /**
      * Returns a list iterator over the elements in this list (in proper
