@@ -23,6 +23,11 @@ import math.fun.DTriFunction;
  * than that estimate; see the class comment of {@link AdaptiveGaussKronrod}.
  * Both branches are safe against a wrong routing decision, so this affects the
  * cost of a call rather than its result.
+ * <p>
+ * Nothing routes to {@link DoubleExponential} from here, and nothing is meant
+ * to: a heuristic for "has an endpoint singularity" would be guesswork where
+ * this one is merely unreliable. {@link Quadrature} offers that rule by name
+ * instead, so the choice is the caller's and explicit.
  */
 public class MetaIntegrator {
 

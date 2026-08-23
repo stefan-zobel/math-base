@@ -22,6 +22,7 @@ import math.probe.DoubleStatistics;
 import math.probe.SampleStatistic;
 import math.solve.AdaptiveGaussKronrod;
 import math.solve.ClenshawCurtis;
+import math.solve.DoubleExponential;
 
 /**
  * Everything this library prints has to read the same on every machine. A
@@ -153,6 +154,12 @@ public class OutputLocaleTest {
             @Override
             public String get() {
                 return ClenshawCurtis.integrate1D(bell, 0.0, 1.0, 1.0e-10).toString();
+            }
+        });
+        add(names, printers, "DoubleExponential.IntegralResult.toString", new Supplier<String>() {
+            @Override
+            public String get() {
+                return DoubleExponential.integrate1D(bell, 0.0, 1.0, 1.0e-10).toString();
             }
         });
         add(names, printers, "BrentMinimizer.Bracket.toString", new Supplier<String>() {

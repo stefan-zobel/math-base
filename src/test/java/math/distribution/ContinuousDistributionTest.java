@@ -12,7 +12,7 @@ import math.fun.DFunction;
 import math.solve.AdaptiveGaussKronrod;
 import math.solve.AdaptiveGaussKronrod.G7_K15;
 import math.solve.ClenshawCurtis;
-import math.solve.InfiniteIntegrator;
+import math.solve.Quadrature;
 import math.solve.RootFinder;
 
 /**
@@ -616,7 +616,7 @@ public class ContinuousDistributionTest {
                 continue;
             }
             for (int k = 0; k < cuts.length; ++k) {
-                double got = InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(row.d), cuts[k],
+                double got = Quadrature.integrate(density(row.d), cuts[k],
                         Double.POSITIVE_INFINITY, TOL);
                 double want = 1.0 - row.d.cdf(cuts[k]);
                 double digits = absDigits(got, want);
@@ -739,11 +739,11 @@ public class ContinuousDistributionTest {
     public void theOneSidedFormsRecoverTheSameWay() {
         Normal far = new Normal(300.0, 1.0);
         assertEquals("the one-sided substitution misses the mass and the fallback catches it", 1.0,
-                InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(far), 0.0,
+                Quadrature.integrate(density(far), 0.0,
                         Double.POSITIVE_INFINITY, TOL),
                 1.0e-9);
         assertEquals("and cutting close to the mass by hand is all it ever took", 1.0,
-                InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, density(far), 290.0,
+                Quadrature.integrate(density(far), 290.0,
                         Double.POSITIVE_INFINITY, TOL),
                 1.0e-9);
     }
@@ -753,7 +753,7 @@ public class ContinuousDistributionTest {
     }
 
     private static double wholeLine(DFunction f) {
-        return InfiniteIntegrator.integrate1DInfinite(G7_K15.POINTS_15, f, Double.NEGATIVE_INFINITY,
+        return Quadrature.integrate(f, Double.NEGATIVE_INFINITY,
                 Double.POSITIVE_INFINITY, TOL);
     }
 

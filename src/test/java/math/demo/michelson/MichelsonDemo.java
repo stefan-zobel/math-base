@@ -525,8 +525,9 @@ public final class MichelsonDemo {
         System.out.println(String.format(L, "  %-52s %.6f", "t(0.975, 99), which every table prints as 1.98422",
                 Double.valueOf(c.tabulatedQuantile)));
         System.out.println();
-        System.out.println("  InfiniteIntegrator returns 0 for a density centred far from the origin,");
-        System.out.println("  which is why this section integrates over mu +/- 12 sd instead.");
+        System.out.println("  This density sits thousands of standard deviations from the origin, where");
+        System.out.println("  InfiniteIntegrator returns 0 unless it is told where the mass is; that is");
+        System.out.println("  why this section integrates over mu +/- 12 sd instead.");
 
         rule("5. where the error actually lives  (math.linalg)");
         Model m = model();

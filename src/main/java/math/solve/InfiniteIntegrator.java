@@ -1,5 +1,6 @@
 package math.solve;
 
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -98,15 +99,31 @@ import math.fun.DTriFunction;
  * silent zero remains. Detection by sampling has that limit in principle, and
  * it bites sooner in more dimensions because the integrand is a product: the
  * rung nearest the mass is off by the same relative amount on every axis at
- * once. Nothing here can help that, since the fallback is reached only through
- * a probe that found something: what the probe cannot see, the fallback is
- * never asked about.
+ * once. No probe can help that, since the fallback is reached only through a
+ * probe that found something: what the probe cannot see, the fallback is never
+ * asked about.
+ *
+ * <h2>Which is why the caller may name the center</h2>
+ * The cure for that residue is to center the substitution on the integrand
+ * rather than to guard it. In one dimension splitting at a peak the probe found
+ * is that cure, and it is taken automatically -- but only for a peak the probe
+ * <em>did</em> find. Where it found nothing, the overloads taking a
+ * {@code center} let a caller say where the mass is, in one, two and three
+ * dimensions, per axis. The substitution then becomes
+ * {@code x = center + t/(1 - t^2)} whatever the ends of the interval are, whose
+ * derivative at the center is one: a feature of unit width there keeps its
+ * width, which is what makes it resolvable. A finite end is not dropped but
+ * carried over into the limit of {@code t} that maps onto it. Named, the normal
+ * at {@code 1e4} above comes back to thirteen digits.
  * <p>
- * The cure for the rest is to center the substitution on the integrand rather
- * than to guard it, and in one dimension splitting at the peak is that cure --
- * an exp-sinh rule anchored at the peak is a substitution centered on the
- * integrand. In two and three dimensions it remains a change to the method that
- * has not been made.
+ * Centering is never <em>inferred</em> in two or three dimensions: an axis with
+ * no center is substituted exactly as it was. And a center is a promise rather
+ * than a licence -- the probe samples it in addition to everything it sampled
+ * before, one evaluation per axis, so a center in the wrong place leaves every
+ * guard here standing. In one dimension it does better than refuse: where the
+ * substitution sampled the mass without resolving it, which only a center the
+ * caller chose can bring about, the domain is split where the mass really is
+ * and the answer comes from there.
  */
 public class InfiniteIntegrator {
 
@@ -260,9 +277,87 @@ public class InfiniteIntegrator {
      */
     public static double integrate1DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
                                                double a, double b, double epsTol) {
+        return integrate1D(setup, f, a, b, epsTol, Double.NaN);
+    }
+
+    /**
+     * Integrates {@code f} over {@code [a, b]} with the substitution centered
+     * on {@code center} instead of on the origin or on the finite end.
+     * <p>
+     * This is for the case the class comment ends on: mass that no probe can
+     * find, because it underflows to zero at every rung of the ladder. A caller
+     * who knows where the mass lies says so here and the substitution is built
+     * around that point: {@code x = center + t/(1 - t^2)}, whose derivative at
+     * the center is one, so a feature of unit width there stays unit width in
+     * {@code t}. A semi-infinite interval uses the same substitution, its
+     * finite end carried over into the limit of {@code t} that maps onto it,
+     * because merely scaling the semi-infinite substitution would move the mass
+     * to the middle and compress it by the same factor, which is not centering.
+     * <p>
+     * A center is a promise, and it is still checked. The probe samples it in
+     * addition to everything it sampled before, so a center that is not where
+     * the mass is leaves the existing guard intact rather than disarming it.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param a
+     *            lower limit, possibly {@code Double.NEGATIVE_INFINITY}
+     * @param b
+     *            upper limit, possibly {@code Double.POSITIVE_INFINITY}
+     * @param epsTol
+     *            error tolerance
+     * @param center
+     *            where the mass of the integrand lies, or {@code Double.NaN}
+     *            for none, which is what the overload without it passes. It has
+     *            no effect on a finite interval, where nothing is substituted
+     * @return the approximated integral
+     * @throws IllegalArgumentException
+     *             if {@code center} is infinite, or does not lie strictly
+     *             inside an interval that has a finite end
+     * @throws ArithmeticException
+     *             if the substitution demonstrably never sampled the region
+     *             that carries the integrand and the double-exponential
+     *             fallback could not resolve it either
+     * @since 1.5.2
+     */
+    public static double integrate1DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
+                                               double a, double b, double epsTol, double center) {
+        return integrate1D(setup, f, a, b, epsTol, center);
+    }
+
+    private static double integrate1D(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
+                                               double a, double b, double epsTol, double rawCenter) {
 
         boolean aInf = (a == Double.NEGATIVE_INFINITY);
         boolean bInf = (b == Double.POSITIVE_INFINITY);
+        final double center = checkCenter(rawCenter, a, b, "center");
+
+        // CASE Z: any infinite interval, centered on a point the caller named
+        if (!Double.isNaN(center)) {
+            final Watch seen = new Watch();
+            // Transformation: x = c + t / (1 - t^2), the doubly infinite one
+            // moved onto the center. Its derivative at t = 0 is one, so a
+            // feature of unit width at the center stays unit width in t --
+            // which is what centering has to mean and what scaling the
+            // semi-infinite substitution instead would not give. A finite end
+            // is not dropped but carried into the limit of t that maps onto it.
+            DFunction transformed = t -> {
+                double t2 = t * t;
+                double divisor = 1.0 - t2;
+                if (Math.abs(divisor) < 1e-15) {
+                    return 0.0;
+                }
+                double x = center + t / divisor;
+                double derivative = (1.0 + t2) / (divisor * divisor);
+                return seen.record(f.apply(x)) * derivative;
+            };
+            double lo = aInf ? -1.0 : preimage(a - center);
+            double hi = bInf ? 1.0 : preimage(b - center);
+            double result = MetaIntegrator.integrate1DSmart(setup, transformed, lo, hi, epsTol);
+            return verify1D(f, seen, a, b, result, epsTol, center);
+        }
 
         // CASE A: Doubly infinite [-inf, +inf]
         if (aInf && bInf) {
@@ -280,7 +375,7 @@ public class InfiniteIntegrator {
             };
             // We integrate the transformed function strictly from -1 to 1
             double result = MetaIntegrator.integrate1DSmart(setup, transformed, -1.0, 1.0, epsTol);
-            return verify1D(f, seen, a, b, result, epsTol);
+            return verify1D(f, seen, a, b, result, epsTol, center);
         }
 
         // CASE B: Semi-infinite upward [a, +inf]
@@ -296,7 +391,7 @@ public class InfiniteIntegrator {
                 return seen.record(f.apply(x)) * derivative;
             };
             double result = MetaIntegrator.integrate1DSmart(setup, transformed, 0.0, 1.0, epsTol);
-            return verify1D(f, seen, a, b, result, epsTol);
+            return verify1D(f, seen, a, b, result, epsTol, center);
         }
 
         // CASE C: Semi-infinite downward [-inf, b]
@@ -312,11 +407,23 @@ public class InfiniteIntegrator {
                 return seen.record(f.apply(x)) * derivative;
             };
             double result = MetaIntegrator.integrate1DSmart(setup, transformed, 0.0, 1.0, epsTol);
-            return verify1D(f, seen, a, b, result, epsTol);
+            return verify1D(f, seen, a, b, result, epsTol, center);
         }
 
         // CASE D: Ordinary finite integral [a, b]
         return MetaIntegrator.integrate1DSmart(setup, f, a, b, epsTol);
+    }
+
+    /**
+     * The point {@code t} that {@code x = c + t/(1 - t^2)} carries onto a
+     * finite end at distance {@code d} from the center, which is the root of
+     * {@code d*t^2 + t - d} that lies in {@code (-1, 1)}. Written as
+     * {@code 2d / (1 + sqrt(1 + 4d^2))} rather than as the quadratic formula:
+     * that form neither divides by zero at {@code d = 0} nor overflows when
+     * {@code d} is large, and {@code hypot} keeps the square root safe too.
+     */
+    private static double preimage(double d) {
+        return (2.0 * d) / (1.0 + Math.hypot(1.0, 2.0 * d));
     }
 
     // =========================================================================
@@ -351,16 +458,67 @@ public class InfiniteIntegrator {
      */
     public static double integrate2DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
                                                double ax, double bx, double ay, double by, double epsTol) {
-        return integrate2D(setup, f, ax, bx, ay, by, epsTol, true);
+        return integrate2D(setup, f, ax, bx, ay, by, epsTol, true, Double.NaN, Double.NaN);
+    }
+
+    /**
+     * Integrates {@code f} over a rectangle whose sides may be infinite, with
+     * each infinite axis of the substitution centered where the caller says the
+     * mass lies instead of on the origin or on the finite end.
+     * <p>
+     * See the single-argument sibling
+     * {@link #integrate1DInfinite(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double, double)}
+     * for what a center is and why supplying one does not disarm the guard.
+     * Centering is never inferred here: an axis whose center is
+     * {@code Double.NaN} is substituted exactly as it was before, so a caller
+     * may center one axis and leave the other alone.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x, possibly infinite
+     * @param bx
+     *            upper limit in x, possibly infinite
+     * @param ay
+     *            lower limit in y, possibly infinite
+     * @param by
+     *            upper limit in y, possibly infinite
+     * @param epsTol
+     *            error tolerance
+     * @param centerX
+     *            where the mass lies in x, or {@code Double.NaN} for none
+     * @param centerY
+     *            where the mass lies in y, or {@code Double.NaN} for none
+     * @return the approximated integral
+     * @throws IllegalArgumentException
+     *             if a center is infinite, or does not lie strictly inside an
+     *             axis that has a finite end
+     * @throws ArithmeticException
+     *             if the substitution demonstrably never sampled the region
+     *             that carries the integrand, or sampled it but disagrees with
+     *             the same integral split around it
+     * @since 1.5.2
+     */
+    public static double integrate2DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
+                                               double ax, double bx, double ay, double by, double epsTol,
+                                               double centerX, double centerY) {
+        return integrate2D(setup, f, ax, bx, ay, by, epsTol, true, centerX, centerY);
     }
 
     private static double integrate2D(AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
                                         double ax, double bx, double ay, double by, double epsTol,
-                                        boolean verify) {
+                                        boolean verify, double rawCx, double rawCy) {
 
         // 1. Analyze bounds
         boolean axInf = (ax == Double.NEGATIVE_INFINITY); boolean bxInf = (bx == Double.POSITIVE_INFINITY);
         boolean ayInf = (ay == Double.NEGATIVE_INFINITY); boolean byInf = (by == Double.POSITIVE_INFINITY);
+
+        final double cx = checkCenter(rawCx, ax, bx, "centerX");
+        final double cy = checkCenter(rawCy, ay, by, "centerY");
+        final boolean onX = !Double.isNaN(cx);
+        final boolean onY = !Double.isNaN(cy);
 
         // 2. Set target integration bounds for the transformed variables
         double transAx = (axInf && bxInf) ? -1.0 : 0.0; double transBx = (axInf && bxInf) ? 1.0 : 1.0;
@@ -369,13 +527,21 @@ public class InfiniteIntegrator {
         if (!axInf && !bxInf) { transAx = ax; transBx = bx; }
         if (!ayInf && !byInf) { transAy = ay; transBy = by; }
 
+        // A centered axis uses the doubly infinite substitution about its
+        // center whatever its ends are, so its finite end becomes a limit in t
+        if (onX) { transAx = axInf ? -1.0 : preimage(ax - cx); transBx = bxInf ? 1.0 : preimage(bx - cx); }
+        if (onY) { transAy = ayInf ? -1.0 : preimage(ay - cy); transBy = byInf ? 1.0 : preimage(by - cy); }
+
         final Watch seen = new Watch();
 
         // 3. Build dynamic wrapper function
         DBiFunction transformed = (tX, tY) -> {
             // Transform X-axis
             double x = tX, jX = 1.0;
-            if (axInf && bxInf) {
+            if (onX) {
+                double div = 1.0 - tX * tX; if (Math.abs(div) < 1e-15) return 0.0;
+                x = cx + tX / div; jX = (1.0 + tX * tX) / (div * div);
+            } else if (axInf && bxInf) {
                 double div = 1.0 - tX * tX; if (Math.abs(div) < 1e-15) return 0.0;
                 x = tX / div; jX = (1.0 + tX * tX) / (div * div);
             } else if (!axInf && bxInf) {
@@ -388,7 +554,10 @@ public class InfiniteIntegrator {
 
             // Transform Y-axis
             double y = tY, jY = 1.0;
-            if (ayInf && byInf) {
+            if (onY) {
+                double div = 1.0 - tY * tY; if (Math.abs(div) < 1e-15) return 0.0;
+                y = cy + tY / div; jY = (1.0 + tY * tY) / (div * div);
+            } else if (ayInf && byInf) {
                 double div = 1.0 - tY * tY; if (Math.abs(div) < 1e-15) return 0.0;
                 y = tY / div; jY = (1.0 + tY * tY) / (div * div);
             } else if (!ayInf && byInf) {
@@ -411,7 +580,7 @@ public class InfiniteIntegrator {
             return result;
         }
 
-        Peak probed = probe2(f, ax, bx, ay, by);
+        Peak probed = probe2(f, ax, bx, ay, by, cx, cy);
         if (probed.value <= 0.0) {
             return result;
         }
@@ -419,15 +588,18 @@ public class InfiniteIntegrator {
             throw missed("[" + limit(ax) + ", " + limit(bx) + "] x [" + limit(ay) + ", " + limit(by) + "]",
                     seen.value(), probed.value, point(probed.x, probed.y));
         }
-        if (!farFromAnchor(probed.x, ax, bx) && !farFromAnchor(probed.y, ay, by)) {
+        if (!farFromAnchor(probed.x, ax, bx, cx) && !farFromAnchor(probed.y, ay, by, cy)) {
             return result;
         }
 
+        // The comparison has to be the one this check always made, so the
+        // orthants are integrated uncentered: a center of the whole domain need
+        // not even lie inside the piece being integrated here.
         double split = 0.0;
         for (int quadrant = 0; quadrant < 4; ++quadrant) {
             double[] rx = orthant(probed.x, ax, bx, (quadrant & 1) == 0);
             double[] ry = orthant(probed.y, ay, by, (quadrant & 2) == 0);
-            split += integrate2D(setup, f, rx[0], rx[1], ry[0], ry[1], epsTol, false);
+            split += integrate2D(setup, f, rx[0], rx[1], ry[0], ry[1], epsTol, false, Double.NaN, Double.NaN);
         }
         if (disagree(split, result)) {
             throw disagreement(point(probed.x, probed.y), result, split);
@@ -471,16 +643,74 @@ public class InfiniteIntegrator {
      */
     public static double integrate3DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
                                                double ax, double bx, double ay, double by, double az, double bz, double epsTol) {
-        return integrate3D(setup, f, ax, bx, ay, by, az, bz, epsTol, true);
+        return integrate3D(setup, f, ax, bx, ay, by, az, bz, epsTol, true, Double.NaN, Double.NaN, Double.NaN);
+    }
+
+    /**
+     * Integrates {@code f} over a box whose sides may be infinite, with each
+     * infinite axis of the substitution centered where the caller says the mass
+     * lies instead of on the origin or on the finite end.
+     * <p>
+     * See the single-argument sibling
+     * {@link #integrate1DInfinite(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double, double)}
+     * for what a center is and why supplying one does not disarm the guard.
+     * Centering is never inferred here: an axis whose center is
+     * {@code Double.NaN} is substituted exactly as it was before.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x, possibly infinite
+     * @param bx
+     *            upper limit in x, possibly infinite
+     * @param ay
+     *            lower limit in y, possibly infinite
+     * @param by
+     *            upper limit in y, possibly infinite
+     * @param az
+     *            lower limit in z, possibly infinite
+     * @param bz
+     *            upper limit in z, possibly infinite
+     * @param epsTol
+     *            error tolerance
+     * @param centerX
+     *            where the mass lies in x, or {@code Double.NaN} for none
+     * @param centerY
+     *            where the mass lies in y, or {@code Double.NaN} for none
+     * @param centerZ
+     *            where the mass lies in z, or {@code Double.NaN} for none
+     * @return the approximated integral
+     * @throws IllegalArgumentException
+     *             if a center is infinite, or does not lie strictly inside an
+     *             axis that has a finite end
+     * @throws ArithmeticException
+     *             if the substitution demonstrably never sampled the region
+     *             that carries the integrand, or sampled it but disagrees with
+     *             the same integral split around it
+     * @since 1.5.2
+     */
+    public static double integrate3DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
+                                               double ax, double bx, double ay, double by, double az, double bz,
+                                               double epsTol, double centerX, double centerY, double centerZ) {
+        return integrate3D(setup, f, ax, bx, ay, by, az, bz, epsTol, true, centerX, centerY, centerZ);
     }
 
     private static double integrate3D(AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
                                         double ax, double bx, double ay, double by, double az, double bz,
-                                        double epsTol, boolean verify) {
+                                        double epsTol, boolean verify, double rawCx, double rawCy, double rawCz) {
 
         boolean axInf = (ax == Double.NEGATIVE_INFINITY); boolean bxInf = (bx == Double.POSITIVE_INFINITY);
         boolean ayInf = (ay == Double.NEGATIVE_INFINITY); boolean byInf = (by == Double.POSITIVE_INFINITY);
         boolean azInf = (az == Double.NEGATIVE_INFINITY); boolean bzInf = (bz == Double.POSITIVE_INFINITY);
+
+        final double cx = checkCenter(rawCx, ax, bx, "centerX");
+        final double cy = checkCenter(rawCy, ay, by, "centerY");
+        final double cz = checkCenter(rawCz, az, bz, "centerZ");
+        final boolean onX = !Double.isNaN(cx);
+        final boolean onY = !Double.isNaN(cy);
+        final boolean onZ = !Double.isNaN(cz);
 
         double transAx = (axInf && bxInf) ? -1.0 : 0.0; double transBx = (axInf && bxInf) ? 1.0 : 1.0;
         double transAy = (ayInf && byInf) ? -1.0 : 0.0; double transBy = (ayInf && byInf) ? 1.0 : 1.0;
@@ -490,24 +720,32 @@ public class InfiniteIntegrator {
         if (!ayInf && !byInf) { transAy = ay; transBy = by; }
         if (!azInf && !bzInf) { transAz = az; transBz = bz; }
 
+        // See the 2D form: a centered axis is substituted about its center
+        if (onX) { transAx = axInf ? -1.0 : preimage(ax - cx); transBx = bxInf ? 1.0 : preimage(bx - cx); }
+        if (onY) { transAy = ayInf ? -1.0 : preimage(ay - cy); transBy = byInf ? 1.0 : preimage(by - cy); }
+        if (onZ) { transAz = azInf ? -1.0 : preimage(az - cz); transBz = bzInf ? 1.0 : preimage(bz - cz); }
+
         final Watch seen = new Watch();
 
         DTriFunction transformed = (tX, tY, tZ) -> {
             // Transform X-axis
             double x = tX, jX = 1.0;
-            if (axInf && bxInf) { double div = 1.0 - tX * tX; if (Math.abs(div) < 1e-15) return 0.0; x = tX / div; jX = (1.0 + tX * tX) / (div * div); }
+            if (onX) { double div = 1.0 - tX * tX; if (Math.abs(div) < 1e-15) return 0.0; x = cx + tX / div; jX = (1.0 + tX * tX) / (div * div); }
+            else if (axInf && bxInf) { double div = 1.0 - tX * tX; if (Math.abs(div) < 1e-15) return 0.0; x = tX / div; jX = (1.0 + tX * tX) / (div * div); }
             else if (!axInf && bxInf) { double div = 1.0 - tX; if (Math.abs(div) < 1e-15) return 0.0; x = ax + tX / div; jX = 1.0 / (div * div); }
             else if (axInf && !bxInf) { double div = 1.0 - tX; if (Math.abs(div) < 1e-15) return 0.0; x = bx - tX / div; jX = 1.0 / (div * div); }
 
             // Transform Y-axis
             double y = tY, jY = 1.0;
-            if (ayInf && byInf) { double div = 1.0 - tY * tY; if (Math.abs(div) < 1e-15) return 0.0; y = tY / div; jY = (1.0 + tY * tY) / (div * div); }
+            if (onY) { double div = 1.0 - tY * tY; if (Math.abs(div) < 1e-15) return 0.0; y = cy + tY / div; jY = (1.0 + tY * tY) / (div * div); }
+            else if (ayInf && byInf) { double div = 1.0 - tY * tY; if (Math.abs(div) < 1e-15) return 0.0; y = tY / div; jY = (1.0 + tY * tY) / (div * div); }
             else if (!ayInf && byInf) { double div = 1.0 - tY; if (Math.abs(div) < 1e-15) return 0.0; y = ay + tY / div; jY = 1.0 / (div * div); }
             else if (ayInf && !byInf) { double div = 1.0 - tY; if (Math.abs(div) < 1e-15) return 0.0; y = by - tY / div; jY = 1.0 / (div * div); }
 
             // Transform Z-axis
             double z = tZ, jZ = 1.0;
-            if (azInf && bzInf) { double div = 1.0 - tZ * tZ; if (Math.abs(div) < 1e-15) return 0.0; z = tZ / div; jZ = (1.0 + tZ * tZ) / (div * div); }
+            if (onZ) { double div = 1.0 - tZ * tZ; if (Math.abs(div) < 1e-15) return 0.0; z = cz + tZ / div; jZ = (1.0 + tZ * tZ) / (div * div); }
+            else if (azInf && bzInf) { double div = 1.0 - tZ * tZ; if (Math.abs(div) < 1e-15) return 0.0; z = tZ / div; jZ = (1.0 + tZ * tZ) / (div * div); }
             else if (!azInf && bzInf) { double div = 1.0 - tZ; if (Math.abs(div) < 1e-15) return 0.0; z = az + tZ / div; jZ = 1.0 / (div * div); }
             else if (azInf && !bzInf) { double div = 1.0 - tZ; if (Math.abs(div) < 1e-15) return 0.0; z = bz - tZ / div; jZ = 1.0 / (div * div); }
 
@@ -522,7 +760,7 @@ public class InfiniteIntegrator {
             return result;
         }
 
-        Peak probed = probe3(f, ax, bx, ay, by, az, bz);
+        Peak probed = probe3(f, ax, bx, ay, by, az, bz, cx, cy, cz);
         if (probed.value <= 0.0) {
             return result;
         }
@@ -531,17 +769,20 @@ public class InfiniteIntegrator {
                     + limit(az) + ", " + limit(bz) + "]", seen.value(), probed.value,
                     point(probed.x, probed.y, probed.z));
         }
-        if (!farFromAnchor(probed.x, ax, bx) && !farFromAnchor(probed.y, ay, by)
-                && !farFromAnchor(probed.z, az, bz)) {
+        if (!farFromAnchor(probed.x, ax, bx, cx) && !farFromAnchor(probed.y, ay, by, cy)
+                && !farFromAnchor(probed.z, az, bz, cz)) {
             return result;
         }
 
+        // Uncentered for the same reason as in 2D: the comparison has to stay
+        // the one this check always made.
         double split = 0.0;
         for (int octant = 0; octant < 8; ++octant) {
             double[] rx = orthant(probed.x, ax, bx, (octant & 1) == 0);
             double[] ry = orthant(probed.y, ay, by, (octant & 2) == 0);
             double[] rz = orthant(probed.z, az, bz, (octant & 4) == 0);
-            split += integrate3D(setup, f, rx[0], rx[1], ry[0], ry[1], rz[0], rz[1], epsTol, false);
+            split += integrate3D(setup, f, rx[0], rx[1], ry[0], ry[1], rz[0], rz[1], epsTol, false, Double.NaN,
+                    Double.NaN, Double.NaN);
         }
         if (disagree(split, result)) {
             throw disagreement(point(probed.x, probed.y, probed.z), result, split);
@@ -558,13 +799,19 @@ public class InfiniteIntegrator {
      * outwards from the finite end of the domain, or from the origin when there
      * is none, then refines around the best rung.
      */
-    private static Peak probe(DFunction f, double a, double b) {
+    private static Peak probe(DFunction f, double a, double b, double center) {
         boolean aInf = (a == Double.NEGATIVE_INFINITY);
         boolean bInf = (b == Double.POSITIVE_INFINITY);
         double anchor = (aInf && bInf) ? 0.0 : (aInf ? b : a);
 
         Peak peak = new Peak();
         peak.record(anchor, f.apply(anchor));
+        // A center is added to what the ladder samples, never substituted for
+        // it: one evaluation buys the caller's point without giving up the
+        // guard against a caller who named the wrong one.
+        if (!Double.isNaN(center)) {
+            peak.record(center, f.apply(center));
+        }
         for (int k = 0; k <= LADDER_STEPS; ++k) {
             double magnitude = Math.pow(LADDER_RATIO, k - LADDER_UNIT);
             if (aInf && bInf) {
@@ -597,42 +844,47 @@ public class InfiniteIntegrator {
     /**
      * The sample positions of one axis: a geometric ladder outwards from
      * whichever end is finite, both signs when neither is, and a uniform scan
-     * when the axis is bounded on both sides.
+     * when the axis is bounded on both sides. A center is appended to that
+     * list, which costs one position per axis rather than a second grid.
      */
-    private static double[] axisSamples(double a, double b, double ratio, int rungs) {
+    private static double[] axisSamples(double a, double b, double center, double ratio, int rungs) {
         boolean aInf = (a == Double.NEGATIVE_INFINITY);
         boolean bInf = (b == Double.POSITIVE_INFINITY);
         int n = 2 * rungs + 1;
+        double[] samples;
         if (!aInf && !bInf) {
-            double[] samples = new double[n];
+            samples = new double[n];
             for (int i = 0; i < n; ++i) {
                 samples[i] = a + ((b - a) * i) / (n - 1.0);
             }
-            return samples;
-        }
-        if (aInf && bInf) {
-            double[] samples = new double[2 * n + 1];
+        } else if (aInf && bInf) {
+            samples = new double[2 * n + 1];
             samples[0] = 0.0;
             for (int k = 0; k < n; ++k) {
                 double magnitude = Math.pow(ratio, k - rungs);
                 samples[1 + 2 * k] = magnitude;
                 samples[2 + 2 * k] = -magnitude;
             }
+        } else {
+            double anchor = aInf ? b : a;
+            samples = new double[n + 1];
+            samples[0] = anchor;
+            for (int k = 0; k < n; ++k) {
+                double magnitude = Math.pow(ratio, k - rungs);
+                samples[1 + k] = aInf ? (anchor - magnitude) : (anchor + magnitude);
+            }
+        }
+        if (Double.isNaN(center)) {
             return samples;
         }
-        double anchor = aInf ? b : a;
-        double[] samples = new double[n + 1];
-        samples[0] = anchor;
-        for (int k = 0; k < n; ++k) {
-            double magnitude = Math.pow(ratio, k - rungs);
-            samples[1 + k] = aInf ? (anchor - magnitude) : (anchor + magnitude);
-        }
-        return samples;
+        double[] withCenter = Arrays.copyOf(samples, samples.length + 1);
+        withCenter[samples.length] = center;
+        return withCenter;
     }
 
-    private static Peak probe2(DBiFunction f, double ax, double bx, double ay, double by) {
-        double[] xs = axisSamples(ax, bx, GRID_RATIO_2D, GRID_RUNGS_2D);
-        double[] ys = axisSamples(ay, by, GRID_RATIO_2D, GRID_RUNGS_2D);
+    private static Peak probe2(DBiFunction f, double ax, double bx, double ay, double by, double cx, double cy) {
+        double[] xs = axisSamples(ax, bx, cx, GRID_RATIO_2D, GRID_RUNGS_2D);
+        double[] ys = axisSamples(ay, by, cy, GRID_RATIO_2D, GRID_RUNGS_2D);
         Peak peak = new Peak();
         for (int i = 0; i < xs.length; ++i) {
             for (int j = 0; j < ys.length; ++j) {
@@ -660,10 +912,11 @@ public class InfiniteIntegrator {
         return peak;
     }
 
-    private static Peak probe3(DTriFunction f, double ax, double bx, double ay, double by, double az, double bz) {
-        double[] xs = axisSamples(ax, bx, GRID_RATIO_3D, GRID_RUNGS_3D);
-        double[] ys = axisSamples(ay, by, GRID_RATIO_3D, GRID_RUNGS_3D);
-        double[] zs = axisSamples(az, bz, GRID_RATIO_3D, GRID_RUNGS_3D);
+    private static Peak probe3(DTriFunction f, double ax, double bx, double ay, double by, double az, double bz,
+            double cx, double cy, double cz) {
+        double[] xs = axisSamples(ax, bx, cx, GRID_RATIO_3D, GRID_RUNGS_3D);
+        double[] ys = axisSamples(ay, by, cy, GRID_RATIO_3D, GRID_RUNGS_3D);
+        double[] zs = axisSamples(az, bz, cz, GRID_RATIO_3D, GRID_RUNGS_3D);
         Peak peak = new Peak();
         for (int i = 0; i < xs.length; ++i) {
             for (int j = 0; j < ys.length; ++j) {
@@ -706,9 +959,38 @@ public class InfiniteIntegrator {
      * finds nothing at all does not accuse: an integrand negligible everywhere
      * the ladder reaches is entitled to integrate to zero.
      */
-    private static double verify1D(DFunction f, Watch seen, double a, double b, double result, double epsTol) {
-        Peak probed = probe(f, a, b);
-        if (probed.value <= 0.0 || seen.value() >= MISS_FACTOR * probed.value) {
+    private static double verify1D(DFunction f, Watch seen, double a, double b, double result, double epsTol,
+            double center) {
+        Peak probed = probe(f, a, b, center);
+        if (probed.value <= 0.0) {
+            // The ladder found nothing anywhere, and an integrand negligible
+            // everywhere it reached is entitled to integrate to zero -- unless
+            // the caller named a place to look, which is worth trying before
+            // that zero is handed out.
+            if (!Double.isNaN(center)) {
+                double named = rescue1D(f, a, b, center, epsTol);
+                if (!Double.isNaN(named)) {
+                    return named;
+                }
+            }
+            return result;
+        }
+        if (seen.value() >= MISS_FACTOR * probed.value) {
+            // The substitution did sample the mass, which used to settle it:
+            // without a center the mass can only be resolved or missed, never
+            // sampled badly, because the substitution sits on the anchor. A
+            // center the caller chose can be far from where the mass turned out
+            // to be, and then sampling it is not the same as resolving it --
+            // the failure the 2D and 3D forms answer with their split check. In
+            // one dimension there is a better answer than a refusal: split
+            // where the mass is and let the rule that crowds its nodes there
+            // settle the disagreement.
+            if (!Double.isNaN(center) && farFromAnchor(probed.x, a, b, center)) {
+                double split = rescue1D(f, a, b, probed.x, epsTol);
+                if (!Double.isNaN(split) && disagree(split, result)) {
+                    return split;
+                }
+            }
             return result;
         }
         // The substitution looked in the wrong place, and the message below
@@ -745,14 +1027,44 @@ public class InfiniteIntegrator {
     }
 
     /** Is this coordinate far from the point its substitution is centered on? */
-    private static boolean farFromAnchor(double coordinate, double a, double b) {
+    private static boolean farFromAnchor(double coordinate, double a, double b, double center) {
         boolean aInf = (a == Double.NEGATIVE_INFINITY);
         boolean bInf = (b == Double.POSITIVE_INFINITY);
         if (!aInf && !bInf) {
             return false;
         }
-        double anchor = (aInf && bInf) ? 0.0 : (aInf ? b : a);
+        double anchor = !Double.isNaN(center) ? center : ((aInf && bInf) ? 0.0 : (aInf ? b : a));
         return Math.abs(coordinate - anchor) > SAFE_RADIUS;
+    }
+
+    /**
+     * Validates one axis's center and returns it, {@code NaN} standing for
+     * none. An axis with two finite ends is not substituted at all, so a center
+     * given for one is dropped here rather than silently changing the rule.
+     */
+    private static double checkCenter(double center, double a, double b, String name) {
+        if (Double.isNaN(center)) {
+            return Double.NaN;
+        }
+        if (Double.isInfinite(center)) {
+            throw new IllegalArgumentException(name + " must be finite, was " + center);
+        }
+        boolean aInf = (a == Double.NEGATIVE_INFINITY);
+        boolean bInf = (b == Double.POSITIVE_INFINITY);
+        if (!aInf && !bInf) {
+            return Double.NaN;
+        }
+        if (!aInf && !(center > a)) {
+            throw new IllegalArgumentException(String.format(Locale.ROOT,
+                    "%s must lie strictly above the finite end %.6g of [%s, %s], was %.6g", name, Double.valueOf(a),
+                    limit(a), limit(b), Double.valueOf(center)));
+        }
+        if (!bInf && !(center < b)) {
+            throw new IllegalArgumentException(String.format(Locale.ROOT,
+                    "%s must lie strictly below the finite end %.6g of [%s, %s], was %.6g", name, Double.valueOf(b),
+                    limit(a), limit(b), Double.valueOf(center)));
+        }
+        return center;
     }
 
     /** One side of a split of {@code [a, b]} at {@code cut}. */
