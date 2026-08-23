@@ -18,21 +18,57 @@ package math.rng;
 /**
  * Factory methods for the default {@link PseudoRandom} algorithm which is
  * currently a {@link MersenneTwister64}.
+ * <p>
+ * The generators returned are not thread-safe; see {@link PseudoRandom} for
+ * what that rules out. To hand one to each of several threads, take them from
+ * {@link #newIndepPseudoRandoms(int)} rather than sharing a single one.
  */
 public final class DefaultRng {
 
+    /**
+     * Returns a new generator seeded unpredictably, and therefore not
+     * reproducible.
+     *
+     * @return a new {@link PseudoRandom}
+     */
     public static PseudoRandom newPseudoRandom() {
         return new MersenneTwister64();
     }
 
+    /**
+     * Returns a new generator for the given seed. The same seed always yields
+     * the same sequence.
+     *
+     * @param seed the seed to start from
+     * @return a new {@link PseudoRandom}
+     */
     public static PseudoRandom newPseudoRandom(long seed) {
         return new MersenneTwister64(seed);
     }
 
+    /**
+     * Returns a new generator for the given seed values, all of which are used
+     * as seed material. The same array always yields the same sequence.
+     *
+     * @param seed the seed values to start from, neither {@code null} nor
+     *            empty
+     * @return a new {@link PseudoRandom}
+     * @throws NullPointerException if {@code seed} is {@code null}
+     * @throws IllegalArgumentException if {@code seed} is empty
+     */
     public static PseudoRandom newPseudoRandom(long[] seed) {
         return new MersenneTwister64(seed);
     }
 
+    /**
+     * Returns {@code count} generators seeded so that their sequences do not
+     * overlap in any practically reachable way. All of them are seeded
+     * unpredictably and are therefore not reproducible.
+     *
+     * @param count the number of generators to create, positive
+     * @return an array of {@code count} independently seeded generators
+     * @throws IllegalArgumentException if {@code count <= 0}
+     */
     public static PseudoRandom[] newIndepPseudoRandoms(int count) {
         if (count <= 0) {
             throw new IllegalArgumentException("count <= 0 : " + count);
@@ -52,6 +88,14 @@ public final class DefaultRng {
         return multiplePrng;
     }
 
+    /**
+     * Returns a new generator seeded from the given one. Note that this
+     * <b>advances {@code prng}</b>: the seed is 312 {@code long} values drawn
+     * from it, so the caller's own sequence moves on by that much.
+     *
+     * @param prng the generator to draw the seed from, advanced by 312 values
+     * @return a new {@link PseudoRandom} independent of {@code prng}
+     */
     public static PseudoRandom newIndepPseudoRandom(PseudoRandom prng) {
         final int NN = 312;
         final long[] seed = new long[NN];
