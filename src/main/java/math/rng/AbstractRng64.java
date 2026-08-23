@@ -45,12 +45,12 @@ public abstract class AbstractRng64 implements PseudoRandom {
     private static final String BAD_RANGE = "max must be >= min";
 
     // not used, but a potential target for a store
-    protected static byte unused;
+    static byte unused;
 
     private long[] initialSeed;
 
     /** cache for the next gaussian */
-    protected double nextGaussian = Double.NaN;
+    private double nextGaussian = Double.NaN;
 
     @Override
     public abstract long nextLong();
@@ -62,7 +62,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public double nextDouble(double min, double max) {
-        if (min > max) {
+        if (!(min <= max)) { // catches NaN as well
             throw new IllegalArgumentException(BAD_RANGE);
         }
         double r;
@@ -114,7 +114,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public float nextFloat(float min, float max) {
-        if (min > max) {
+        if (!(min <= max)) { // catches NaN as well
             throw new IllegalArgumentException(BAD_RANGE);
         }
         float r;
