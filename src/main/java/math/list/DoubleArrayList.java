@@ -17,6 +17,7 @@ package math.list;
 
 import java.io.Externalizable;
 import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.math.BigDecimal;
@@ -1735,7 +1736,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public double min() {
             if (isEmpty()) {
-                throw new NoSuchElementException();
+                throw new NoSuchElementException("empty list");
             }
             return DoubleArrayList.min(size, offset, root.elementData);
         }
@@ -1743,7 +1744,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public double max() {
             if (isEmpty()) {
-                throw new NoSuchElementException();
+                throw new NoSuchElementException("empty list");
             }
             return DoubleArrayList.max(size, offset, root.elementData);
         }
@@ -1751,7 +1752,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public double avg() {
             if (isEmpty()) {
-                throw new NoSuchElementException();
+                throw new NoSuchElementException("empty list");
             }
             return DoubleArrayList.avg(size, offset, root.elementData);
         }
@@ -1764,7 +1765,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public double median() {
             if (isEmpty()) {
-                throw new NoSuchElementException();
+                throw new NoSuchElementException("empty list");
             }
             return DoubleArrayList.median(size, offset, root.elementData);
         }
@@ -1912,7 +1913,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         @Override
         public double logSumExp() {
             if (isEmpty()) {
-                throw new NoSuchElementException();
+                throw new NoSuchElementException("empty list");
             }
             return DoubleArrayList.logSumExp(size, offset, root.elementData);
         }
@@ -2237,7 +2238,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     /* check for list length greater or equal 2 */
     static int checkLengthGeq2(int length) {
         if (length < 2) {
-            throw new IllegalArgumentException("length is : " + length);
+            throw new IllegalArgumentException("at least 2 elements are needed, but the length is " + length);
         }
         return length;
     }
@@ -2473,7 +2474,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double logSumExp() {
         if (isEmpty()) {
-            throw new NoSuchElementException();
+            throw new NoSuchElementException("empty list");
         }
         return logSumExp(size, 0, elementData);
     }
@@ -2598,7 +2599,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double min() {
         if (isEmpty()) {
-            throw new NoSuchElementException();
+            throw new NoSuchElementException("empty list");
         }
         return min(size, 0, elementData);
     }
@@ -2609,7 +2610,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double max() {
         if (isEmpty()) {
-            throw new NoSuchElementException();
+            throw new NoSuchElementException("empty list");
         }
         return max(size, 0, elementData);
     }
@@ -2620,7 +2621,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double avg() {
         if (isEmpty()) {
-            throw new NoSuchElementException();
+            throw new NoSuchElementException("empty list");
         }
         return avg(size, 0, elementData);
     }
@@ -2639,7 +2640,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public double median() {
         if (isEmpty()) {
-            throw new NoSuchElementException();
+            throw new NoSuchElementException("empty list");
         }
         return median(size, 0, elementData);
     }
@@ -2857,8 +2858,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     @Override
     public void writeExternal(ObjectOutput out) throws IOException {
         int expectedModCount = modCount;
+        final double[] es = elementData;
         out.writeInt(size);
-        out.writeObject(elementData);
+        // the elements, not the spare capacity behind them: neither clear()
+        // nor a removal erases that tail, so writing the whole array hands
+        // out what the list no longer holds -- and pays for it
+        out.writeObject((es.length == size) ? es : Arrays.copyOf(es, size));
         if (modCount != expectedModCount) {
             throw new ConcurrentModificationException();
         }
@@ -2866,7 +2871,20 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        size = in.readInt();
-        elementData = (double[]) in.readObject();
+        final int newSize = in.readInt();
+        final double[] es = (double[]) in.readObject();
+        if (es == null) {
+            throw new InvalidObjectException("no element array");
+        }
+        if (newSize < 0 || newSize > es.length) {
+            throw new InvalidObjectException("size " + newSize + " for an array of length " + es.length);
+        }
+        // a stream written before writeExternal stopped emitting the spare
+        // capacity is still readable: it can only be longer than the size it
+        // declares. An empty list comes back able to grow like a constructed
+        // one rather than one element at a time
+        elementData = (newSize == 0) ? DEFAULTCAPACITY_EMPTY_ELEMENTDATA : es;
+        size = newSize;
+        modCount = 0;
     }
 }
