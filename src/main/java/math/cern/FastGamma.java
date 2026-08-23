@@ -45,40 +45,117 @@ public final class FastGamma {
     private static final double c5 = 8.4175084175084175e-04;
     private static final double c6 = -1.9175269175269175e-03;
 
-    /** below this the Stirling series is not used and the argument is shifted up */
+    /** the six term Stirling series is accurate from here up */
     private static final double STIRLING_MIN = 11.0;
+
+    /** below this the rational approximation in {@link GammaFun} takes over */
+    private static final double RATIONAL_MAX = 13.0;
+
+    /**
+     * below this gamma is the reciprocal to well past the last bit, and the
+     * reciprocal is what the rational approximation would have to form
+     */
+    private static final double RECIPROCAL_MAX = 1.0e-305;
+
+    /** natural logarithm of pi */
+    private static final double LN_PI = 1.14472988584940017414;
 
     /**
      * Returns a quick approximation of the gamma function <tt>gamma(x)</tt>.
-     * 
+     * <p>
+     * Below zero the sign has to be put back on by hand, because
+     * {@link #logGamma(double)} is the logarithm of the magnitude and gamma
+     * alternates sign there: negative on <tt>(-1, 0)</tt>, positive on
+     * <tt>(-2, -1)</tt>, and so on. At a pole there is no value to return --
+     * the two one-sided limits are <tt>+infinity</tt> and <tt>-infinity</tt>
+     * -- so that answers <tt>NaN</tt>.
+     *
      * @param x the value
      * @return gamma(x)
      */
     public static double gamma(final double x) {
-        return Math.exp(logGamma(x));
+        if (x > 0.0 || Double.isNaN(x)) {
+            return Math.exp(logGamma(x));
+        }
+        if (x == Math.floor(x)) {
+            return Double.NaN;
+        }
+        final double magnitude = Math.exp(logGamma(x));
+        return ((((long) Math.floor(-x)) & 1L) == 0L) ? -magnitude : magnitude;
     }
 
     /**
-     * Returns a quick approximation of <tt>log(gamma(x))</tt>.
-     * 
+     * Returns <tt>log(|gamma(x)|)</tt>, the natural logarithm of the absolute
+     * value of the gamma function.
+     * <p>
+     * Defined on the whole real line: <tt>+infinity</tt> at the poles, which
+     * are zero and the negative integers, and the logarithm of the magnitude
+     * elsewhere, since gamma alternates sign below zero. <tt>NaN</tt> answers
+     * <tt>NaN</tt> and <tt>-infinity</tt>, where the magnitude has no limit --
+     * it runs to zero between the poles and to infinity at each of them.
+     * <p>
+     * Above <tt>x = 13</tt> this is the Stirling series; below it the rational
+     * approximation of {@link GammaFun#lnGamma(double)}, which is both more
+     * accurate and faster there than shifting the argument up and subtracting
+     * the logarithm of the shift. That subtraction used to cost about five
+     * ulps of absolute error everywhere below 13, which near the two zeros of
+     * <tt>log(gamma)</tt> at <tt>x = 1</tt> and <tt>x = 2</tt> is a relative
+     * error of <tt>1e-10</tt>; <tt>logGamma(1.0)</tt> came out as
+     * <tt>1.78e-15</tt> rather than zero.
+     *
      * @param x the value
-     * @return log(gamma(x))
+     * @return log(|gamma(x)|)
      */
     public static double logGamma(double x) {
-        if (x <= 0.0 /* || x > 1.3e19 */) {
-            return -999;
+        if (x > 0.0) {
+            if (x < RATIONAL_MAX) {
+                if (x < RECIPROCAL_MAX) {
+                    // gamma(x) = 1/x - euler + O(x), and the correction is far
+                    // below the last bit of log(x) this far down. The rational
+                    // approximation would divide by x to shift the argument
+                    // up, and that overflows below 1 / Double.MAX_VALUE
+                    return -Math.log(x);
+                }
+                return GammaFun.lnGamma(x);
+            }
+            if (x == Double.POSITIVE_INFINITY) {
+                return x;
+            }
+            // the shift loop the Stirling branch used to carry is gone: it ran
+            // below x = 11, and nothing below 13 reaches here any more
+            return (x - 0.5) * Math.log(x) - x + c0 + stirlingSeries(x);
         }
-
-        double z;
-        for (z = 1.0; x < STIRLING_MIN; x++) {
-            z *= x;
+        if (Double.isNaN(x)) {
+            return Double.NaN;
         }
-
-        final double g = (x - 0.5) * Math.log(x) - x + c0 + stirlingSeries(x);
-        if (z == 1.0) {
-            return g;
+        if (x == Double.NEGATIVE_INFINITY) {
+            // |gamma| runs to zero between the poles and to infinity at each
+            // of them, so there is nothing to converge to
+            return Double.NaN;
         }
-        return g - Math.log(z);
+        if (x == Math.floor(x)) {
+            return Double.POSITIVE_INFINITY;
+        }
+        // reflection: |gamma(x)| = pi / (|sin(pi x)| * |gamma(1 - x)|) and
+        // gamma(1 - x) = q * gamma(q) with q = -x, so
+        // log|gamma(x)| = log(pi) - log|sin(pi x)| - log(q) - logGamma(q).
+        // The three logarithms are kept apart on purpose: q * sin(pi q)
+        // underflows for a q below about 1e-162, while each factor on its own
+        // is still a normal number
+        final double q = -x;
+        if (q < RECIPROCAL_MAX) {
+            // the reciprocal again, only negative. Taken through the formula
+            // below it would go through sin(pi q), and pi times a q this small
+            // is a deep subnormal with a handful of bits left
+            return -Math.log(q);
+        }
+        double f = q - Math.floor(q);
+        if (f > 0.5) {
+            // sin(pi f) is symmetric about one half; the smaller argument
+            // is the one Math.sin can reduce without losing digits
+            f = 1.0 - f;
+        }
+        return LN_PI - Math.log(Math.sin(Math.PI * f)) - Math.log(q) - logGamma(q);
     }
 
     /**
@@ -103,17 +180,13 @@ public final class FastGamma {
      * size of <tt>logGamma</tt>. Below <tt>x = 11</tt> the series does not
      * apply and the plain difference is taken, which is accurate there.
      *
-     * @param x the value, strictly positive
-     * @param delta the offset, with <tt>x + delta</tt> strictly positive
-     * @return log(gamma(x + delta) / gamma(x)), or <tt>-999</tt> if either
-     *         argument of the two gamma functions is not strictly positive
+     * @param x the value
+     * @param delta the offset
+     * @return log(|gamma(x + delta)| / |gamma(x)|)
      * @since 1.5.2
      */
     public static double logGammaRatio(double x, double delta) {
         final double y = x + delta;
-        if (x <= 0.0 || y <= 0.0) {
-            return -999;
-        }
         if (delta == 0.0) {
             return 0.0;
         }

@@ -202,12 +202,17 @@ public class ContinuousDistributionTest {
                 .floors(11.0, 13.0, 13.0, 15.0, 14.0, 11.0));
         r.add(row("ChiSquare", "df=30", new ChiSquare(30.0), 0.0, 150.0).moments(0.0, 150.0)
                 .floors(14.0, 14.0, 14.0, 14.0, 14.0, 14.0));
+        // the round-trip floor here is 15 and not 16 for the reason spelled
+        // out at df=8 below: the quantile of p = 0.9 comes back exact or one
+        // ulp away, nothing in between, and which of the two is decided by
+        // the last bit of the density
         r.add(row("StudentT", "df=1", new StudentT(1.0), -1000.0, 1000.0).flags(NO_MEAN).tail(7.0e-4)
-                .floors(14.0, 14.0, 12.0, 16.0, 0.0, 0.0));
+                .floors(14.0, 14.0, 12.0, 15.0, 0.0, 0.0));
         r.add(row("StudentT", "df=2", new StudentT(2.0), -500.0, 500.0).flags(NO_VARIANCE).tail(5.0e-6)
                 .floors(15.0, 15.0, 13.0, 15.0, 15.0, 0.0));
+        // mean floor 15, same reason as df=8 below
         r.add(row("StudentT", "df=3", new StudentT(3.0), -300.0, 300.0).moments(-3000.0, 3000.0).tail(1.0e-7)
-                .floors(15.0, 15.0, 12.0, 15.0, 16.0, 3.0));
+                .floors(15.0, 15.0, 12.0, 15.0, 15.0, 3.0));
         // the mean floor here is 15 and not 16 because the mean is exactly
         // zero: relDigits then reports either 17, when the quadrature happens
         // to cancel to the last bit, or 15.9546, when it is left holding one
