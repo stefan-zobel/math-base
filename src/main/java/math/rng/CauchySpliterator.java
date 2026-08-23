@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2021 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,13 +37,18 @@ final class CauchySpliterator extends PseudoRandomSpliterator implements Spliter
 
     @Override
     public Spliterator.OfDouble trySplit() {
-        long idx = index;
-        long s = (idx + fence) >>> 1;
-        if (s <= idx) {
+        long s = splitPoint();
+        if (s < 0L) {
             return null;
         }
+        PseudoRandom half = detach(prng);
+        if (half == null) {
+            // the source cannot hand out an independent generator
+            return null;
+        }
+        long idx = index;
         index = s;
-        return new CauchySpliterator(prng, idx, s, location, scale);
+        return new CauchySpliterator(half, idx, s, location, scale);
     }
 
     @Override

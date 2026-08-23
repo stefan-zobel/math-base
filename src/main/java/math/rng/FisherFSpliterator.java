@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2021 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,13 +57,19 @@ final class FisherFSpliterator extends PseudoRandomSpliterator implements Splite
 
     @Override
     public Spliterator.OfDouble trySplit() {
-        long idx = index;
-        long s = (idx + fence) >>> 1;
-        if (s <= idx) {
+        long s = splitPoint();
+        if (s < 0L) {
             return null;
         }
+        PseudoRandom halfU = detach(prng_U);
+        PseudoRandom halfV = detach(prng_V);
+        if (halfU == null || halfV == null) {
+            // the source cannot hand out independent generators
+            return null;
+        }
+        long idx = index;
         index = s;
-        return new FisherFSpliterator(prng_U, prng_V, idx, s, d1, d2);
+        return new FisherFSpliterator(halfU, halfV, idx, s, d1, d2);
     }
 
     @Override

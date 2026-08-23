@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Stefan Zobel
+ * Copyright 2021, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,13 +34,18 @@ final class PseudoRandomDoubleSpliterator extends PseudoRandomSpliterator implem
 
     @Override
     public Spliterator.OfDouble trySplit() {
-        long idx = index;
-        long s = (idx + fence) >>> 1;
-        if (s <= idx) {
+        long s = splitPoint();
+        if (s < 0L) {
             return null;
         }
+        PseudoRandom half = detach(prng);
+        if (half == null) {
+            // the source cannot hand out an independent generator
+            return null;
+        }
+        long idx = index;
         index = s;
-        return new PseudoRandomDoubleSpliterator(prng, idx, s, min, max);
+        return new PseudoRandomDoubleSpliterator(half, idx, s, min, max);
     }
 
     @Override

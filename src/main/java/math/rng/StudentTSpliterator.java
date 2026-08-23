@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2021 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,13 +35,18 @@ final class StudentTSpliterator extends PseudoRandomSpliterator implements Split
 
     @Override
     public Spliterator.OfDouble trySplit() {
-        long idx = index;
-        long s = (idx + fence) >>> 1;
-        if (s <= idx) {
+        long s = splitPoint();
+        if (s < 0L) {
             return null;
         }
+        PseudoRandom half = detach(prng);
+        if (half == null) {
+            // the source cannot hand out an independent generator
+            return null;
+        }
+        long idx = index;
         index = s;
-        return new StudentTSpliterator(prng, idx, s, df);
+        return new StudentTSpliterator(half, idx, s, df);
     }
 
     @Override
@@ -79,9 +84,9 @@ final class StudentTSpliterator extends PseudoRandomSpliterator implements Split
          * Normal variates is adapted to the Student-t distribution. The two
          * generated variates are not independent and the expected number of
          * uniforms per variate is 2.5464.
-         * 
+         *
          * Reference:
-         * 
+         *
          * R.W. Bailey (1994): Polar generation of random variates with the
          * t-distribution, Mathematics of Computation 62, 779-781.
          */
