@@ -33,6 +33,9 @@ final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implement
 
     TruncatedNormalSpliterator(PseudoRandom prng, long index, long fence, double lower, double upper) {
         super(index, fence);
+        if (!(lower < upper)) {
+            throw new IllegalArgumentException("lower must be smaller than upper : " + lower + ", " + upper);
+        }
         this.lower = lower;
         this.upper = upper;
         this.a = ProbabilityFuncs.errorFunction(lower / MathConsts.SQRT_TWO);
@@ -90,12 +93,15 @@ final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implement
     private double nextTruncatedNormal() {
         double u = prng.nextDouble(a, b);
         double out = MathConsts.SQRT_TWO * ProbabilityFuncs.errorFunctionInverse(u);
-        // Clamp the value to the open interval (lower, upper) to make sure that
-        // rounding doesn't push us outside of the range
-        if (out == lower) {
+        // Clamp the value to the open interval (lower, upper). The round trip
+        // through the error function and its inverse is not exact, so the
+        // result can land beyond the bound and not merely on it: at
+        // |lower| = 8.2 it undershoots by about 0.01, and from |lower| = 8.3
+        // upwards the error function has saturated to -1 and the inverse
+        // returns -Infinity. An equality test catches neither.
+        if (out <= lower) {
             out = Math.nextUp(lower);
-        }
-        if (out == upper) {
+        } else if (out >= upper) {
             out = Math.nextDown(upper);
         }
         return out;
