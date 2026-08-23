@@ -37,13 +37,13 @@ final class BetaSpliterator extends PseudoRandomSpliterator implements Spliterat
         this.alpha = alpha;
         this.beta = beta;
         this.prng_U = prng;
-        if (prng instanceof SplittablePseudoRandom) {
-            this.prng_V = ((SplittablePseudoRandom) prng).split();
-        } else {
-            // this not only requires that 'prng' is an AbstractRng64 but
-            // also that is has a public constructor taking a seed as a long
-            this.prng_V = ((AbstractRng64) prng).newInstance();
+        // this distribution draws from two independent generators
+        PseudoRandom second = detach(prng);
+        if (second == null) {
+            throw new IllegalArgumentException("cannot derive the second generator a beta distribution needs from "
+                    + prng.getAlgorithm() + ": it is neither splittable nor re-creatable from its current state");
         }
+        this.prng_V = second;
     }
 
     private BetaSpliterator(PseudoRandom prng_u, PseudoRandom prng_v, long index, long fence, double alpha,
