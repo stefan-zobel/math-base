@@ -101,6 +101,9 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public double nextGaussian(double mean, double stdDeviation) {
+        if (stdDeviation <= 0.0) {
+            throw new IllegalArgumentException("Standard deviation must be positive (" + stdDeviation + ")");
+        }
         return mean + stdDeviation * nextGaussian();
     }
 
@@ -514,7 +517,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
     }
 
     private static void checkRange(double min, double max) {
-        if (!(min <= max && (max - min) < Double.POSITIVE_INFINITY)) {
+        if (!(min <= max)) { // catches NaN as well
             throw new IllegalArgumentException(BAD_RANGE);
         }
     }
