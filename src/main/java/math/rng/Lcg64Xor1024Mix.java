@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Stefan Zobel
+ * Copyright 2021, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,14 +69,14 @@ public class Lcg64Xor1024Mix extends AbstractRng64 implements SplittablePseudoRa
 
     private Lcg64Xor1024Mix(XorShift64Star seeder) {
         seed = new long[16];
-        a = seeder.nextLong();
+        a = seeder.nextLong() | 1; // must be odd
         s = seeder.nextLong();
         seeder.nextLongs(seed);
         saveSeed();
     }
 
     protected Lcg64Xor1024Mix(long a, long s, long[] seed) {
-        this.a = a;
+        this.a = a | 1; // must be odd
         this.s = s;
         this.seed = seed;
         saveSeed();
