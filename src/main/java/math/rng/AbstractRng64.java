@@ -486,10 +486,9 @@ public abstract class AbstractRng64 implements PseudoRandom {
             // caution: this assumes that there always exists a constructor that
             // takes a long but we can't guarantee this
             Constructor<? extends AbstractRng64> cons = this.getClass().getDeclaredConstructor(long.class);
-            long seed0 = this.getSeed()[0];
-            return cons.newInstance(BitMix.pelican(seed0));
+            return cons.newInstance(BitMix.pelican(nextLong()));
         } catch (Throwable t) {
-            throw new IllegalStateException(t);
+            throw new IllegalStateException("cannot derive a second generator from " + getAlgorithm(), t);
         }
     }
 
