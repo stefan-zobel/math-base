@@ -6,6 +6,7 @@ import java.util.stream.IntStream;
 import math.cern.Arithmetic;
 import math.cern.ProbabilityFuncs;
 import math.rng.BitMix;
+import math.rng.SplitMix64Seed;
 import math.rng.XorShiftRot256StarStar;
 
 /**
@@ -56,7 +57,7 @@ public final class Bootstrap {
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
 
     /**
-     * Runs the bootstrap from a seed drawn off the default generator, so the
+     * Runs the bootstrap from a seed drawn off the package seed source, so the
      * result cannot be reproduced. Use
      * {@link #Bootstrap(double[], SampleStatistic, int, long)} when it has to
      * be.
@@ -69,7 +70,7 @@ public final class Bootstrap {
      *            the number of bootstrap replications
      */
     public Bootstrap(double[] sample, SampleStatistic statistic, int iterations) {
-        this(sample, statistic, iterations, XorShiftRot256StarStar.getDefault().nextLong());
+        this(sample, statistic, iterations, SplitMix64Seed.seed());
     }
 
     /**

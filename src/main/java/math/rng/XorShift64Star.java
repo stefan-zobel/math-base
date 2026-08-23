@@ -34,8 +34,6 @@ package math.rng;
  */
 public class XorShift64Star extends Marsaglia64 {
 
-    private static final XorShift64Star defaultRng = new XorShift64Star();
-
     public XorShift64Star() {
     }
 
@@ -55,9 +53,5 @@ public class XorShift64Star extends Marsaglia64 {
         x ^= (x >>> 27);
         seed = x;
         return x * 0x2545f4914f6cdd1dL;
-    }
-
-    public static PseudoRandom getDefault() {
-        return defaultRng;
     }
 }

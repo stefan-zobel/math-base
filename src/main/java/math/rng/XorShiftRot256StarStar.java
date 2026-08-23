@@ -27,8 +27,6 @@ package math.rng;
  */
 public class XorShiftRot256StarStar extends Xoshiro256 {
 
-    private static final XorShiftRot256StarStar defaultRng = new XorShiftRot256StarStar();
-
     public XorShiftRot256StarStar() {
     }
 
@@ -72,9 +70,5 @@ public class XorShiftRot256StarStar extends Xoshiro256 {
         long[] mix = Seed.get4Constants();
         SpookyMix.mix(new long[] { x0, x1, x2, x3 }, mix);
         return new XorShiftRot256StarStar(mix[0], mix[1], mix[2], mix[3]);
-    }
-
-    public static SplittablePseudoRandom getDefault() {
-        return defaultRng;
     }
 }

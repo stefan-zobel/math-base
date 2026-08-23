@@ -28,7 +28,6 @@ package math.rng;
 public class Interleaved4Stc64 extends AbstractRng64 implements SplittablePseudoRandom {
 
     private static final int SIZE = 4;
-    private static final Interleaved4Stc64 defaultRng = new Interleaved4Stc64();
     private int pos = 0;
     private final Stc64[] prng = new Stc64[SIZE];
 
@@ -77,9 +76,5 @@ public class Interleaved4Stc64 extends AbstractRng64 implements SplittablePseudo
     @Override
     public Interleaved4Stc64 split() {
         return new Interleaved4Stc64(prng[0].split(), prng[1].split(), prng[2].split(), prng[3].split());
-    }
-
-    public static SplittablePseudoRandom getDefault() {
-        return defaultRng;
     }
 }

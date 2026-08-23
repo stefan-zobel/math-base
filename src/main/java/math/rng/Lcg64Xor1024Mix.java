@@ -28,8 +28,6 @@ package math.rng;
  */
 public class Lcg64Xor1024Mix extends AbstractRng64 implements SplittablePseudoRandom {
 
-    private static final Lcg64Xor1024Mix defaultRng = new Lcg64Xor1024Mix();
-
     /*
      * Comment taken from the Java 17 implementation: Multiplier used in the LCG
      * portion of the algorithm. Chosen based on research by Sebastiano Vigna
@@ -120,9 +118,5 @@ public class Lcg64Xor1024Mix extends AbstractRng64 implements SplittablePseudoRa
         x[p] = ((s0 << 25) | (s0 >>> 39)) ^ s15 ^ (s15 << 27);
         x[pos] = ((s15 << 36) | (s15 >>> 28));
         return rnd;
-    }
-
-    public static SplittablePseudoRandom getDefault() {
-        return defaultRng;
     }
 }

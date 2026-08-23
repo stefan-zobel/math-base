@@ -15,12 +15,20 @@
  */
 package math.dl;
 
+import math.rng.PseudoRandom;
 import math.rng.Stc64;
 
 /**
  * The softmax function in deep learning.
  */
 public final class Softmax {
+
+    /**
+     * The generator the sampling methods without an explicit one draw from.
+     * One per thread, because the generators of {@code math.rng} are not
+     * thread-safe and a sampling method has nowhere else to keep state.
+     */
+    private static final ThreadLocal<Stc64> RNG = ThreadLocal.withInitial(Stc64::new);
 
     /**
      * Determine the softmax distribution for the {@code in} array partition of
@@ -207,8 +215,25 @@ public final class Softmax {
      * @return class index {@code i} with probability {@code softmax[i]}
      */
     public static int sampleClass(double[] softmax) {
+        return sampleClass(softmax, RNG.get());
+    }
+
+    /**
+     * Samples a class index from the softmax distribution randomly according to
+     * the class probabilities in the {@code softmax} array, drawing from the
+     * given generator. The same generator state and the same distribution
+     * reproduce the same index.
+     *
+     * @param softmax
+     *            a softmax (discrete probability) distribution
+     * @param prng
+     *            the generator to draw from
+     * @return class index {@code i} with probability {@code softmax[i]}
+     * @since 1.5.2
+     */
+    public static int sampleClass(double[] softmax, PseudoRandom prng) {
         int classIdx = 0;
-        double p = Stc64.getDefault().nextDouble();
+        double p = prng.nextDouble();
         // roulette wheel selection
         for (int i = 0; i < softmax.length; ++i) {
             p -= softmax[i];
@@ -229,8 +254,25 @@ public final class Softmax {
      * @return class index {@code i} with probability {@code softmax[i]}
      */
     public static int sampleClassF(float[] softmax) {
+        return sampleClassF(softmax, RNG.get());
+    }
+
+    /**
+     * Samples a class index from the softmax distribution randomly according to
+     * the class probabilities in the {@code softmax} array, drawing from the
+     * given generator. The same generator state and the same distribution
+     * reproduce the same index.
+     *
+     * @param softmax
+     *            a softmax (discrete probability) distribution
+     * @param prng
+     *            the generator to draw from
+     * @return class index {@code i} with probability {@code softmax[i]}
+     * @since 1.5.2
+     */
+    public static int sampleClassF(float[] softmax, PseudoRandom prng) {
         int classIdx = 0;
-        float p = Stc64.getDefault().nextFloat();
+        float p = prng.nextFloat();
         // roulette wheel selection
         for (int i = 0; i < softmax.length; ++i) {
             p -= softmax[i];

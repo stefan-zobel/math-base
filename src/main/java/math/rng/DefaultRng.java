@@ -21,10 +21,6 @@ package math.rng;
  */
 public final class DefaultRng {
 
-    public static PseudoRandom getGlobalPseudoRandom() {
-        return MersenneTwister64.getDefault();
-    }
-
     public static PseudoRandom newPseudoRandom() {
         return new MersenneTwister64();
     }
@@ -45,8 +41,7 @@ public final class DefaultRng {
             return new PseudoRandom[] { newPseudoRandom() };
         }
         final int NN = 312;
-        final long[] seed = new long[NN];
-        getGlobalPseudoRandom().nextLongs(seed);
+        final long[] seed = SplitMix64Seed.seed(NN);
         final PseudoRandom[] multiplePrng = new PseudoRandom[count];
         for (int i = 0; i < multiplePrng.length; ++i) {
             final PseudoRandom prng = newPseudoRandom(seed);

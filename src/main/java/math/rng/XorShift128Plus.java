@@ -34,8 +34,6 @@ package math.rng;
  */
 public class XorShift128Plus extends AbstractRng64 {
 
-    private static final XorShift128Plus defaultRng = new XorShift128Plus();
-
     private long x0;
     private long x1;
 
@@ -70,10 +68,6 @@ public class XorShift128Plus extends AbstractRng64 {
         x1 = s1 ^ s0 ^ (s1 >>> 18) ^ (s0 >>> 5);
         x0 = s0;
         return s;
-    }
-
-    public static PseudoRandom getDefault() {
-        return defaultRng;
     }
 
     private void escape() {

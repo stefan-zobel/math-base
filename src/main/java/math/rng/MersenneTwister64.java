@@ -50,7 +50,6 @@
  */
 package math.rng;
 
-import java.security.SecureRandom;
 import java.util.Objects;
 
 /**
@@ -87,8 +86,6 @@ public class MersenneTwister64 extends AbstractRng64 {
 
     private static final long[] mag01 = { 0L, MATRIX_A };
 
-    private static final MersenneTwister64 defaultRng = createDefaultRng();
-
     /* The array for the state vector */
     private long[] mt = new long[NN];
 
@@ -96,7 +93,7 @@ public class MersenneTwister64 extends AbstractRng64 {
     private int mti = NN + 1;
 
     public MersenneTwister64() {
-        setSeed(XorShift1024Star.getDefault().nextLong());
+        setSeed(SplitMix64Seed.seed());
         saveSeed(mt);
     }
 
@@ -199,25 +196,5 @@ public class MersenneTwister64 extends AbstractRng64 {
         x ^= (x >>> 43);
 
         return x;
-    }
-
-    public static PseudoRandom getDefault() {
-        return defaultRng;
-    }
-
-    private static MersenneTwister64 createDefaultRng() {
-        final long[] randSeed = new long[NN];
-        try {
-            SecureRandom sr = SecureRandom.getInstance("SHA1PRNG");
-            for (int i = 0; i < NN; ++i) {
-                randSeed[i] = sr.nextLong();
-            }
-        } catch (Exception e) {
-            PseudoRandom rng = XorShift1024Star.getDefault();
-            for (int i = 0; i < NN; ++i) {
-                randSeed[i] = rng.nextLong();
-            }
-        }
-        return new MersenneTwister64(randSeed);
     }
 }

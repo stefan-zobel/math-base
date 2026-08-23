@@ -37,8 +37,6 @@ package math.rng;
  */
 public class XorShift1024Star extends AbstractRng64 implements SplittablePseudoRandom {
 
-    private static final XorShift1024Star defaultRng = new XorShift1024Star();
-
     private int pos = 0;
     private final long[] seed = new long[16];
 
@@ -88,10 +86,6 @@ public class XorShift1024Star extends AbstractRng64 implements SplittablePseudoR
         long[] mix = Seed.get16Constants();
         SpookyMix.mix(seed, mix);
         return new XorShift1024Star(mix, true);
-    }
-
-    public static SplittablePseudoRandom getDefault() {
-        return defaultRng;
     }
 
     /*

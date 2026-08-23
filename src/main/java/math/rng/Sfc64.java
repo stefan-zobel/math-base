@@ -23,8 +23,6 @@ package math.rng;
  */
 public class Sfc64 extends AbstractRng64 implements SplittablePseudoRandom {
 
-    private static final Sfc64 defaultRng = new Sfc64();
-
     private long a;
     private long b;
     private long c;
@@ -74,10 +72,6 @@ public class Sfc64 extends AbstractRng64 implements SplittablePseudoRandom {
         long[] mix = Seed.get4Constants();
         SpookyMix.mix(new long[] { a, b, c, counter }, mix);
         return new Sfc64(mix[0], mix[1], mix[2], mix[3]);
-    }
-
-    public static SplittablePseudoRandom getDefault() {
-        return defaultRng;
     }
 
     private void escape() {

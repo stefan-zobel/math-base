@@ -19,28 +19,52 @@ import math.linalg.CholeskyDecomp;
 import math.linalg.DMatrix;
 import math.rng.Lcg64Xor1024Mix;
 import math.rng.PseudoRandom;
+import math.rng.SplitMix64Seed;
 
 /**
  * A random sampler for arbitrary multivariate normal distributions.
+ * <p>
+ * Each sampler owns its generator, so a sampler must not be shared between
+ * threads. Give each thread its own.
  */
 public class MultivariateNormalSampler {
 
     private static final double EPS = 1.0e-7;
-    private static final PseudoRandom rng = Lcg64Xor1024Mix.getDefault();
 
+    private final PseudoRandom rng;
     private final DMatrix mean;
     private final DMatrix choleskyL;
 
     /**
      * Creates a sampler for a multivariate normal distribution identified by
-     * {@code mean} and {@code covarianceMatrix}.
-     * 
+     * {@code mean} and {@code covarianceMatrix}, seeded from the package seed
+     * source, so its samples cannot be reproduced. Use
+     * {@link #MultivariateNormalSampler(DMatrix, DMatrix, long)} when they have
+     * to be.
+     *
      * @param mean
      *            column vector containing the means
      * @param covarianceMatrix
      *            positive semidefinite covariance matrix
      */
     public MultivariateNormalSampler(DMatrix mean, DMatrix covarianceMatrix) {
+        this(mean, covarianceMatrix, SplitMix64Seed.seed());
+    }
+
+    /**
+     * Creates a sampler for a multivariate normal distribution identified by
+     * {@code mean} and {@code covarianceMatrix}, seeded from {@code seed}. The
+     * same seed, mean and covariance matrix reproduce the same samples exactly.
+     *
+     * @param mean
+     *            column vector containing the means
+     * @param covarianceMatrix
+     *            positive semidefinite covariance matrix
+     * @param seed
+     *            the seed the samples are drawn from
+     * @since 1.5.2
+     */
+    public MultivariateNormalSampler(DMatrix mean, DMatrix covarianceMatrix, long seed) {
         if (mean.numRows() != covarianceMatrix.numRows()) {
             throw new IllegalArgumentException("inconsistent matrix dimensions");
         }
@@ -51,6 +75,7 @@ public class MultivariateNormalSampler {
         this.choleskyL = CholeskyDecomp
                 .cholesky(covarianceMatrix.add(DMatrix.identity(covarianceMatrix.numRows()).scaleInplace(EPS)));
         this.mean = mean.copy();
+        this.rng = new Lcg64Xor1024Mix(seed);
     }
 
     /**

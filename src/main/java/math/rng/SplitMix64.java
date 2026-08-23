@@ -37,8 +37,6 @@ public class SplitMix64 extends AbstractRng64 implements SplittablePseudoRandom 
      */
     private static final long GOLDEN = 0x9e3779b97f4a7c15L;
 
-    private static final SplitMix64 defaultRng = new SplitMix64();
-
     private long state;
 
     /*
@@ -78,10 +76,6 @@ public class SplitMix64 extends AbstractRng64 implements SplittablePseudoRandom 
     @Override
     public SplitMix64 split() {
         return new SplitMix64(nextLong(), mixGamma(state += gamma));
-    }
-
-    public static SplittablePseudoRandom getDefault() {
-        return defaultRng;
     }
 
     /*
