@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2021 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@
 package math.rng;
 
 import java.security.SecureRandom;
+import java.util.Objects;
 
 /**
  * 64-bit Mersenne Twister. This generator has a period of
@@ -104,7 +105,25 @@ public class MersenneTwister64 extends AbstractRng64 {
         saveSeed(mt);
     }
 
+    /**
+     * Creates a new {@code MersenneTwister64} seeded from the given array. The
+     * array is the seed material itself -- the reference
+     * {@code init_by_array64} initialization consumes every element of it,
+     * cycling over the array until the whole state is covered -- so unlike in
+     * the other generators of this package an empty array carries nothing to
+     * seed with.
+     *
+     * @param seedArray
+     *            the seed values, at least one
+     * @throws NullPointerException
+     *             if {@code seedArray} is {@code null}
+     * @throws IllegalArgumentException
+     *             if {@code seedArray} is empty
+     */
     public MersenneTwister64(long[] seedArray) {
+        if (Objects.requireNonNull(seedArray, "seedArray").length == 0) {
+            throw new IllegalArgumentException("seedArray must not be empty");
+        }
         setSeed(seedArray);
         saveSeed(mt);
     }
