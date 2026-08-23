@@ -210,7 +210,10 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public int next(int bits) {
-        return (int) (nextLong() >>> (64 - bits));
+        if (bits < 0 || bits > 32) {
+            throw new IllegalArgumentException("bits must be in [0, 32] : " + bits);
+        }
+        return (bits == 0) ? 0 : (int) (nextLong() >>> (64 - bits));
     }
 
     @Override
