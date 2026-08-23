@@ -208,7 +208,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
         do {
             r = nextLong();
         } while (r < min || r > max);
-        return r;       
+        return r;
     }
 
     @Override
