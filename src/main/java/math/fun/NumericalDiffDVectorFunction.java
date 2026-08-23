@@ -28,18 +28,26 @@ import math.MathConsts;
  * evaluation of {@link #valueAt(double[], double[])}, so a Jacobian costs
  * {@code n + 1} of them.
  * <p>
- * The floor is the one place where this class deviates from
- * {@link NumericalDiffDMultiFunction}, and it is not cosmetic. A purely
- * relative step collapses along with the component it is taken from: for
+ * The floor is not cosmetic, and it is the step
+ * {@link NumericalDiffDMultiFunction} takes as well. A purely relative step
+ * collapses along with the component it is taken from: for
  * {@code F(x) = (x0^2 + x1^2 - 1, x0 + x1 - 1)} at {@code x0 = 1e-4} it gets
  * the first column wrong by 40 per cent, and by {@code x0 = 1e-9} the whole
  * column comes back as exactly zero, because the change it induces in
  * {@code F} is far below the last bit of {@code F} itself. A singular Jacobian
- * out of a perfectly ordinary point is worse than a coarse one, and the floor
- * costs an order of magnitude of accuracy where the relative step was working
- * to buy that back. It assumes the arguments are scaled to be of order one,
- * the same assumption a solver's step test makes; where they are not, say so
- * through {@code diffScale}.
+ * out of a perfectly ordinary point is worse than a coarse one -- and the
+ * floor is not the coarser of the two anyway: for an {@code F} whose curvature
+ * is of order one it is the more accurate by up to three orders of magnitude,
+ * and from {@code |x| >= 1} the two are the same number.
+ * <p>
+ * What the floor does cost is an {@code F} that varies on the scale of
+ * {@code x} itself where that scale is far below one: there it steps clean
+ * over the feature, by close to seven orders of magnitude at
+ * {@code |x| = 1e-12}. It assumes, in other words, that the arguments are
+ * scaled to be of order one, the same assumption a solver's step test makes;
+ * where they are not, say so through {@code diffScale}, which multiplied by
+ * the magnitude the arguments actually have buys the relative step's accuracy
+ * back.
  * <p>
  * The forward difference is accurate to about the square root of the machine
  * epsilon. Where the derivative can be written down, implement

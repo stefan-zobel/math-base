@@ -318,4 +318,88 @@ public class NumericalDiffDVectorFunctionTest {
         f.derivativeAt(new double[] { 1.0, 2.0, 3.0, 4.0 }, new double[4]);
         assertEquals(5, calls[0]);
     }
+
+    /**
+     * The scalar face of {@link #testAComponentNearZeroStillProducesAColumn}.
+     * There is no matrix here to come out singular, so what the floor rescues
+     * is the component itself: the derivative in {@code x0} is one to nine
+     * digits everywhere on this ladder, and a step proportional to {@code x0}
+     * alone returns 40 per cent of it at {@code 1e-8} and nothing at all from
+     * {@code 1e-9} downwards. The last rung is there because the exact zero
+     * was never the hard case.
+     */
+    @Test
+    public void testAComponentNearZeroStillProducesAGradient() {
+        NumericalDiffDMultiFunction f = new NumericalDiffDMultiFunction() {
+            @Override
+            public double apply(double[] x) {
+                return Math.sin(x[0]) + x[1] * x[1];
+            }
+        };
+        double[] gradient = new double[2];
+        double[] smaller = { 1.0e-2, 1.0e-4, 1.0e-6, 1.0e-8, 1.0e-9, 1.0e-12, 1.0e-14, 0.0, 1.0e-300 };
+        for (int k = 0; k < smaller.length; ++k) {
+            f.derivativeAt(new double[] { smaller[k], 1.0 }, gradient);
+            String where = "x0 = " + smaller[k];
+            assertEquals(where, Math.cos(smaller[k]), gradient[0], 1.0e-7);
+            assertEquals(where, 2.0, gradient[1], 1.0e-6);
+        }
+    }
+
+    /** One function, wrapped below as a gradient and as a one-row Jacobian. */
+    private static double shared(double[] x) {
+        return Math.sin(x[0]) * x[1] + Math.exp(0.25 * x[2]) - x[0] * x[0];
+    }
+
+    /**
+     * The two classes take the same step, so with a single result they do
+     * arithmetically identical work and have to agree bit for bit. This is the
+     * assertion that fails first if they are ever allowed to drift apart
+     * again.
+     */
+    @Test
+    public void testTheTwoSiblingsTakeTheSameStep() {
+        NumericalDiffDMultiFunction scalar = new NumericalDiffDMultiFunction() {
+            @Override
+            public double apply(double[] x) {
+                return shared(x);
+            }
+        };
+        NumericalDiffDVectorFunction vector = new NumericalDiffDVectorFunction(1) {
+            @Override
+            public void valueAt(double[] x, double[] values) {
+                values[0] = shared(x);
+            }
+        };
+        double[] gradient = new double[3];
+        double[] jacobian = new double[3];
+        double[] ladder = { 0.0, 1.0e-12, -1.0e-12, 1.0e-6, -3.5, 1.0, 0.25, 1.0e2, -1.0e4, 1.0e6 };
+        for (int k = 0; k < ladder.length; ++k) {
+            double[] x = { ladder[k], -1.5, 0.75 };
+            scalar.derivativeAt(x, gradient);
+            vector.jacobianAt(x, jacobian);
+            for (int j = 0; j < 3; ++j) {
+                assertEquals("component " + j + " at x0 = " + ladder[k], jacobian[j], gradient[j], 0.0);
+            }
+        }
+    }
+
+    /** The scale is refused on the same terms as the vector sibling's. */
+    @Test
+    public void testTheScalarSiblingValidatesItsScale() {
+        double[] badScales = { 0.0, -1.0e-8, Double.NaN, Double.POSITIVE_INFINITY };
+        for (int k = 0; k < badScales.length; ++k) {
+            try {
+                new NumericalDiffDMultiFunction(badScales[k]) {
+                    @Override
+                    public double apply(double[] x) {
+                        throw new AssertionError("not evaluated");
+                    }
+                };
+                fail("scale " + badScales[k] + " was accepted");
+            } catch (IllegalArgumentException expected) {
+                assertNotNull(expected.getMessage());
+            }
+        }
+    }
 }
