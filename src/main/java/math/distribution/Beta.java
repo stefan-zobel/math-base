@@ -30,7 +30,7 @@ public class Beta implements ContinuousDistribution {
 
     private final double alpha;
     private final double beta;
-    private final double pdfNormFactor;
+    private final double logPdfNormFactor;
 
     public Beta(double alpha, double beta) {
         if (alpha <= 0.0) {
@@ -41,15 +41,43 @@ public class Beta implements ContinuousDistribution {
         }
         this.alpha = alpha;
         this.beta = beta;
-        this.pdfNormFactor = Math.exp(logGamma(alpha + beta) - (logGamma(alpha) + logGamma(beta)));
+        this.logPdfNormFactor = logGamma(alpha + beta) - (logGamma(alpha) + logGamma(beta));
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The normalizing factor is kept as its logarithm and the three factors are
+     * combined in one exponential. Held as a plain number it leaves the
+     * {@code double} range from {@code alpha = beta = 511} upwards, and the
+     * product with the two powers then read {@code infinity} times something
+     * tiny: the density of a {@code Beta(1000, 1000)} at one half is
+     * {@code 35.7}, and it used to come back as {@code Infinity}, of a
+     * {@code Beta(1e8, 1e8)} as {@code NaN}. Those are ordinary shapes -- an F
+     * test with a few thousand degrees of freedom reaches them through
+     * {@link FisherF#pdf(double)}.
+     */
     @Override
     public double pdf(double x) {
         if (x < 0.0 || x > 1.0) {
             return 0.0;
         }
-        return pdfNormFactor * Math.pow(x, alpha - 1) * Math.pow(1 - x, beta - 1);
+        if (x == 0.0) {
+            // the shape alone decides the left end: a pole below one, the
+            // normalizing factor at one, and zero above it. Computed,
+            // (alpha - 1) * log(x) reads zero times minus infinity here
+            if (alpha < 1.0) {
+                return Double.POSITIVE_INFINITY;
+            }
+            return (alpha == 1.0) ? Math.exp(logPdfNormFactor) : 0.0;
+        }
+        if (x == 1.0) {
+            if (beta < 1.0) {
+                return Double.POSITIVE_INFINITY;
+            }
+            return (beta == 1.0) ? Math.exp(logPdfNormFactor) : 0.0;
+        }
+        return Math.exp(logPdfNormFactor + (alpha - 1.0) * Math.log(x) + (beta - 1.0) * Math.log1p(-x));
     }
 
     @Override

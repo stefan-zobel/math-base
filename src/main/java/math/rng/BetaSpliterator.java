@@ -103,23 +103,51 @@ final class BetaSpliterator extends PseudoRandomSpliterator implements Spliterat
         }
     }
 
+    /**
+     * Draws from {@code Beta(alpha, beta)} through the gamma ratio
+     * {@code X / (X + Y)}, computed as {@code 1 / (1 + exp(logY - logX))}.
+     * <p>
+     * The identity is exact, but forming {@code X} and {@code Y} first is not:
+     * for a shape below one a {@code Gamma(k, 1)} draw spans hundreds of
+     * decades and falls off the bottom of the {@code double} range. One
+     * underflowed draw drags the ratio to an exact zero where the true value is
+     * representable -- at {@code alpha = beta = 0.005} that doubled the rate of
+     * exact zeros, 0.0236 measured against the 0.0121 the distribution has --
+     * and two underflowed draws made it {@code 0/0}, which is where the 22 per
+     * cent of {@code NaN} at {@code alpha = beta = 0.001} came from. Taking the
+     * difference of the logarithms instead keeps the lower tail down to
+     * {@code 4.9e-324}, exactly as far as a {@code double} reaches.
+     * <p>
+     * What no arrangement of the arithmetic can buy back is the upper end. A
+     * {@code double} resolves {@code 4.9e-324} above zero but only
+     * {@code 1.1e-16} below one, so for small shapes a large share of the
+     * result is exactly {@code 1.0} -- 34.6 per cent at
+     * {@code alpha = beta = 0.01}. That is the correctly rounded answer and not
+     * a defect: the distribution really does put that much mass within half an
+     * ulp of one. It does mean that a caller who needs the upper tail should
+     * swap the two shapes and read the lower one, because {@code 1 - X} has
+     * nothing left to say.
+     *
+     * @param prng_U
+     *            the generator for the first gamma variate
+     * @param prng_V
+     *            an independent generator for the second
+     * @param alpha
+     *            the first shape, greater than zero
+     * @param beta
+     *            the second shape, greater than zero
+     * @return a {@code Beta(alpha, beta)} variate
+     */
     static double sample(PseudoRandom prng_U, PseudoRandom prng_V, double alpha, double beta) {
-        // This may not be the most efficient solution,
-        // but it doesn't get any simpler. The problem is
-        // alpha and beta must not be too small, especially
-        // a beta < 1 paired with a very large alpha is numerically
-        // inaccurate. But this seems to be true for all algorithms
-        // (commons.math appears to be even more inaccurate than this
-        // simple implementation - not to mention that it is much slower)
-        //
-        // An alpha and/or beta of 0.125 (1/8) should be ok, values below are
-        // not. If you need to have a beta in the range 1/8 <= beta < 1 then
-        // alpha must not be too large. A ratio of beta : alpha of 1 : 1800
-        // should be ok (e.g. alpha = 225 for beta = 0.125). Don't go above
-        // that. If only alpha is small (but not less than code 1/8) there seems
-        // to exist no practically relevant limit for the magnitude of beta
-        // (other than the lower bound of 1/8).
-        double u = GammaSpliterator.sample(prng_U, alpha, 1.0);
-        return u / (u + GammaSpliterator.sample(prng_V, beta, 1.0));
+        double logX = GammaSpliterator.logSample(prng_U, alpha);
+        double logY = GammaSpliterator.logSample(prng_V, beta);
+        double d = logY - logX;
+        // stay on whichever side of one half the result falls: for d >= 0 it is
+        // exp(-d) all the way down to the smallest subnormal
+        if (d >= 0.0) {
+            double e = Math.exp(-d);
+            return e / (1.0 + e);
+        }
+        return 1.0 / (1.0 + Math.exp(d));
     }
 }

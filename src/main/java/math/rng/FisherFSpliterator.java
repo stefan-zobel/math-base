@@ -103,8 +103,33 @@ final class FisherFSpliterator extends PseudoRandomSpliterator implements Splite
         }
     }
 
+    /**
+     * Draws from {@code F(d1, d2)} as the scaled ratio of two gamma variates:
+     * with {@code X ~ Gamma(d1/2, 1)} and {@code Y ~ Gamma(d2/2, 1)} the
+     * quotient {@code (X d2) / (Y d1)} has the F distribution, and in
+     * logarithms that is a difference.
+     * <p>
+     * The route through {@code Beta(d1/2, d2/2)} that this replaced ended in
+     * {@code (y d2) / (d1 - d1 y)}, which divides by zero as soon as the beta
+     * variate rounds to one -- and for a small numerator degree of freedom it
+     * does, because a {@code double} resolves only {@code 1.1e-16} below one.
+     * The difference of logarithms has no such point: {@link Math#exp} answers
+     * {@code Infinity} above {@code 709.8} and zero below {@code -745.1}, and
+     * both are the correct rounding of an F value out that far.
+     *
+     * @param prng_U
+     *            the generator for the numerator variate
+     * @param prng_V
+     *            an independent generator for the denominator variate
+     * @param d1
+     *            the numerator degrees of freedom
+     * @param d2
+     *            the denominator degrees of freedom
+     * @return an {@code F(d1, d2)} variate
+     */
     private static double sample(PseudoRandom prng_U, PseudoRandom prng_V, double d1, double d2) {
-        double y = BetaSpliterator.sample(prng_U, prng_V, d1 / 2.0, d2 / 2.0);
-        return (y * d2) / (d1 - d1 * y);
+        double logX = GammaSpliterator.logSample(prng_U, d1 / 2.0);
+        double logY = GammaSpliterator.logSample(prng_V, d2 / 2.0);
+        return Math.exp(logX - logY + Math.log(d2 / d1));
     }
 }
