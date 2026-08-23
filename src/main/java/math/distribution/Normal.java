@@ -69,10 +69,22 @@ public class Normal implements ContinuousDistribution {
         this.factor = (1.0 / (this.stdDev * SQRT_TWO_PI));
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The exponent is formed from {@code (x - mean) / stdDev} rather than from
+     * the squared distance over the variance. {@code variance} is
+     * {@code stdDev * stdDev} and leaves the {@code double} range on both
+     * sides -- it underflows to zero below a standard deviation of about
+     * {@code 1.5e-162} and overflows above {@code 1.3e154} -- and the quotient
+     * then read {@code 0/0} or {@code infinity/infinity}. A
+     * {@code Normal(0, 1e-170)} had density {@code NaN} at its own mean, where
+     * the value is {@code 3.99e169}.
+     */
     @Override
     public double pdf(double x) {
-        double xMinusMu = (x - mean);
-        return factor * Math.exp(-(xMinusMu * xMinusMu) / (2.0 * variance));
+        double z = (x - mean) / stdDev;
+        return factor * Math.exp(-0.5 * (z * z));
     }
 
     @Override
