@@ -39,14 +39,28 @@ public class StudentT implements ContinuousDistribution {
         if (df <= 0.0) {
             throw new IllegalArgumentException("df <= 0.0 : " + df);
         }
-        double tmp = FastGamma.logGamma((df + 1.0) / 2.0) - FastGamma.logGamma(df / 2.0);
-        this.pdfConst = Math.exp(tmp) / Math.sqrt(Math.PI * df);
+        // the normalizing constant is log(gamma((df+1)/2) / gamma(df/2)), and
+        // subtracting the two logarithms throws it away for a large df: they
+        // are of order df*log(df) while their difference is of order log(df),
+        // so from df = 1e13 onward the answer arrives quantized -- 20.0 where
+        // 16.92 is right at 1e15 -- and from df = 1e16 it is zero, because
+        // (df + 1) / 2 and df / 2 are then the same double
+        this.pdfConst = Math.exp(FastGamma.logGammaRatio(df / 2.0, 0.5)) / Math.sqrt(Math.PI * df);
         this.df = df;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The power is taken through the logarithm because {@code 1 + x*x/df}
+     * rounds to one long before the density does anything: at
+     * {@code df = 1e14} the increment is 45 ulps of one and raising it to
+     * {@code -(df+1)/2} multiplies that rounding by half the degrees of
+     * freedom. {@code Math.log1p} keeps the increment at its own size.
+     */
     @Override
     public double pdf(double x) {
-        return pdfConst * Math.pow((1.0 + x * x / df), -(df + 1.0) * 0.5);
+        return pdfConst * Math.exp(-(df + 1.0) * 0.5 * Math.log1p(x * x / df));
     }
 
     @Override

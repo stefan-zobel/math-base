@@ -208,8 +208,16 @@ public class ContinuousDistributionTest {
                 .floors(15.0, 15.0, 13.0, 15.0, 15.0, 0.0));
         r.add(row("StudentT", "df=3", new StudentT(3.0), -300.0, 300.0).moments(-3000.0, 3000.0).tail(1.0e-7)
                 .floors(15.0, 15.0, 12.0, 15.0, 16.0, 3.0));
+        // the mean floor here is 15 and not 16 because the mean is exactly
+        // zero: relDigits then reports either 17, when the quadrature happens
+        // to cancel to the last bit, or 15.9546, when it is left holding one
+        // ulp of one. Which of the two a row draws is decided by the last bit
+        // of the density, and it moved from df=100 to df=8 when StudentT
+        // stopped forming its normalizing constant as a difference of two
+        // logarithms -- with the density itself bit for bit unchanged there.
+        // Normal(0, 1), df=2 and df=100 already carry 15 for the same reason
         r.add(row("StudentT", "df=8", new StudentT(8.0), -60.0, 60.0).moments(-600.0, 600.0).tail(1.0e-11)
-                .floors(14.0, 14.0, 13.0, 15.0, 16.0, 13.0));
+                .floors(14.0, 14.0, 13.0, 15.0, 15.0, 13.0));
         r.add(row("StudentT", "df=100", new StudentT(100.0), -30.0, 30.0).moments(-60.0, 60.0)
                 .floors(13.0, 13.0, 13.0, 14.0, 15.0, 13.0));
         r.add(row("Beta", "2, 5", new Beta(2.0, 5.0), 0.0, 1.0)
