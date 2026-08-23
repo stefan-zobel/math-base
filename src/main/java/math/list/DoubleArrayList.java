@@ -1826,7 +1826,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public double norm2() {
-            return Math.sqrt(dot(size, offset, root.elementData, offset, root.elementData));
+            return DoubleArrayList.norm2(size, offset, root.elementData);
         }
 
         @Override
@@ -2082,12 +2082,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double[] getArrayUnsafe() {
-        double[] es = elementData;
-        if (es == DEFAULTCAPACITY_EMPTY_ELEMENTDATA || es == EMPTY_ELEMENTDATA) {
-            es = new double[0];
-            elementData = es;
-        }
-        return es;
+        // handing out the empty sentinel is harmless -- an array of length
+        // zero cannot be modified -- whereas replacing it would cost the list
+        // its default-capacity marker, and with it the jump to capacity 10 on
+        // the first add
+        return elementData;
     }
 
     /**
@@ -2226,6 +2225,40 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return Math.scalb(Math.sqrt(var), -k);
     }
 
+    static double norm2(int length, int aoff, double[] a) {
+        double sum = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            sum += a[i] * a[i];
+        }
+        if (sum >= length * Double.MIN_NORMAL && sum != Double.POSITIVE_INFINITY) {
+            // the common case: the sum is a normal number, so no square was
+            // lost at either end of the range and the direct route is exact
+            return Math.sqrt(sum);
+        }
+        // a square leaves the double range long before the norm does -- a
+        // single element of 1e200 is enough for the sum to be Infinity, one of
+        // 1e-200 for it to be zero, and from 1e-160 downwards the squares turn
+        // subnormal and quietly drop digits. Retry on data scaled to about
+        // one, which is exact because the factor is a power of two. NaN and
+        // infinite input reach this branch as well and carry through it
+        // unchanged
+        double max = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            max = Math.max(max, Math.abs(a[i]));
+        }
+        if (max == 0.0) {
+            return 0.0;
+        }
+        final int exponent = Math.getExponent(max);
+        final double scale = Math.scalb(1.0, -exponent);
+        double scaledSum = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            double scaled = a[i] * scale;
+            scaledSum += scaled * scaled;
+        }
+        return Math.scalb(Math.sqrt(scaledSum), exponent);
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -2332,7 +2365,7 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public double norm2() {
-        return Math.sqrt(dot(size, elementData, 0, elementData));
+        return norm2(size, 0, elementData);
     }
 
     /**
