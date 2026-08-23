@@ -163,8 +163,8 @@ public abstract class AbstractRng64 implements PseudoRandom {
         final long nMinus1 = n - 1L;
         long x = nextLong();
         if ((n & nMinus1) == 0L) {
-            // power of two shortcut
-            return x & nMinus1;
+            // power of two shortcut: take the high bits
+            return (x >>> (64 - Long.numberOfTrailingZeros(n))) & nMinus1;
         }
         // rejection-based algorithm to get uniform longs
         for (long y = x >>> 1; y + nMinus1 - (x = y % n) < 0L; y = nextLong() >>> 1) {
