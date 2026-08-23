@@ -2180,17 +2180,50 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
     static double stddev(int length, int aoff, double[] a) {
         length = checkLengthGeq2(length);
-        double sum = 0.0;
-        double sumSqr = 0.0;
+        double maxAbs = 0.0;
         for (int i = aoff; i < aoff + length; ++i) {
-            double x = a[i];
-            sum += x;
-            sumSqr += x * x;
+            maxAbs = Math.max(maxAbs, Math.abs(a[i]));
         }
-        sumSqr = sumSqr / length;
-        double mean = sum / length;
-        double var = sumSqr - (mean * mean);
-        return Math.sqrt(var);
+        if (maxAbs == 0.0) {
+            return 0.0;
+        }
+        if (Double.isNaN(maxAbs) || Double.isInfinite(maxAbs)) {
+            return Double.NaN;
+        }
+        // scale the data to about one, so that squaring a deviation can
+        // neither overflow nor drop into the subnormals. The factor is a power
+        // of two, which makes the scaling exact: the result is the same to the
+        // last bit as the unscaled computation wherever that one stays inside
+        // the double range
+        int k = -Math.getExponent(maxAbs);
+        if (k < -1022) {
+            k = -1022;
+        }
+        final double scale = Math.scalb(1.0, k);
+        double sum = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            sum += a[i] * scale;
+        }
+        final double mean = sum / length;
+        double sumDev = 0.0;
+        double sumSqrDev = 0.0;
+        for (int i = aoff; i < aoff + length; ++i) {
+            double d = a[i] * scale - mean;
+            sumDev += d;
+            sumSqrDev += d * d;
+        }
+        // two passes rather than E[x^2] - mean^2, which cancels away the whole
+        // answer once the data is centered far from zero. The residual sum of
+        // the deviations carries the rounding error left in the mean and is
+        // subtracted out; without it the result is still wrong by the square
+        // of that error, which is what breaks the one-pass form
+        double var = (sumSqrDev - (sumDev * sumDev) / length) / length;
+        if (var < 0.0) {
+            // the subtraction carries no sign guarantee, and a negative
+            // argument would turn the result into NaN
+            var = 0.0;
+        }
+        return Math.scalb(Math.sqrt(var), -k);
     }
 
     /**
@@ -2391,7 +2424,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         if (length == 1) {
             return a[aoff];
         }
-        return medianOnSorted(length, aoff, sorted(length, aoff, a));
+        // sorted() copies into a new zero-based buffer, so the offset into 'a'
+        // must not be carried over into it
+        return medianOnSorted(length, 0, sorted(length, aoff, a));
     }
 
     static double medianOnSorted(int length, int aoff, double[] a) {
