@@ -33,13 +33,26 @@ abstract class Marsaglia64 extends AbstractRng64 {
     }
 
     Marsaglia64(long seed) {
-        this.seed = SplitMix64Seed.seed(seed);
+        this.seed = nonZero(SplitMix64Seed.seed(seed));
         escape();
     }
 
     Marsaglia64(long[] seed) {
-        this.seed = SplitMix64Seed.seed(seed);
+        this.seed = nonZero(SplitMix64Seed.seed(seed));
         escape();
+    }
+
+    /*
+     * The all-zero state is the fixed point of every xorshift: once there the
+     * generator can never leave, nextLong() returns 0 forever and
+     * nextGaussian() never terminates. It is reachable, because the mixer in
+     * SplitMix64Seed maps 0 to 0 and therefore turns the seed -GOLDEN into a
+     * zero state. XorShift1024Star, XorShift128Plus, Xoshiro256 and
+     * Lcg64Xor1024Mix all seed themselves through a XorShift64Star, so they
+     * would inherit it. Every other seed is left exactly as it was.
+     */
+    private static long nonZero(long state) {
+        return (state == 0L) ? -1L : state;
     }
 
     /*
