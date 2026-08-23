@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2024 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -185,7 +185,21 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public long nextLong(long min, long max) {
-        return min + nextLong((max - min) + 1L);
+        if (min > max) {
+            throw new IllegalArgumentException(BAD_RANGE);
+        }
+        long span = max - min + 1L;
+        if (span > 0L) {
+            return min + nextLong(span);
+        }
+        // the span exceeds Long.MAX_VALUE, so it cannot be expressed as a
+        // bound: draw from the whole range and reject, which accepts with
+        // probability greater than one half
+        long r;
+        do {
+            r = nextLong();
+        } while (r < min || r > max);
+        return r;       
     }
 
     @Override
@@ -258,13 +272,13 @@ public abstract class AbstractRng64 implements PseudoRandom {
     @Override
     public LongStream longs() {
         return longStream(
-                new PseudoRandomLongSpliterator(this, 0L, Long.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE));
+                new PseudoRandomLongSpliterator(this, 0L, Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
     }
 
     @Override
     public LongStream longs(long streamSize) {
         checkStreamSize(streamSize);
-        return longStream(new PseudoRandomLongSpliterator(this, 0L, streamSize, Integer.MIN_VALUE, Integer.MAX_VALUE));
+        return longStream(new PseudoRandomLongSpliterator(this, 0L, streamSize, Long.MIN_VALUE, Long.MAX_VALUE));
     }
 
     @Override
