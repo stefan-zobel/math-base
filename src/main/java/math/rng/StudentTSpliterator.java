@@ -95,7 +95,11 @@ final class StudentTSpliterator extends PseudoRandomSpliterator implements Split
             u1 = 2.0 * prng.nextDouble() - 1.0; // between -1 and 1
             u2 = 2.0 * prng.nextDouble() - 1.0; // between -1 and 1
             q = u1 * u1 + u2 * u2;
-        } while (q > 1.0);
+            // both endpoints of the acceptance region have to go: q == 0.0
+            // makes the result NaN, q == 1.0 makes it an exact zero. This is
+            // the rejection AbstractRng64.nextGaussian() uses for the same
+            // polar method
+        } while (q >= 1.0 || q == 0.0);
         return u1 * Math.sqrt(df * (Math.exp(-2.0 / df * Math.log(q)) - 1.0) / q);
     }
 }
