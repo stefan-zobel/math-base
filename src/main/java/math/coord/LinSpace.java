@@ -52,6 +52,7 @@ public final class LinSpace {
     private final double stop;
     private final int numberOfPoints;
     private final double step;
+    private final boolean wideSpan;
     private double[] vec;
 
     private LinSpace(double start, double end, int numberOfPoints, double[] data) {
@@ -73,7 +74,21 @@ public final class LinSpace {
             this.stop = end;
             this.numberOfPoints = numberOfPoints;
         }
-        step = (this.numberOfPoints == 1) ? 0.0 : (this.stop - this.start) / (this.numberOfPoints - 1);
+        double span = this.stop - this.start;
+        if (this.numberOfPoints == 1) {
+            step = 0.0;
+            wideSpan = false;
+        } else if (!Double.isInfinite(span)) {
+            step = span / (this.numberOfPoints - 1);
+            wideSpan = false;
+        } else {
+            // the span leaves the double range, so halve the bounds before
+            // dividing, the way AbstractRng64.nextDouble(double, double) does.
+            // Only here: halving unconditionally would round a subnormal step
+            // down to zero
+            step = (this.stop / 2.0 - this.start / 2.0) / (this.numberOfPoints - 1) * 2.0;
+            wideSpan = true;
+        }
         if (data != null) {
             if (data.length != this.numberOfPoints) {
                 throw new IllegalStateException(
@@ -88,6 +103,7 @@ public final class LinSpace {
         stop = other.stop;
         numberOfPoints = other.numberOfPoints;
         step = other.step;
+        wideSpan = other.wideSpan;
         if (other.vec != null) {
             vec = other.vec.clone();
         }
@@ -130,6 +146,13 @@ public final class LinSpace {
         }
         if (pos == numberOfPoints) {
             return stop;
+        }
+        if (wideSpan) {
+            // (pos - 1) * step would leave the double range again for a
+            // position far from start, so measure from whichever endpoint is
+            // the nearer one and keep the factor below half the count
+            return (pos - 1 <= numberOfPoints - pos) ? start + ((pos - 1) * step)
+                    : stop - ((numberOfPoints - pos) * step);
         }
         return start + ((pos - 1) * step);
     }
