@@ -23,37 +23,42 @@ import java.util.Set;
 /**
  * A set that holds primitive integer values. An {@code int} value that cannot
  * occur as a value in the set must be passed as {@code sentinel} on
- * construction. For efficiency, the {@code int} taking methods
- * {@link #addInt(int)}, {@link #containsInt(int)}, {@link #removeInt(int)}
- * should be used.
+ * construction. Any {@code int} is acceptable as a sentinel,
+ * {@code Integer.MAX_VALUE} included. For efficiency, the {@code int} taking
+ * methods {@link #addInt(int)}, {@link #containsInt(int)},
+ * {@link #removeInt(int)} should be used.
  */
 public class IntHashSet implements Set<Integer>, Cloneable {
 
     private IntIntHashMap map;
 
-    private final int PRESENT = Integer.MAX_VALUE;
+    private final int present;
 
     private final int sentinel;
 
     public IntHashSet(int sentinel) {
         this.map = new IntIntHashMap(sentinel);
         this.sentinel = sentinel;
+        this.present = presentFor(sentinel);
     }
 
     public IntHashSet(Collection<Integer> c, int sentinel) {
         this.map = new IntIntHashMap(Math.max((int) (c.size() / .75f) + 1, 16), sentinel);
         this.sentinel = sentinel;
+        this.present = presentFor(sentinel);
         addAll(c);
     }
 
     public IntHashSet(int initialCapacity, float loadFactor, int sentinel) {
         this.map = new IntIntHashMap(initialCapacity, loadFactor, sentinel);
         this.sentinel = sentinel;
+        this.present = presentFor(sentinel);
     }
 
     public IntHashSet(int initialCapacity, int sentinel) {
         this.map = new IntIntHashMap(initialCapacity, sentinel);
         this.sentinel = sentinel;
+        this.present = presentFor(sentinel);
     }
 
     @Override
@@ -81,12 +86,12 @@ public class IntHashSet implements Set<Integer>, Cloneable {
     }
 
     public boolean addInt(int value) {
-        return map.putInt(value, PRESENT) == sentinel;
+        return map.putInt(value, present) == sentinel;
     }
 
     @Override
     public boolean add(Integer e) {
-        return map.put(e, PRESENT) == null;
+        return map.put(e, present) == null;
     }
 
     public boolean removeInt(int value) {
@@ -95,7 +100,10 @@ public class IntHashSet implements Set<Integer>, Cloneable {
 
     @Override
     public boolean remove(Object o) {
-        return map.remove(o) == PRESENT;
+        // every key in this set maps to 'present', so the mere existence of
+        // an entry is the whole answer. Comparing the value would unbox a null
+        // for an element that is not in the set
+        return map.remove(o) != null;
     }
 
     @Override
@@ -256,6 +264,13 @@ public class IntHashSet implements Set<Integer>, Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new InternalError();
         }
+    }
+
+    private static int presentFor(int sentinel) {
+        // the value every key is mapped to has to differ from the value the
+        // map answers for an absent key, and that sentinel is caller-chosen:
+        // it may well be Integer.MAX_VALUE
+        return (sentinel == Integer.MAX_VALUE) ? Integer.MIN_VALUE : Integer.MAX_VALUE;
     }
 
     private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;

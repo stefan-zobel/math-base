@@ -408,10 +408,12 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
 
     @Override
     public Object clone() {
-        IntIntHashMap result = null;
+        IntIntHashMap result;
         try {
             result = (IntIntHashMap) super.clone();
         } catch (CloneNotSupportedException e) {
+            // cannot happen, this class is Cloneable
+            throw new InternalError();
         }
         if (result.table != EMPTY_TABLE) {
             result.inflateTable(Math.min((int) Math.min(size * Math.min(1 / loadFactor, 4.0f), IntIntHashMap.MAX_CAP),
