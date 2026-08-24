@@ -31,6 +31,18 @@ import java.util.Set;
  * from all {@code int} value returning methods (such as {@link #getInt(int)},
  * {@link #putInt(int, int)} or {@link #removeInt(int)}) when the passed key
  * doesn't exist in the map.
+ * <p>
+ * The map permits neither {@code null} keys nor {@code null} values.
+ * {@link #get(Object)}, {@link #containsKey(Object)} and
+ * {@link #remove(Object)} throw a {@link NullPointerException} for a
+ * {@code null} key, which {@link Map} provides for.
+ * <p>
+ * Unlike the {@code java.util.HashMap} this class was translated from, the
+ * map keeps no modification count, so the iterators of {@link #keySet()},
+ * {@link #values()} and {@link #entrySet()} are not fail-fast. Structurally
+ * modifying the map while one of them is in use, by anything other than the
+ * iterator's own {@link Iterator#remove()}, leaves the traversal undefined
+ * rather than throwing a {@code ConcurrentModificationException}.
  */
 public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
 
@@ -461,7 +473,16 @@ public class IntIntHashMap implements Map<Integer, Integer>, Cloneable {
 
         @Override
         public final Integer setValue(Integer newValue) {
-            throw new UnsupportedOperationException();
+            if (newValue == null) {
+                throw new NullPointerException();
+            }
+            // the bucket this entry sits in is chosen from the stored hash,
+            // which is derived from the key alone, so neither the placement
+            // nor the size changes here. hashCode() does change, key ^ value
+            // being what Map.Entry prescribes
+            int old = value;
+            value = newValue.intValue();
+            return Integer.valueOf(old);
         }
 
         @Override

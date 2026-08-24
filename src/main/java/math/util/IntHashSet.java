@@ -27,6 +27,11 @@ import java.util.Set;
  * {@code Integer.MAX_VALUE} included. For efficiency, the {@code int} taking
  * methods {@link #addInt(int)}, {@link #containsInt(int)},
  * {@link #removeInt(int)} should be used.
+ * <p>
+ * The set permits no {@code null} elements, and its iterator is the key set
+ * iterator of the underlying {@link IntIntHashMap}: it is not fail-fast
+ * either, so the restriction on modifying the set during a traversal carries
+ * over.
  */
 public class IntHashSet implements Set<Integer>, Cloneable {
 
