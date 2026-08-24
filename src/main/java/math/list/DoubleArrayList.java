@@ -29,11 +29,12 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Spliterator;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleConsumer;
 import java.util.function.DoublePredicate;
 
 import math.fun.DForEachIterator;
+import math.rng.DefaultRng;
+import math.rng.PseudoRandom;
 
 /**
  * Resizable primitive double[] array implementation. This is essentially a
@@ -75,12 +76,16 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     int modCount = 0;
 
     /**
-     * Constructs an empty list with the specified initial capacity.
+     * Constructs an empty list with the specified initial capacity. The list
+     * has no elements: {@code new DoubleArrayList(5)} has room for five and a
+     * {@link #size()} of zero, where the {@code int} of
+     * {@link #DoubleArrayList(int, double)} is a length.
      *
      * @param initialCapacity
      *            the initial capacity of the list
      * @throws IllegalArgumentException
      *             if the specified initial capacity is negative
+     * @see #DoubleArrayList(int, double)
      */
     public DoubleArrayList(int initialCapacity) {
         if (initialCapacity > 0) {
@@ -94,14 +99,18 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
     /**
      * Constructs a list with length {@code initialLength} where all elements
-     * have {@code initialValue} as initial value.
-     * 
+     * have {@code initialValue} as initial value. The list has that many
+     * elements: {@code new DoubleArrayList(5, 0.0)} has a {@link #size()} of
+     * five, where the {@code int} of {@link #DoubleArrayList(int)} is a
+     * capacity.
+     *
      * @param initialLength
      *            the initial length of the list
      * @param initialValue
      *            the initial value of all elements in the list
      * @throws IllegalArgumentException
      *             if the specified initial length is negative
+     * @see #DoubleArrayList(int)
      */
     public DoubleArrayList(int initialLength, double initialValue) {
         if (initialLength > 0) {
@@ -164,8 +173,11 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
     /**
      * Constructs a random list of length {@code size} with random values
-     * uniformly distributed between {@code min} and {@code max}.
-     * 
+     * uniformly distributed between {@code min} and {@code max}, drawn from an
+     * unpredictable source of randomness. Pass a generator to
+     * {@link #randomUniform(double, double, int, PseudoRandom)} for a
+     * reproducible result.
+     *
      * @param min
      *            lower bound of the uniform distribution
      * @param max
@@ -173,13 +185,50 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      * @param size
      *            length of the list
      * @return a random list of length {@code size}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative, or if {@code max} is not
+     *             {@code >= min}, which includes either bound being
+     *             {@code NaN}
      */
     public static DoubleArrayList randomUniform(double min, double max, int size) {
+        return randomUniform(min, max, size, DefaultRng.newPseudoRandom());
+    }
+
+    /**
+     * Constructs a random list of length {@code size} with random values
+     * uniformly distributed between {@code min} and {@code max}, drawn from
+     * {@code prng}. The same generator in the same state always yields the
+     * same list.
+     *
+     * @param min
+     *            lower bound of the uniform distribution
+     * @param max
+     *            upper bound of the uniform distribution
+     * @param size
+     *            length of the list
+     * @param prng
+     *            the generator the values are drawn from
+     * @return a random list of length {@code size}
+     * @throws NullPointerException
+     *             if {@code prng} is {@code null}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative, or if {@code max} is not
+     *             {@code >= min}, which includes either bound being
+     *             {@code NaN}
+     * @since 1.5.2
+     */
+    public static DoubleArrayList randomUniform(double min, double max, int size, PseudoRandom prng) {
+        Objects.requireNonNull(prng, "prng");
+        checkSize(size);
+        if (!(min <= max)) { // catches NaN as well
+            throw new IllegalArgumentException("max must be >= min (min = " + min + ", max = " + max + ")");
+        }
         double[] values = new double[size];
-        ThreadLocalRandom rng = ThreadLocalRandom.current();
-        double spread = max - min;
         for (int i = 0; i < values.length; ++i) {
-            values[i] = min + spread * rng.nextDouble();
+            // the generator draws the bounded value itself: min + (max - min)
+            // * u overflows to infinity for a spread that leaves the double
+            // range, which -MAX_VALUE .. MAX_VALUE does
+            values[i] = prng.nextDouble(min, max);
         }
         return new DoubleArrayList(values, false);
     }
@@ -187,8 +236,10 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
     /**
      * Constructs a random list of length {@code size} with random values
      * normally distributed with mean {@code mu} and standard deviation
-     * {@code sigma}.
-     * 
+     * {@code sigma}, drawn from an unpredictable source of randomness. Pass a
+     * generator to {@link #randomNormal(double, double, int, PseudoRandom)}
+     * for a reproducible result.
+     *
      * @param mu
      *            mean (expectation) of the normal distribution
      * @param sigma
@@ -197,17 +248,54 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      * @param size
      *            length of the list
      * @return a random list of length {@code size}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative or {@code sigma} is not
+     *             {@code > 0.0}, which includes {@code NaN}
      */
     public static DoubleArrayList randomNormal(double mu, double sigma, int size) {
-        if (sigma <= 0.0) {
+        return randomNormal(mu, sigma, size, DefaultRng.newPseudoRandom());
+    }
+
+    /**
+     * Constructs a random list of length {@code size} with random values
+     * normally distributed with mean {@code mu} and standard deviation
+     * {@code sigma}, drawn from {@code prng}. The same generator in the same
+     * state always yields the same list.
+     *
+     * @param mu
+     *            mean (expectation) of the normal distribution
+     * @param sigma
+     *            standard deviation of the normal distribution, must be
+     *            {@code > 0.0}
+     * @param size
+     *            length of the list
+     * @param prng
+     *            the generator the values are drawn from
+     * @return a random list of length {@code size}
+     * @throws NullPointerException
+     *             if {@code prng} is {@code null}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative or {@code sigma} is not
+     *             {@code > 0.0}, which includes {@code NaN}
+     * @since 1.5.2
+     */
+    public static DoubleArrayList randomNormal(double mu, double sigma, int size, PseudoRandom prng) {
+        Objects.requireNonNull(prng, "prng");
+        checkSize(size);
+        if (!(sigma > 0.0)) { // catches NaN as well
             throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
         }
         double[] values = new double[size];
-        ThreadLocalRandom rng = ThreadLocalRandom.current();
         for (int i = 0; i < values.length; ++i) {
-            values[i] = mu + sigma * rng.nextGaussian();
+            values[i] = prng.nextGaussian(mu, sigma);
         }
         return new DoubleArrayList(values, false);
+    }
+
+    private static void checkSize(int size) {
+        if (size < 0) {
+            throw new IllegalArgumentException("Illegal Size: " + size);
+        }
     }
 
     /**
@@ -793,7 +881,15 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
      */
     @Override
     public DoubleList shuffle() {
-        shuffle(size, 0, elementData);
+        return shuffle(DefaultRng.newPseudoRandom());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public DoubleList shuffle(PseudoRandom prng) {
+        shuffle(size, 0, elementData, Objects.requireNonNull(prng, "prng"));
         return this;
     }
 
@@ -1354,7 +1450,12 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
 
         @Override
         public DoubleList shuffle() {
-            DoubleArrayList.shuffle(size, offset, root.elementData);
+            return shuffle(DefaultRng.newPseudoRandom());
+        }
+
+        @Override
+        public DoubleList shuffle(PseudoRandom prng) {
+            DoubleArrayList.shuffle(size, offset, root.elementData, Objects.requireNonNull(prng, "prng"));
             return this;
         }
 
@@ -2546,10 +2647,9 @@ public class DoubleArrayList implements DoubleList, Cloneable, Externalizable {
         return b;
     }
 
-    static void shuffle(int length, int aoff, double[] a) {
-        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+    static void shuffle(int length, int aoff, double[] a, PseudoRandom prng) {
         for (int i = length; i > 1; --i) {
-            swap(aoff, a, i - 1, rnd.nextInt(i));
+            swap(aoff, a, i - 1, prng.nextInt(i));
         }
     }
 

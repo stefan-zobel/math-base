@@ -24,6 +24,7 @@ import java.util.stream.DoubleStream;
 import java.util.stream.StreamSupport;
 
 import math.fun.DForEachIterator;
+import math.rng.PseudoRandom;
 
 /**
  * A resizable primitive double[] array with vector operations that behaves
@@ -187,8 +188,11 @@ public interface DoubleList {
 
     /**
      * Constructs a random list of length {@code size} with random values
-     * uniformly distributed between {@code min} and {@code max}.
-     * 
+     * uniformly distributed between {@code min} and {@code max}, drawn from an
+     * unpredictable source of randomness. Pass a generator to
+     * {@link #randomUniform(double, double, int, PseudoRandom)} for a
+     * reproducible result.
+     *
      * @param min
      *            lower bound of the uniform distribution
      * @param max
@@ -196,6 +200,10 @@ public interface DoubleList {
      * @param size
      *            length of the list
      * @return a random list of length {@code size}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative, or if {@code max} is not
+     *             {@code >= min}, which includes either bound being
+     *             {@code NaN}
      */
     static DoubleList randomUniform(double min, double max, int size) {
         return DoubleArrayList.randomUniform(min, max, size);
@@ -203,9 +211,38 @@ public interface DoubleList {
 
     /**
      * Constructs a random list of length {@code size} with random values
+     * uniformly distributed between {@code min} and {@code max}, drawn from
+     * {@code prng}. The same generator in the same state always yields the
+     * same list.
+     *
+     * @param min
+     *            lower bound of the uniform distribution
+     * @param max
+     *            upper bound of the uniform distribution
+     * @param size
+     *            length of the list
+     * @param prng
+     *            the generator the values are drawn from
+     * @return a random list of length {@code size}
+     * @throws NullPointerException
+     *             if {@code prng} is {@code null}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative, or if {@code max} is not
+     *             {@code >= min}, which includes either bound being
+     *             {@code NaN}
+     * @since 1.5.2
+     */
+    static DoubleList randomUniform(double min, double max, int size, PseudoRandom prng) {
+        return DoubleArrayList.randomUniform(min, max, size, prng);
+    }
+
+    /**
+     * Constructs a random list of length {@code size} with random values
      * normally distributed with mean {@code mu} and standard deviation
-     * {@code sigma}.
-     * 
+     * {@code sigma}, drawn from an unpredictable source of randomness. Pass a
+     * generator to {@link #randomNormal(double, double, int, PseudoRandom)}
+     * for a reproducible result.
+     *
      * @param mu
      *            mean (expectation) of the normal distribution
      * @param sigma
@@ -214,9 +251,39 @@ public interface DoubleList {
      * @param size
      *            length of the list
      * @return a random list of length {@code size}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative or {@code sigma} is not
+     *             {@code > 0.0}, which includes {@code NaN}
      */
     static DoubleList randomNormal(double mu, double sigma, int size) {
         return DoubleArrayList.randomNormal(mu, sigma, size);
+    }
+
+    /**
+     * Constructs a random list of length {@code size} with random values
+     * normally distributed with mean {@code mu} and standard deviation
+     * {@code sigma}, drawn from {@code prng}. The same generator in the same
+     * state always yields the same list.
+     *
+     * @param mu
+     *            mean (expectation) of the normal distribution
+     * @param sigma
+     *            standard deviation of the normal distribution, must be
+     *            {@code > 0.0}
+     * @param size
+     *            length of the list
+     * @param prng
+     *            the generator the values are drawn from
+     * @return a random list of length {@code size}
+     * @throws NullPointerException
+     *             if {@code prng} is {@code null}
+     * @throws IllegalArgumentException
+     *             if {@code size} is negative or {@code sigma} is not
+     *             {@code > 0.0}, which includes {@code NaN}
+     * @since 1.5.2
+     */
+    static DoubleList randomNormal(double mu, double sigma, int size, PseudoRandom prng) {
+        return DoubleArrayList.randomNormal(mu, sigma, size, prng);
     }
 
     /**
@@ -1011,11 +1078,39 @@ public interface DoubleList {
     DoubleList sanitizeNonFinite(double nanSurrogate, double posInfSurrogate, double negInfSurrogate);
 
     /**
-     * Randomly permutes the elements in this list in place using a default
-     * source of randomness. All permutations occur with approximately equal
-     * probability.
-     * 
+     * Randomly permutes the elements in this list in place using an
+     * unpredictable source of randomness. All permutations occur with
+     * approximately equal probability. Pass a generator to
+     * {@link #shuffle(PseudoRandom)} for a reproducible permutation.
+     *
      * @return this list with elements randomly permuted
      */
     DoubleList shuffle();
+
+    /**
+     * Randomly permutes the elements in this list in place, taking the
+     * randomness from {@code prng}. All permutations occur with approximately
+     * equal probability, and the same generator in the same state always
+     * yields the same permutation.
+     *
+     * @param prng
+     *            the generator the permutation is drawn from
+     * @return this list with elements randomly permuted
+     * @throws NullPointerException
+     *             if {@code prng} is {@code null}
+     * @since 1.5.2
+     */
+    default DoubleList shuffle(PseudoRandom prng) {
+        Objects.requireNonNull(prng, "prng");
+        // Fisher-Yates over get/set, so that an implementation inherits it
+        // without an array of its own; DoubleArrayList overrides with the
+        // version that swaps in place
+        for (int i = size(); i > 1; --i) {
+            int j = prng.nextInt(i);
+            double tmp = get(i - 1);
+            set(i - 1, get(j));
+            set(j, tmp);
+        }
+        return this;
+    }
 }
