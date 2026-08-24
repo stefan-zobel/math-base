@@ -27,7 +27,10 @@ final class Scal {
             }
         } else if (alpha == 0.0) {
             for (int i = 0; i < n; ++i) {
-                x[xOff + i * incX] *= 0.0;
+                // assign rather than multiply, the way reference BLAS does: a
+                // multiplication turns a NaN or an infinity in x into a NaN, and
+                // answers -0.0 where x was negative
+                x[xOff + i * incX] = 0.0;
             }
         }
     }

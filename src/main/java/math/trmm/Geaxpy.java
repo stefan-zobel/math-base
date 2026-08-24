@@ -45,10 +45,10 @@ final class Geaxpy {
             // General case
             //
             for (int j = 0; j < n; ++j) {
+                int base_X = X_start + j * incColX;
                 int base_Y = Y_start + j * incColY;
-                int _incColX = j * incColX;
                 for (int i = 0; i < m; ++i) {
-                    Y[base_Y + i * incRowY] += alpha * X[i * incRowX + _incColX];
+                    Y[base_Y + i * incRowY] += alpha * X[base_X + i * incRowX];
                 }
             }
         }

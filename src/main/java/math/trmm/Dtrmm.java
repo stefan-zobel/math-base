@@ -197,7 +197,7 @@ public final class Dtrmm {
         }
 
         // Quick return if possible
-        if (n == 0) {
+        if (m == 0 || n == 0) {
             return;
         }
 
