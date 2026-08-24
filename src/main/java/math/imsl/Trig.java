@@ -28,11 +28,40 @@ public final class Trig {
             -2.2460229999999999e-12, 1.9058700000000001e-13, -1.6171999999999999e-14, 1.372e-15,
             -1.1600000000000001e-16, 8.9999999999999999e-18 };
 
+    // The point at which tanh reaches 1.0 in double precision:
+    // 0.5 * ln(8 / eps), where 2 * e^(-2x) finally drops below half an ulp of
+    // the largest double below 1.0. The routine used to saturate at
+    // 7.9772948850000001, a single precision cutoff, where the true value is
+    // still 1 - 2.36e-7. The branch below reaches 1.0 on its own from
+    // 0.5 * ln(4 / eps) = 18.715 upwards, so past that this constant is really
+    // a guard against Math.exp overflowing at 709.78, where the quotient of
+    // two infinities would be NaN.
+    private static final double TANH_CUTOFF = 19.061547465398498;
+
+    /**
+     * The square of the hyperbolic secant, {@code 1 / cosh(x)^2}. Computed
+     * from {@link #cosh(double)} and accurate over the whole range; do not
+     * derive it from {@code 1 - tanh(x)^2}, which cancels to exactly zero
+     * from {@code |x| > 18.7} upwards, where this method still answers
+     * 2.2e-16.
+     *
+     * @param x
+     *            input value
+     * @return {@code sech(x)^2} at {@code x}
+     */
     public static double sech2(double x) {
         double y = cosh(x);
         return 1.0 / (y * y);
     }
 
+    /**
+     * The hyperbolic cosine of {@code x}.
+     *
+     * @param x
+     *            input value
+     * @return {@code cosh(x)}, {@code +Infinity} for an infinite argument
+     *         and {@code NaN} for {@code NaN}
+     */
     public static double cosh(double x) {
         if (Double.isNaN(x)) {
             return Double.NaN;
@@ -47,6 +76,17 @@ public final class Trig {
         return 0.5 * y;
     }
 
+    /**
+     * The hyperbolic tangent of {@code d}, accurate to about two ulp over
+     * the whole range. It saturates to {@code +/-1} only where a
+     * {@code double} does, so {@code 1 - tanh(d)^2} stays meaningful up to
+     * {@code |d| = 18.7}; beyond that use {@link #sech2(double)}.
+     *
+     * @param d
+     *            input value
+     * @return {@code tanh(d)} in {@code [-1, 1]}, {@code NaN} for
+     *         {@code NaN}
+     */
     public static double tanh(double d) {
         double d2 = Math.abs(d);
         double d1;
@@ -56,7 +96,7 @@ public final class Trig {
             d1 = d;
         } else if (d2 <= 1.0) {
             d1 = d * (1.0 + csevl(2.0 * d * d - 1.0, TANH_COEFF));
-        } else if (d2 < 7.9772948850000001) {
+        } else if (d2 < TANH_CUTOFF) {
             d2 = Math.exp(d2);
             d1 = sign((d2 - 1.0 / d2) / (d2 + 1.0 / d2), d);
         } else {
