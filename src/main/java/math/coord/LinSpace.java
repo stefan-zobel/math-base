@@ -27,10 +27,10 @@ import math.fun.DIndexIterator;
 
 /**
  * Evenly spaced points between {@code start} and {@code end}. The spacing
- * between the points is {@code (end-start)/(n-1)} where {@code n} is the number
- * of points. A {@code LinSpace} always includes the endpoints. If {@code end}
- * is smaller than {@code start}, then the {@code LinSpace} describes descending
- * values.
+ * between the points is {@code Math.abs((end-start)/(n-1))} where {@code n}
+ * is the number of points. A {@code LinSpace} always includes the endpoints.
+ * If {@code end} is smaller than {@code start}, then the {@code LinSpace}
+ * describes descending values.
  * <p>
  * The number of points is always the number that was asked for. Equal
  * endpoints are not a special case: {@code linspace(a, a, n)} is {@code n}
@@ -109,22 +109,52 @@ public final class LinSpace {
         }
     }
 
+    /**
+     * The distance between two neighboring points, as a magnitude: it is never
+     * negative, not even for a descending range, and it is zero for a
+     * {@code LinSpace} of a single point.
+     * 
+     * @return the absolute distance between neighboring points
+     */
     public double spacing() {
         return Math.abs(step);
     }
 
+    /**
+     * The number of points, which is always the number that was asked for.
+     * 
+     * @return the number of points, at least 1
+     */
     public int size() {
         return numberOfPoints;
     }
 
+    /**
+     * The first point, {@code point(1)}.
+     * 
+     * @return start point of the interval
+     */
     public double start() {
         return start;
     }
 
+    /**
+     * The last point, {@code point(size())}. For a {@code LinSpace} of a
+     * single point this is that point, and equal to {@link #start()}.
+     * 
+     * @return endpoint of the interval
+     */
     public double end() {
         return stop;
     }
 
+    /**
+     * A fresh iterator over the abscissas, in order, whose
+     * {@code nextIndex()} runs from 1 to {@link #size()}. It yields the same
+     * values as {@link #point(int)}.
+     * 
+     * @return a new iterator over the points
+     */
     public DIndexIterator iterator() {
         return new DblIt(this);
     }
@@ -157,6 +187,21 @@ public final class LinSpace {
         return start + ((pos - 1) * step);
     }
 
+    /**
+     * The sub-range between the 1-based positions {@code from} and {@code to},
+     * both included, as a new {@code LinSpace}. The two may be given in either
+     * order. The slice begins and ends exactly on the points of this range;
+     * its interior points are its own, because it carries its own spacing.
+     * Values, if this {@code LinSpace} has any, are copied along.
+     * 
+     * @param from
+     *            1-based position of one end of the slice
+     * @param to
+     *            1-based position of the other end of the slice
+     * @return a new {@code LinSpace} of {@code |to - from| + 1} points
+     * @throws IndexOutOfBoundsException
+     *             if {@code from} or {@code to} is not in {@code [1, size()]}
+     */
     public LinSpace slice(int from, int to) {
         checkPosition(from, "from");
         checkPosition(to, "to");
@@ -183,6 +228,16 @@ public final class LinSpace {
         return new LinSpace(begin, end, count, d);
     }
 
+    /**
+     * The sub-range from the first point up to and including the 1-based
+     * position {@code to}, as a new {@code LinSpace}.
+     * 
+     * @param to
+     *            1-based position of the last point of the slice
+     * @return a new {@code LinSpace} of {@code to} points
+     * @throws IndexOutOfBoundsException
+     *             if {@code to} is not in {@code [1, size()]}
+     */
     public LinSpace sliceTo(int to) {
         checkPosition(to, "to");
         boolean c = vec != null;
@@ -198,6 +253,16 @@ public final class LinSpace {
         return new LinSpace(start, abscissa(to), count, d);
     }
 
+    /**
+     * The sub-range from the 1-based position {@code from} up to and including
+     * the last point, as a new {@code LinSpace}.
+     * 
+     * @param from
+     *            1-based position of the first point of the slice
+     * @return a new {@code LinSpace} of {@code size() - from + 1} points
+     * @throws IndexOutOfBoundsException
+     *             if {@code from} is not in {@code [1, size()]}
+     */
     public LinSpace sliceFrom(int from) {
         checkPosition(from, "from");
         boolean c = vec != null;
@@ -229,6 +294,12 @@ public final class LinSpace {
         return abscissa(pos);
     }
 
+    /**
+     * Gives this {@code LinSpace} a value vector of {@link #size()} zeros,
+     * discarding any values it already held.
+     * 
+     * @return this {@code LinSpace}
+     */
     public LinSpace allocate() {
         vec = new double[numberOfPoints];
         return this;
@@ -249,6 +320,17 @@ public final class LinSpace {
         return points;
     }
 
+    /**
+     * The value at the 1-based position {@code pos}.
+     * 
+     * @param pos
+     *            1-based position of the value
+     * @return the value at that position
+     * @throws IndexOutOfBoundsException
+     *             if {@code pos} is not in {@code [1, size()]}
+     * @throws NoSuchElementException
+     *             if this {@code LinSpace} holds no values
+     */
     public double value(int pos) {
         checkPosition(pos, "pos");
         if (vec == null) {
@@ -257,6 +339,14 @@ public final class LinSpace {
         return vec[pos - 1];
     }
 
+    /**
+     * The value vector itself, not a copy: writing into the returned array
+     * changes this {@code LinSpace}.
+     * 
+     * @return the internal array of {@link #size()} values
+     * @throws NoSuchElementException
+     *             if this {@code LinSpace} holds no values
+     */
     // escape hatch
     public double[] values() {
         if (vec == null) {
@@ -265,6 +355,19 @@ public final class LinSpace {
         return vec;
     }
 
+    /**
+     * Sets the value at the 1-based position {@code pos}.
+     * 
+     * @param pos
+     *            1-based position of the value
+     * @param x
+     *            the value to store
+     * @return this {@code LinSpace}
+     * @throws IndexOutOfBoundsException
+     *             if {@code pos} is not in {@code [1, size()]}
+     * @throws NoSuchElementException
+     *             if this {@code LinSpace} holds no values
+     */
     public LinSpace setValue(int pos, double x) {
         checkPosition(pos, "pos");
         if (vec == null) {
@@ -274,10 +377,23 @@ public final class LinSpace {
         return this;
     }
 
+    /**
+     * A fresh traversal over the abscissas, in order, yielding the same values
+     * as {@link #point(int)}.
+     * 
+     * @return a new traversal over the points
+     */
     public DForEach forEach() {
         return new DblForEach(this);
     }
 
+    /**
+     * A fresh traversal over the points paired with their values, in order.
+     * 
+     * @return a new traversal over point and value
+     * @throws NoSuchElementException
+     *             if this {@code LinSpace} holds no values
+     */
     public DForEachBi forEachBi() {
         if (!hasValues()) {
             throw new NoSuchElementException("no data");
@@ -467,6 +583,18 @@ public final class LinSpace {
         return linspace(start, end, numberOfPoints).eval(fun);
     }
 
+    /**
+     * A {@code LinSpace} over integer abscissas centered on zero, holding a
+     * copy of {@code data}. For an odd length the abscissas are symmetric,
+     * {@code -2, -1, 0, 1, 2}; for an even one there is one more below zero
+     * than above, {@code -2, -1, 0, 1}.
+     * 
+     * @param data
+     *            the values, copied into the result
+     * @return a new {@code LinSpace} of {@code data.length} points
+     * @throws IllegalArgumentException
+     *             if {@code data} is empty
+     */
     public static LinSpace centeredIntIndexed(double[] data) {
         final int length = data.length;
         if (length < 1) {
@@ -481,6 +609,18 @@ public final class LinSpace {
         return new LinSpace(start, end, length, data.clone());
     }
 
+    /**
+     * A {@code LinSpace} over abscissas centered on zero at a spacing of one,
+     * holding a copy of {@code data}. The abscissas are symmetric for either
+     * length: {@code -2, -1, 0, 1, 2} for an odd one and
+     * {@code -1.5, -0.5, 0.5, 1.5} for an even one.
+     * 
+     * @param data
+     *            the values, copied into the result
+     * @return a new {@code LinSpace} of {@code data.length} points
+     * @throws IllegalArgumentException
+     *             if {@code data} is empty
+     */
     public static LinSpace centeredDoubleIndexed(double[] data) {
         final int length = data.length;
         if (length < 1) {
@@ -493,6 +633,12 @@ public final class LinSpace {
         return new LinSpace(-sym, sym, length, data.clone());
     }
 
+    /**
+     * Whether this {@code LinSpace} holds values, i.e. whether
+     * {@link #values()} and {@link #value(int)} can be called.
+     * 
+     * @return {@code true} if a value vector is present
+     */
     public boolean hasValues() {
         return vec != null;
     }
