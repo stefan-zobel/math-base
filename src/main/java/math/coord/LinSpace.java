@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Stefan Zobel
+ * Copyright 2018, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,18 @@ import math.fun.DIndexIterator;
  * is smaller than {@code start}, then the {@code LinSpace} describes descending
  * values.
  * <p>
+ * The number of points is always the number that was asked for. Equal
+ * endpoints are not a special case: {@code linspace(a, a, n)} is {@code n}
+ * copies of {@code a} with a spacing of zero. A {@code LinSpace} of a single
+ * point sits on {@code start}, and {@link #end()} reports that same point.
+ * <p>
+ * Every accessor reports the same abscissa for the same position:
+ * {@link #point(int)}, {@link #points()}, {@link #iterator()},
+ * {@link #forEach()}, {@link #forEachBi()} and {@link #eval(DFunction)} agree
+ * bit for bit, and both endpoints are exact. A slice begins and ends exactly
+ * on the points of the range it was cut from; its interior points are its own,
+ * because it carries its own spacing.
+ * <p>
  * Note that indexes are 1-based!
  */
 public final class LinSpace {
@@ -39,6 +51,7 @@ public final class LinSpace {
     private final double start;
     private final double stop;
     private final int numberOfPoints;
+    private final double step;
     private double[] vec;
 
     private LinSpace(double start, double end, int numberOfPoints, double[] data) {
@@ -47,19 +60,24 @@ public final class LinSpace {
         if (numberOfPoints <= 0) {
             throw new IllegalArgumentException("numberOfPoints must be strictly positive : " + numberOfPoints);
         }
-        if (start == end || numberOfPoints == 1) {
-            this.start = end;
-            this.stop = end;
+        if (numberOfPoints == 1) {
+            // one point has no interval, so it sits on start the way
+            // numpy's linspace(a, b, 1) does. stop follows start rather than
+            // end, otherwise pos == 1 and pos == numberOfPoints coincide and
+            // point(1) would answer start where points() answers stop
+            this.start = start;
+            this.stop = start;
             this.numberOfPoints = 1;
         } else {
             this.start = start;
             this.stop = end;
             this.numberOfPoints = numberOfPoints;
         }
+        step = (this.numberOfPoints == 1) ? 0.0 : (this.stop - this.start) / (this.numberOfPoints - 1);
         if (data != null) {
             if (data.length != this.numberOfPoints) {
                 throw new IllegalStateException(
-                        "inconsistent vector dimension : " + numberOfPoints + " != " + data.length);
+                        "inconsistent vector dimension : " + this.numberOfPoints + " != " + data.length);
             }
             vec = data;
         }
@@ -69,20 +87,14 @@ public final class LinSpace {
         start = other.start;
         stop = other.stop;
         numberOfPoints = other.numberOfPoints;
+        step = other.step;
         if (other.vec != null) {
             vec = other.vec.clone();
         }
     }
 
     public double spacing() {
-        if (numberOfPoints == 1) {
-            return 0.0;
-        }
-        if (stop < start) {
-            return (start - stop) / (numberOfPoints - 1);
-        } else {
-            return (stop - start) / (numberOfPoints - 1);
-        }
+        return Math.abs(step);
     }
 
     public int size() {
@@ -98,12 +110,28 @@ public final class LinSpace {
     }
 
     public DIndexIterator iterator() {
-        return new DblIt(numberOfPoints, start, stop, step());
+        return new DblIt(this);
     }
 
-    private double step() {
-        double step = spacing();
-        return (start > stop) ? -step : step;
+    /**
+     * The abscissa at the 1-based position {@code pos}, unchecked. Every
+     * accessor of this class goes through here, so that the same position
+     * cannot have two values. Both endpoints come back exactly; the points in
+     * between are {@code start + (pos - 1) * step}, which does not accumulate
+     * rounding along the way the way a running sum does.
+     * 
+     * @param pos
+     *            1-based position, in {@code [1, numberOfPoints]}
+     * @return the abscissa at that position
+     */
+    private double abscissa(int pos) {
+        if (pos == 1) {
+            return start;
+        }
+        if (pos == numberOfPoints) {
+            return stop;
+        }
+        return start + ((pos - 1) * step);
     }
 
     public LinSpace slice(int from, int to) {
@@ -122,13 +150,12 @@ public final class LinSpace {
         // to <= n
         if (from == to) {
             int count = 1;
-            double point = start + ((from - 1) * step());
+            double point = abscissa(from);
             return new LinSpace(point, point, count, c ? new double[] { vec[from - 1] } : null);
         }
         int count = 1 + to - from;
-        double step = step();
-        double begin = start + ((from - 1) * step);
-        double end = begin + ((count - 1) * step);
+        double begin = abscissa(from);
+        double end = abscissa(to);
         double[] d = c ? Arrays.copyOfRange(vec, from - 1, to) : null;
         return new LinSpace(begin, end, count, d);
     }
@@ -145,7 +172,7 @@ public final class LinSpace {
         // to is in [2..n-1]
         int count = to;
         double[] d = c ? Arrays.copyOfRange(vec, 0, to) : null;
-        return new LinSpace(start, start + ((count - 1) * step()), count, d);
+        return new LinSpace(start, abscissa(to), count, d);
     }
 
     public LinSpace sliceFrom(int from) {
@@ -160,18 +187,23 @@ public final class LinSpace {
         // from is in [2..n-1]
         int count = 1 + numberOfPoints - from;
         double[] d = c ? Arrays.copyOfRange(vec, from - 1, from - 1 + count) : null;
-        return new LinSpace(start + ((from - 1) * step()), stop, count, d);
+        return new LinSpace(abscissa(from), stop, count, d);
     }
 
+    /**
+     * The abscissa at the 1-based position {@code pos}. Both endpoints are
+     * exact: {@code point(1)} is {@code start} and {@code point(size())} is
+     * {@code end()}.
+     * 
+     * @param pos
+     *            1-based position of the point
+     * @return the abscissa at that position
+     * @throws IndexOutOfBoundsException
+     *             if {@code pos} is not in {@code [1, size()]}
+     */
     public double point(int pos) {
         checkPosition(pos, "pos");
-        if (pos == 1) {
-            return start;
-        }
-        if (pos == numberOfPoints) {
-            return stop;
-        }
-        return start + ((pos - 1) * step());
+        return abscissa(pos);
     }
 
     public LinSpace allocate() {
@@ -179,18 +211,17 @@ public final class LinSpace {
         return this;
     }
 
+    /**
+     * All abscissas, in order, as a fresh array. Entry {@code i} is
+     * {@code point(i + 1)}, exactly.
+     * 
+     * @return a new array of {@link #size()} abscissas
+     */
     // escape hatch
     public double[] points() {
         double[] points = new double[numberOfPoints];
-        double current = start;
-        double delta = step();
         for (int i = 0; i < points.length; ++i) {
-            if (i == points.length - 1) {
-                points[i] = stop;
-            } else {
-                points[i] = current;
-            }
-            current += delta;
+            points[i] = abscissa(i + 1);
         }
         return points;
     }
@@ -221,73 +252,61 @@ public final class LinSpace {
     }
 
     public DForEach forEach() {
-        return new DblForEach(numberOfPoints, start, stop, step());
+        return new DblForEach(this);
     }
 
     public DForEachBi forEachBi() {
         if (!hasValues()) {
             throw new NoSuchElementException("no data");
         }
-        return new DblForEachBi(numberOfPoints, start, stop, step(), vec);
+        return new DblForEachBi(this, vec);
     }
 
+    /**
+     * A new {@code LinSpace} over the same points, holding the value of
+     * {@code fun} at each of them. {@code fun} is evaluated at
+     * {@code point(i)} for every {@code i}, ascending and descending ranges
+     * alike, so the value at the last point is the value at {@link #end()}.
+     * 
+     * @param fun
+     *            the function to evaluate at each of the points
+     * @return a new {@code LinSpace} carrying the values of {@code fun}
+     */
     public LinSpace eval(DFunction fun) {
-        double current = start;
-        double last = stop;
-        double delta = step();
-        LinSpace result = new LinSpace(this).allocate();
+        LinSpace result = new LinSpace(start, stop, numberOfPoints, new double[numberOfPoints]);
         double[] y = result.vec;
         for (int i = 0; i < y.length; ++i) {
-            if (current <= last) {
-                y[i] = fun.apply(current);
-            } else {
-                y[i] = fun.apply(last);
-            }
-            current += delta;
+            y[i] = fun.apply(abscissa(i + 1));
         }
         return result;
     }
 
     private static final class DblForEach implements DForEach {
+        private final LinSpace lsp;
+        private final int total;
         private int remaining;
-        private double current;
-        private final double last;
-        private final double delta;
 
-        DblForEach(int numberOfPoints, double start, double stop, double spacing) {
-            remaining = numberOfPoints;
-            current = start;
-            last = stop;
-            delta = spacing;
+        DblForEach(LinSpace lsp) {
+            this.lsp = lsp;
+            total = lsp.numberOfPoints;
+            remaining = total;
         }
 
         @Override
         public void forEachRemaining(DConsumer action) {
             while (remaining > 0) {
+                int pos = total - remaining + 1;
                 --remaining;
-                double x = current;
-                if (remaining == 0) {
-                    action.accept(last);
-                    return;
-                } else {
-                    current = x + delta;
-                }
-                action.accept(x);
+                action.accept(lsp.abscissa(pos));
             }
         }
 
         @Override
         public boolean tryAdvance(DConsumer action) {
             if (remaining > 0) {
+                int pos = total - remaining + 1;
                 --remaining;
-                double x = current;
-                if (remaining == 0) {
-                    action.accept(last);
-                    return true;
-                } else {
-                    current = x + delta;
-                }
-                action.accept(x);
+                action.accept(lsp.abscissa(pos));
                 return true;
             }
             return false;
@@ -296,49 +315,33 @@ public final class LinSpace {
 
     private static final class DblForEachBi implements DForEachBi {
 
-        private int remaining;
-        private double current;
-        private final double last;
-        private final double delta;
+        private final LinSpace lsp;
         private final int total;
         private final double[] data;
+        private int remaining;
 
-        DblForEachBi(int numberOfPoints, double start, double stop, double spacing, double[] vec) {
-            total = numberOfPoints;
-            remaining = numberOfPoints;
-            current = start;
-            last = stop;
-            delta = spacing;
+        DblForEachBi(LinSpace lsp, double[] vec) {
+            this.lsp = lsp;
+            total = lsp.numberOfPoints;
+            remaining = total;
             data = vec;
         }
 
         @Override
         public void forEachRemaining(DBiConsumer action) {
             while (remaining > 0) {
+                int pos = total - remaining + 1;
                 --remaining;
-                double x = current;
-                if (remaining == 0) {
-                    action.accept(last, data[total - 1]);
-                    return;
-                } else {
-                    current = x + delta;
-                }
-                action.accept(x, data[total - remaining - 1]);
+                action.accept(lsp.abscissa(pos), data[pos - 1]);
             }
         }
 
         @Override
         public boolean tryAdvance(DBiConsumer action) {
             if (remaining > 0) {
+                int pos = total - remaining + 1;
                 --remaining;
-                double x = current;
-                if (remaining == 0) {
-                    action.accept(last, data[total - 1]);
-                    return true;
-                } else {
-                    current = x + delta;
-                }
-                action.accept(x, data[total - remaining - 1]);
+                action.accept(lsp.abscissa(pos), data[pos - 1]);
                 return true;
             }
             return false;
@@ -346,18 +349,14 @@ public final class LinSpace {
     }
 
     private static final class DblIt implements DIndexIterator {
-        private int remaining;
-        private double current;
-        private final double last;
-        private final double delta;
+        private final LinSpace lsp;
         private final int total;
+        private int remaining;
 
-        DblIt(int numberOfPoints, double start, double stop, double spacing) {
-            total = numberOfPoints;
-            remaining = numberOfPoints;
-            current = start;
-            last = stop;
-            delta = spacing;
+        DblIt(LinSpace lsp) {
+            this.lsp = lsp;
+            total = lsp.numberOfPoints;
+            remaining = total;
         }
 
         @Override
@@ -376,14 +375,9 @@ public final class LinSpace {
         @Override
         public double next() {
             if (remaining > 0) {
+                int pos = total - remaining + 1;
                 --remaining;
-                double x = current;
-                if (remaining == 0) {
-                    return last;
-                } else {
-                    current = x + delta;
-                }
-                return x;
+                return lsp.abscissa(pos);
             }
             throw new NoSuchElementException("exhausted");
         }
@@ -403,13 +397,51 @@ public final class LinSpace {
         return new LinSpace(start, end, 128, null);
     }
 
+    /**
+     * Returns {@code numberOfPoints} evenly spaced points between
+     * {@code start} and {@code end} (including the interval endpoints).
+     * <p>
+     * The count is honored as given. For {@code start == end} the result is
+     * {@code numberOfPoints} copies of that value, and for
+     * {@code numberOfPoints == 1} it is the single point {@code start}.
+     * 
+     * @param start
+     *            start point of interval (included)
+     * @param end
+     *            endpoint of interval (included)
+     * @param numberOfPoints
+     *            the number of points, must be strictly positive
+     * @return sample interval containing {@code numberOfPoints} points
+     * @throws IllegalArgumentException
+     *             if {@code numberOfPoints} is not strictly positive, or if
+     *             {@code start} or {@code end} is infinite or {@code NaN}
+     */
     public static LinSpace linspace(double start, double end, int numberOfPoints) {
         return new LinSpace(start, end, numberOfPoints, null);
     }
 
+    /**
+     * Returns {@code numberOfPoints} evenly spaced points between
+     * {@code start} and {@code end}, each carrying the value of {@code fun} at
+     * that point. {@code fun} is evaluated once per point, so a degenerate
+     * interval yields {@code numberOfPoints} copies of the same value.
+     * 
+     * @param start
+     *            start point of interval (included)
+     * @param end
+     *            endpoint of interval (included)
+     * @param numberOfPoints
+     *            the number of points, must be strictly positive
+     * @param fun
+     *            the function to evaluate at each of the points
+     * @return sample interval of {@code numberOfPoints} points holding the
+     *         values of {@code fun}
+     * @throws IllegalArgumentException
+     *             if {@code numberOfPoints} is not strictly positive, or if
+     *             {@code start} or {@code end} is infinite or {@code NaN}
+     */
     public static LinSpace compute(double start, double end, int numberOfPoints, DFunction fun) {
-        LinSpace lsp = linspace(start, end, numberOfPoints).allocate();
-        return lsp.eval(fun);
+        return linspace(start, end, numberOfPoints).eval(fun);
     }
 
     public static LinSpace centeredIntIndexed(double[] data) {
