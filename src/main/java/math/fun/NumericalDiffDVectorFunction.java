@@ -40,14 +40,23 @@ import math.MathConsts;
  * is of order one it is the more accurate by up to three orders of magnitude,
  * and from {@code |x| >= 1} the two are the same number.
  * <p>
- * What the floor does cost is an {@code F} that varies on the scale of
- * {@code x} itself where that scale is far below one: there it steps clean
- * over the feature, by close to seven orders of magnitude at
- * {@code |x| = 1e-12}. It assumes, in other words, that the arguments are
- * scaled to be of order one, the same assumption a solver's step test makes;
- * where they are not, say so through {@code diffScale}, which multiplied by
- * the magnitude the arguments actually have buys the relative step's accuracy
- * back.
+ * What the floor does cost is an {@code F} whose scale is not one, and it
+ * costs in both directions. Where {@code F} varies on the scale of {@code x}
+ * itself and that scale is far below one, the step clears the feature -- by
+ * close to seven orders of magnitude at {@code |x| = 1e-12}. Where the scale
+ * is far above one and the component itself sits below one, the step is too
+ * small instead, and the difference measures the last bits of {@code F}
+ * rather than a change in it: for a component behaving like
+ * {@code sin(x / s)} at {@code x = 0} the derivative is off by {@code 3e-3}
+ * at {@code s = 1e-6} and again at {@code s = 1e6}.
+ * <p>
+ * It assumes, in other words, that the arguments are scaled to be of order
+ * one, the same assumption a solver's step test makes; where they are not,
+ * say so through {@code diffScale}, which multiplied by the magnitude the
+ * arguments actually have buys that accuracy back. That covers arguments
+ * sharing one scale and not a vector whose components have several, since
+ * {@code diffScale} multiplies the floor as well and can therefore express
+ * only one of them.
  * <p>
  * The forward difference is accurate to about the square root of the machine
  * epsilon. Where the derivative can be written down, implement

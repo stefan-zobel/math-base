@@ -38,13 +38,22 @@ import math.MathConsts;
  * is the more accurate of the two by up to three orders of magnitude, and from
  * {@code |x| >= 1} the two are the same number.
  * <p>
- * What it assumes is that the arguments are scaled to be of order one. Where
- * they are not -- where {@code f} varies on the scale of {@code x} itself and
- * that scale is far below one -- the floor steps clean over the feature, and
- * the way to say so is {@code diffScale}: multiplied by the magnitude the
- * arguments actually have, it buys the accuracy of the relative step back.
- * That covers arguments sharing one scale, not a vector whose components have
- * several.
+ * What it assumes is that the arguments are scaled to be of order one, and it
+ * costs accuracy in both directions where they are not. Where {@code f} varies
+ * on a scale far below one, the step clears the feature; where it varies on a
+ * scale far above one and the component itself sits below one, the step is too
+ * small instead, and the difference comes back as the last bits of {@code f}
+ * rather than as a change in it. For {@code sin(x / s)} at {@code x = 0} the
+ * derivative is off by {@code 3e-3} at {@code s = 1e-6} and again at
+ * {@code s = 1e6}, where a step floored at {@code s} stays below {@code 2e-8}.
+ * <p>
+ * The way to say that the arguments have a scale of their own is
+ * {@code diffScale}, which multiplied by the magnitude they actually have buys
+ * that accuracy back. It covers arguments sharing one scale, not a vector
+ * whose components have several: it multiplies the floor as well and can
+ * therefore express only one of them. Across scales from {@code 1e-6} to
+ * {@code 1e6} the best single value leaves the worst component some 700 times
+ * off what a per-component floor reaches.
  * <p>
  * The forward difference is accurate to about the square root of the machine
  * epsilon. Where the derivative can be written down, implement
