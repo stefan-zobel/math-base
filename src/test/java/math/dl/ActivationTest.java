@@ -2,6 +2,7 @@ package math.dl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.function.DoubleUnaryOperator;
 
@@ -161,7 +162,7 @@ public class ActivationTest {
                 double x = act.lo + (act.hi - act.lo) * i / 400000.0;
                 double got = act.value.applyAsDouble(x);
                 double ref = act.valueRef.applyAsDouble(x);
-                assertClose(act.name + ".value at " + x, ref, got);
+                assertCloseAt(act.name, ".value", x, ref, got);
             }
         }
     }
@@ -175,7 +176,7 @@ public class ActivationTest {
                 double x = act.lo + (act.hi - act.lo) * i / 400000.0;
                 double got = act.deriv.applyAsDouble(x);
                 double ref = act.derivRef.applyAsDouble(x);
-                assertClose(act.name + ".derivative at " + x, ref, got);
+                assertCloseAt(act.name, ".derivative", x, ref, got);
             }
         }
     }
@@ -194,10 +195,45 @@ public class ActivationTest {
                 double h = 1e-5 * Math.max(1.0, Math.abs(x));
                 double num = (act.value.applyAsDouble(x + h) - act.value.applyAsDouble(x - h)) / (2.0 * h);
                 double ana = act.deriv.applyAsDouble(x);
-                assertTrue(act.name + " derivative at " + x + ": analytic " + ana + ", difference quotient "
-                        + num, Math.abs(ana - num) <= NUMERIC_TOL * Math.max(Math.abs(num), 1.0));
+                if (Math.abs(ana - num) > NUMERIC_TOL * Math.max(Math.abs(num), 1.0)) {
+                    fail(act.name + " derivative at " + x + ": analytic " + ana
+                            + ", difference quotient " + num);
+                }
             }
         }
+    }
+
+    /**
+     * {@code GELU} and {@code Swish} both send an odd function through a
+     * logistic, and {@code sigma(-u)} is {@code 1 - sigma(u)}, so two
+     * identities hold exactly whatever the arithmetic underneath does:
+     * {@code f(x) - f(-x) = x} and {@code f'(x) + f'(-x) = 1}. Neither knows
+     * how the logistic is computed, which is what makes them worth asserting
+     * beside the reference comparisons -- a reference can share a mistake
+     * with the implementation, an identity cannot.
+     * <p>
+     * What they cover is the formula, not the placement of the cutoffs.
+     * Checked against the GELU from before its rewrite: both identities hold
+     * there too, because that version cut off symmetrically at +/-4.861 and a
+     * symmetric truncation cancels out of {@code f(x) - f(-x)}. So this is
+     * cover for a wrong coefficient or a lost sign; a badly placed constant is
+     * what the reference comparisons and {@code theValuesAreContinuous} are
+     * for.
+     * <p>
+     * They are not vacuous: {@code Mish} satisfies neither, because its
+     * softplus is not odd, and violates both by 0.2.
+     */
+    @Test
+    public void theSymmetryIdentitiesHold() {
+        // y(x) = K * (x + 0.044715 * x^3) is odd, so GELU has them
+        assertIdentities("GELU", GELU::gelu, GELU::dgelu_dx, 1e-15, 1e-15);
+
+        // and so does x * sigma(x). Its derivative identity is the looser of
+        // the two, measured 5.218e-15 against GELU's 3.331e-16, and that is
+        // not noise: it is the cancellation in x * s + s * (1 - x * s), left
+        // in place deliberately because the error is below what the reference
+        // comparisons ask for. The identity finds it with no reference at all
+        assertIdentities("Swish", Swish::swish, Swish::dswish_dx, 1e-15, 2e-14);
     }
 
     // ----- invariants that hold whatever the reference says ------------------
@@ -244,9 +280,9 @@ public class ActivationTest {
             float x = (float) (40.0 * (((lcg >>> 11) * 0x1.0p-53) - 0.5));
             for (int a = 0; a < acts.length; ++a) {
                 Act act = acts[a];
-                assertFloatMatches(act.name + ".valueF at " + x, act.value.applyAsDouble(x),
+                assertFloatMatchesAt(act.name, ".valueF", x, act.value.applyAsDouble(x),
                         act.valueF.apply(x));
-                assertFloatMatches(act.name + ".derivF at " + x, act.deriv.applyAsDouble(x),
+                assertFloatMatchesAt(act.name, ".derivF", x, act.deriv.applyAsDouble(x),
                         act.derivF.apply(x));
             }
         }
@@ -338,17 +374,55 @@ public class ActivationTest {
     // ----- helpers -----------------------------------------------------------
 
     private static void assertClose(String what, double expected, double actual) {
-        assertTrue(what + " : expected " + expected + " but was " + actual,
-                Math.abs(actual - expected) <= REL_TOL * Math.abs(expected) + ABS_TOL);
+        if (Math.abs(actual - expected) > REL_TOL * Math.abs(expected) + ABS_TOL) {
+            fail(what + " : expected " + expected + " but was " + actual);
+        }
     }
 
-    private static void assertFloatMatches(String what, double exact, float rounded) {
+    /**
+     * The same check for the sweeps, which run it 400000 times per function.
+     * They take the label in pieces rather than assembled, because building a
+     * message that is thrown away costs more than the arithmetic it describes:
+     * assembling it every iteration rather than only on failure was 2.1 s of
+     * this class.
+     */
+    private static void assertCloseAt(String name, String what, double x, double expected, double actual) {
+        if (Math.abs(actual - expected) > REL_TOL * Math.abs(expected) + ABS_TOL) {
+            fail(name + what + " at " + x + " : expected " + expected + " but was " + actual);
+        }
+    }
+
+    private static void assertFloatMatchesAt(String name, String what, float x, double exact, float rounded) {
         double mag = Math.abs(exact);
         if (mag <= 1e-30 || mag >= 1e30) {
             return; // outside float range the cast can only underflow or overflow
         }
-        assertTrue(what + " : double " + exact + ", float " + rounded,
-                Math.abs(rounded - exact) <= FLOAT_TOL * mag);
+        if (Math.abs(rounded - exact) > FLOAT_TOL * mag) {
+            fail(name + what + " at " + x + " : double " + exact + ", float " + rounded);
+        }
+    }
+
+    private static void assertIdentities(String name, DoubleUnaryOperator f, DoubleUnaryOperator d,
+            double valueTol, double derivTol) {
+        // two bands: dense where the functions bend, thinner out to 800,
+        // which crosses every cutoff either of them has
+        assertIdentitiesOn(name, f, d, valueTol, derivTol, 1e-6, 40.0, 400000);
+        assertIdentitiesOn(name, f, d, valueTol, derivTol, 40.0, 800.0, 100000);
+    }
+
+    private static void assertIdentitiesOn(String name, DoubleUnaryOperator f, DoubleUnaryOperator d,
+            double valueTol, double derivTol, double lo, double hi, int n) {
+        for (int i = 1; i <= n; ++i) {
+            double x = lo + (hi - lo) * i / (double) n;
+            double odd = f.applyAsDouble(x) - f.applyAsDouble(-x);
+            if (Math.abs(odd - x) > valueTol * x) {
+                fail(name + " at " + x + " : f(x) - f(-x) is " + odd + ", not x");
+            }
+            double even = d.applyAsDouble(x) + d.applyAsDouble(-x);
+            if (Math.abs(even - 1.0) > derivTol) {
+                fail(name + " at " + x + " : f'(x) + f'(-x) is " + even + ", not 1");
+            }
+        }
     }
 
     /** No step at a cutoff means the two sides differ by about the slope times 2 eps. */

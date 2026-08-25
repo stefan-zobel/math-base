@@ -1,7 +1,9 @@
 package math.dl;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -122,6 +124,70 @@ public class SoftmaxTest {
             assertTrue("index " + c, c >= 0 && c < P.length);
             int cf = Softmax.sampleClassF(PF, prng);
             assertTrue("index " + cf, cf >= 0 && cf < PF.length);
+        }
+    }
+
+    /**
+     * {@code reweigh} used to hand the caller its own array back at a
+     * temperature of 1.0 and a fresh one at every other temperature, so
+     * whether writing into the result destroyed the input depended on a
+     * runtime value.
+     */
+    @Test
+    public void testTheResultIsNeverTheArgument() {
+        double[] p = { 0.1, 0.2, 0.3, 0.4 };
+        float[] pf = { 0.1f, 0.2f, 0.3f, 0.4f };
+        double[] pBefore = p.clone();
+        float[] pfBefore = pf.clone();
+        double[] temperatures = { 0.5, 1.0, 2.0 };
+        for (int k = 0; k < temperatures.length; ++k) {
+            double t = temperatures[k];
+            double[] out = Softmax.reweigh(p, t);
+            float[] outF = Softmax.reweighF(pf, (float) t);
+            assertTrue("t = " + t + " handed back the argument", out != p);
+            assertTrue("t = " + t + " handed back the argument", outF != pf);
+            out[0] = 99.0;
+            outF[0] = 99.0f;
+            assertArrayEquals("t = " + t + " let the result reach the input", pBefore, p, 0.0);
+            assertArrayEquals("t = " + t + " let the result reach the input", pfBefore, pf, 0.0f);
+        }
+
+        // and a temperature of 1.0 still does nothing to the distribution
+        double[] same = Softmax.reweigh(p, 1.0);
+        for (int i = 0; i < p.length; ++i) {
+            assertEquals("element " + i, Double.doubleToRawLongBits(p[i]),
+                    Double.doubleToRawLongBits(same[i]));
+        }
+        float[] sameF = Softmax.reweighF(pf, 1.0f);
+        for (int i = 0; i < pf.length; ++i) {
+            assertEquals("element " + i, Float.floatToRawIntBits(pf[i]), Float.floatToRawIntBits(sameF[i]));
+        }
+    }
+
+    /**
+     * The javadoc promises an {@code IllegalArgumentException} for a negative
+     * probability. The shortcut at 1.0 used to return before anything was
+     * checked, so that one temperature accepted what the others refused.
+     */
+    @Test
+    public void testEveryTemperatureValidatesItsInput() {
+        double[] temperatures = { 0.5, 1.0, 2.0 };
+        for (int k = 0; k < temperatures.length; ++k) {
+            double t = temperatures[k];
+            try {
+                Softmax.reweigh(new double[] { -1.0, 2.0 }, t);
+                fail("t = " + t + " accepted a negative probability");
+            } catch (IllegalArgumentException expected) {
+                assertTrue("t = " + t + ": " + expected.getMessage(),
+                        expected.getMessage().contains("negative probability"));
+            }
+            try {
+                Softmax.reweighF(new float[] { -1.0f, 2.0f }, (float) t);
+                fail("t = " + t + " accepted a negative probability");
+            } catch (IllegalArgumentException expected) {
+                assertTrue("t = " + t + ": " + expected.getMessage(),
+                        expected.getMessage().contains("negative probability"));
+            }
         }
     }
 }

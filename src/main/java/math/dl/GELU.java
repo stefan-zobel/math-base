@@ -31,12 +31,13 @@ public final class GELU {
      * @return GELU value at x
      */
     public static double gelu(double x) {
-        // measured: below -30.0 the result underflows to -0.0 anyway, and
-        // from 7.09 upwards it is exactly x. The cutoffs used to sit at
-        // +/-4.861, which is where the tangent gave up rather than where a
-        // double does, so gelu(-4.861) answered -0.0 for a true -5.73e-07.
-        // They also keep x * x * x, which overflows past 5.6e102, out of the
-        // way
+        // bisected: the result underflows to -0.0 at -21.159790 and is
+        // exactly x from 7.089343 upwards. The lower constant sits well past
+        // that with room to spare, the upper one right at it. The cutoffs
+        // used to be +/-4.861, which is where the tangent gave up rather than
+        // where a double does, so gelu(-4.861) answered -0.0 for a true
+        // -5.73e-07. They also keep x * x * x, which overflows past 5.6e102,
+        // out of the way, and -Infinity, for which x * 0.0 is NaN
         if (x < -30.0) {
             return -0.0;
         }
@@ -65,10 +66,11 @@ public final class GELU {
      * @return GELU derivative at x
      */
     public static double dgelu_dx(double x) {
-        // measured: below -21.5 the result underflows to 0.0, and from 7.45
-        // upwards it is exactly 1.0. The upper cutoff was already right; the
-        // lower one used to mirror it and cut the tail off 14 units early.
-        // They also keep x * x, which overflows past 1.3e154, out of the way
+        // bisected: the result underflows to 0.0 at -21.174008 and is exactly
+        // 1.0 from 7.446393 upwards. The upper cutoff was already right at
+        // 7.446; the lower one used to mirror it and cut the tail off 14
+        // units early. They also keep x * x, which overflows past 1.3e154,
+        // out of the way
         if (x < -21.5) {
             return -0.0;
         }
