@@ -655,14 +655,14 @@ public final class MLE {
         for (int i = 0; i < x.length; i++) {
             sum += x[i];
         }
-        double sigma = sum / n;
+        double mu = sum / n;
 
         sum = 0.0;
         for (int i = 0; i < x.length; i++) {
-            double dev = x[i] - sigma;
+            double dev = x[i] - mu;
             sum = sum + (dev * dev);
         }
-        return new ParNormal(sigma, Math.sqrt(sum / n));
+        return new ParNormal(mu, Math.sqrt(sum / n));
     }
 
     /**
