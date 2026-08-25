@@ -17,7 +17,9 @@ package math.dl;
 
 /**
  * Determines the index of the largest element in a given part of a float[] or
- * double[] array.
+ * double[] array. The index is into the array, not into the part, so a caller
+ * that wants a slice-relative one subtracts the offset back out, as
+ * {@code MultiClassAccuracy} does at both of its call sites.
  */
 public final class ArrayMaxPos {
 
@@ -31,7 +33,8 @@ public final class ArrayMaxPos {
      *            starting position in {@code a}
      * @param a
      *            the array to inspect
-     * @return index of the largest element in the given array slice
+     * @return index of the largest element, counted from the start of
+     *         {@code a} rather than from {@code off}
      */
     public static int maxPos(int length, int off, double[] a) {
         double max = a[off];
@@ -56,7 +59,8 @@ public final class ArrayMaxPos {
      *            starting position in {@code a}
      * @param a
      *            the array to inspect
-     * @return index of the largest element in the given array slice
+     * @return index of the largest element, counted from the start of
+     *         {@code a} rather than from {@code off}
      */
     public static int maxPosF(int length, int off, float[] a) {
         float max = a[off];
