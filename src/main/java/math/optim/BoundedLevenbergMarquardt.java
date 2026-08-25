@@ -424,6 +424,17 @@ public final class BoundedLevenbergMarquardt {
      * and a difference quotient that probes outside would measure nonsense
      * without saying so.
      * <p>
+     * The step itself is the magnitude of the parameter it is taken from,
+     * <em>floored at one</em> -- the step both
+     * {@link math.fun.NumericalDiffDMultiFunction} and
+     * {@link math.fun.NumericalDiffDVectorFunction} take. The floor is what
+     * keeps a parameter near zero, but not at zero, from being handed a step
+     * so small that the residuals come back unchanged in every bit. That
+     * column of zeros is indistinguishable from a parameter the residuals do
+     * not depend on, so the parameter stays where it started and the search
+     * reports success. Where the box is narrower than the step, the step
+     * shrinks to fit as described above; the floor is not lowered to meet it.
+     * <p>
      * If the residuals are not computed to machine precision, say so through
      * the {@code functionAccuracy} of the six-argument constructor. The step
      * for the difference is chosen from it, and left at the default it will be
@@ -893,10 +904,7 @@ public final class BoundedLevenbergMarquardt {
             System.arraycopy(x, 0, probe, 0, n);
             for (int j = 0; j < n; j++) {
                 double xj = x[j];
-                double h = relativeStep * Math.abs(xj);
-                if (h == 0.0) {
-                    h = relativeStep;
-                }
+                double h = relativeStep * Math.max(Math.abs(xj), 1.0);
                 double room = upper[j] - xj;
                 if (h <= room) {
                     // forward, the ordinary case
@@ -907,6 +915,11 @@ public final class BoundedLevenbergMarquardt {
                     // wider of the two and stay inside it
                     h = (room >= xj - lower[j]) ? room : lower[j] - xj;
                 }
+                // difference by what the sum actually moved, not by what was
+                // asked for: the two part company once h reaches the last bits
+                // of xj, and once the box has shrunk it to fit
+                double xjPlusH = xj + h;
+                h = xjPlusH - xj;
                 if (h == 0.0) {
                     // the parameter is pinned, so the column is never used
                     for (int i = 0; i < m; i++) {
@@ -914,7 +927,7 @@ public final class BoundedLevenbergMarquardt {
                     }
                     continue;
                 }
-                probe[j] = xj + h;
+                probe[j] = xjPlusH;
                 function.valueAt(probe, probed);
                 probe[j] = xj;
                 int column = j * m;

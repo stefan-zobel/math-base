@@ -484,6 +484,51 @@ public class BoundedLevenbergMarquardtTest {
         assertEquals("rate", 1.5, r.parameters[1], 1.0e-5);
     }
 
+    @Test
+    public void testAParameterNearZeroIsStillEstimated() {
+        // the fit must not depend on where a parameter started. Without the
+        // floor the step for an offset at 1e-10 is 1e-18, the residuals come
+        // back unchanged in every bit, the column is zero and the parameter
+        // is never moved again -- and the search reports success
+        double[] t = grid(30, 0.0, 4.0);
+        double[] y = decayData(t, 3.0, 1.5, 0.5, 0.0);
+        double[] lower = { 0.0, 0.01, -10.0 };
+        double[] upper = { 100.0, 100.0, 10.0 };
+        double[] starts = { 0.5, 1.0e-6, 1.0e-10, 1.0e-12, 0.0 };
+        for (int k = 0; k < starts.length; k++) {
+            Undefined model = new Undefined(new Decay(t, y), lower, upper);
+            BoundedLevenbergMarquardt.Result r = solver(2000).solve(model,
+                    new double[] { 1.0, 0.5, starts[k] }, t.length, lower, upper);
+            String at = "from " + starts[k] + " (" + r.status + ")";
+            assertEquals(at + ": the difference step left the box", 0, model.outside);
+            assertTrue(at + ": the search did not converge", r.converged);
+            assertEquals(at + ": amplitude", 3.0, r.parameters[0], 1.0e-6);
+            assertEquals(at + ": rate", 1.5, r.parameters[1], 1.0e-6);
+            assertEquals(at + ": offset", 0.5, r.parameters[2], 1.0e-6);
+        }
+    }
+
+    @Test
+    public void testTheStepDoesNotShrinkWithTheParameterItIsTakenFrom() {
+        // the first Jacobian is one evaluation at the point plus one probe
+        // per parameter, so the first four calls hold it. The probe of the
+        // third parameter has to sit a step away from 1e-10 rather than
+        // 1e-10 times a step
+        double start = 1.0e-10;
+        double[] t = grid(30, 0.0, 4.0);
+        double[] y = decayData(t, 3.0, 1.5, 0.5, 0.0);
+        double[] lower = { 0.0, 0.01, -10.0 };
+        double[] upper = { 100.0, 100.0, 10.0 };
+        Recorder recorder = new Recorder(new Decay(t, y));
+        solver(2000).solve(recorder, new double[] { 1.0, 0.5, start }, t.length, lower, upper);
+        assertTrue("the first Jacobian was never formed : " + recorder.calls, recorder.calls >= 4);
+        double largest = 0.0;
+        for (int k = 0; k < 4; k++) {
+            largest = Math.max(largest, Math.abs(recorder.thirdParameter[k] - start));
+        }
+        assertTrue("the third parameter was probed with a step of " + largest, largest > 1.0e-9);
+    }
+
     // ------------------------------------------------------ degenerate ends --
 
     @Test
