@@ -45,6 +45,12 @@
  * interchangeable and none of them is rejected.</li>
  * </ul>
  *
+ * {@link math.rng.DefaultRng#newPseudoRandom(long[])} follows neither reading
+ * whole: it hands the array to a generator of the second kind, but rejects
+ * {@code null} and an empty array itself, so that seeding the default
+ * generator from nothing stays an error rather than silently becoming that
+ * one fixed stream.
+ *
  * The seed a generator was built from is reported by
  * {@link math.rng.PseudoRandom#getSeed()}.
  *

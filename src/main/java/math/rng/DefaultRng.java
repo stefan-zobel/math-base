@@ -15,9 +15,13 @@
  */
 package math.rng;
 
+import java.util.Objects;
+
 /**
  * Factory methods for the default {@link PseudoRandom} algorithm which is
- * currently a {@link MersenneTwister64}.
+ * currently a {@link XorShiftRot256StarStar}: period
+ * 2<sup>256</sup>&nbsp;&minus;&nbsp;1, {@code 4}-dimensionally equidistributed,
+ * and splittable.
  * <p>
  * The generators returned are not thread-safe; see {@link PseudoRandom} for
  * what that rules out. To hand one to each of several threads, take them from
@@ -32,7 +36,7 @@ public final class DefaultRng {
      * @return a new {@link PseudoRandom}
      */
     public static PseudoRandom newPseudoRandom() {
-        return new MersenneTwister64();
+        return new XorShiftRot256StarStar();
     }
 
     /**
@@ -43,12 +47,19 @@ public final class DefaultRng {
      * @return a new {@link PseudoRandom}
      */
     public static PseudoRandom newPseudoRandom(long seed) {
-        return new MersenneTwister64(seed);
+        return new XorShiftRot256StarStar(seed);
     }
 
     /**
-     * Returns a new generator for the given seed values, all of which are used
-     * as seed material. The same array always yields the same sequence.
+     * Returns a new generator for the given seed values. They are hashed down
+     * to a single {@code long} through {@link SplitMix64Seed#seed(long[])}, so
+     * a longer array does not carry more of the seed into the generator. The
+     * same array always yields the same sequence.
+     * <p>
+     * That mapping accepts {@code null} and an empty array, sending both onto
+     * one fixed seed; this factory rejects them instead, because having
+     * nothing to seed with is far more likely a mistake than a request for
+     * that one well-known stream.
      *
      * @param seed the seed values to start from, neither {@code null} nor
      *            empty
@@ -57,7 +68,10 @@ public final class DefaultRng {
      * @throws IllegalArgumentException if {@code seed} is empty
      */
     public static PseudoRandom newPseudoRandom(long[] seed) {
-        return new MersenneTwister64(seed);
+        if (Objects.requireNonNull(seed, "seed").length == 0) {
+            throw new IllegalArgumentException("seed must not be empty");
+        }
+        return new XorShiftRot256StarStar(seed);
     }
 
     /**
@@ -73,46 +87,41 @@ public final class DefaultRng {
         if (count <= 0) {
             throw new IllegalArgumentException("count <= 0 : " + count);
         }
-        if (count == 1) {
-            return new PseudoRandom[] { newPseudoRandom() };
-        }
-        final int NN = 312;
-        final long[] seed = SplitMix64Seed.seed(NN);
         final PseudoRandom[] multiplePrng = new PseudoRandom[count];
         for (int i = 0; i < multiplePrng.length; ++i) {
-            final PseudoRandom prng = newPseudoRandom(seed);
-            // now change the seed
-            reseed(NN, seed, prng);
-            multiplePrng[i] = prng;
+            // the no-argument constructor takes four independent values from
+            // SplitMix64Seed, so every generator starts from 256 bits of its
+            // own. All of them sit on the same cycle of length 2^256 - 1, but
+            // the chance that one of them starts within reach of another is
+            // not a number anybody has to plan around
+            multiplePrng[i] = new XorShiftRot256StarStar();
         }
         return multiplePrng;
     }
 
     /**
-     * Returns a new generator seeded from the given one. Note that this
-     * <b>advances {@code prng}</b>: the seed is 312 {@code long} values drawn
-     * from it, so the caller's own sequence moves on by that much.
+     * Returns a new generator independent of the given one. It is derived from
+     * the state {@code prng} has reached rather than from the seed it started
+     * at, so repeated calls on the same generator do not repeat themselves --
+     * at the price of <b>advancing {@code prng} by one value</b>.
+     * <p>
+     * A generator that can {@link SplittablePseudoRandom#split() split} is
+     * split, and the result is then of the same algorithm as {@code prng};
+     * one that cannot is re-created from its current state; and for anything
+     * that is neither, a generator of the default algorithm is seeded from a
+     * single draw.
      *
-     * @param prng the generator to draw the seed from, advanced by 312 values
+     * @param prng the generator to derive from, advanced by one value
      * @return a new {@link PseudoRandom} independent of {@code prng}
+     * @throws NullPointerException if {@code prng} is {@code null}
      */
     public static PseudoRandom newIndepPseudoRandom(PseudoRandom prng) {
-        final int NN = 312;
-        final long[] seed = new long[NN];
-        reseed(NN, seed, prng);
-        return newPseudoRandom(seed);
-    }
-
-    private static void reseed(int len, long[] seed, PseudoRandom prng) {
-        prng.nextLongs(seed);
-        int j = 0;
-        while (j < seed.length && seed[j] == 0L) {
-            ++j;
+        Objects.requireNonNull(prng, "prng");
+        PseudoRandom indep = PseudoRandomSpliterator.detach(prng);
+        if (indep != null) {
+            return indep;
         }
-        final long nucleus = (j < seed.length) ? seed[j] : -1L;
-        final long[] half_seed = new long[len / 2];
-        new XorShift1024Star(nucleus ^ SplitMix64Seed.seed()).nextLongs(half_seed);
-        System.arraycopy(half_seed, 0, seed, 0, half_seed.length);
+        return new XorShiftRot256StarStar(prng.nextLong());
     }
 
     private DefaultRng() {
