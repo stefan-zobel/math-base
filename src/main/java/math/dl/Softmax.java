@@ -114,18 +114,25 @@ public final class Softmax {
      *            a softmax (discrete probability) distribution
      * @param t
      *            temperature coefficient to use (t must be &gt; 0.0)
-     * @return a reweighted distribution (to a different temperature when
-     *         {@code t != 1.0})
+     * @return a new array holding the reweighted distribution; at
+     *         {@code t == 1.0} a copy of {@code softmax} itself
      * @throws IllegalArgumentException
      *             if t is zero or negative or if one of the probabilities in
      *             the softmax distribution is negative
      */
     public static double[] reweigh(double[] softmax, double t) {
-        if (t == 1.0) {
-            return softmax;
-        }
         if (t <= 0.0) {
             throw new IllegalArgumentException("temperature must be strictly positive: " + t);
+        }
+        if (t == 1.0) {
+            // the distribution is unchanged, but neither the check nor the
+            // copy is optional: every other temperature validates through
+            // clamp() and returns a fresh array, and a caller writing into
+            // the result used to be writing into its own argument
+            for (int i = 0; i < softmax.length; ++i) {
+                clamp(softmax[i]);
+            }
+            return softmax.clone();
         }
         double[] b = new double[softmax.length];
         double sum = 0.0;
@@ -169,18 +176,22 @@ public final class Softmax {
      *            a softmax (discrete probability) distribution
      * @param t
      *            temperature coefficient to use (t must be &gt; 0.0)
-     * @return a reweighted distribution (to a different temperature when
-     *         {@code t != 1.0})
+     * @return a new array holding the reweighted distribution; at
+     *         {@code t == 1.0} a copy of {@code softmax} itself
      * @throws IllegalArgumentException
      *             if t is zero or negative or if one of the probabilities in
      *             the softmax distribution is negative
      */
     public static float[] reweighF(float[] softmax, float t) {
-        if (t == 1.0f) {
-            return softmax;
-        }
         if (t <= 0.0f) {
             throw new IllegalArgumentException("temperature must be strictly positive: " + t);
+        }
+        if (t == 1.0f) {
+            // see reweigh(double[], double)
+            for (int i = 0; i < softmax.length; ++i) {
+                clampF(softmax[i]);
+            }
+            return softmax.clone();
         }
         float[] b = new float[softmax.length];
         float sum = 0.0f;
@@ -211,7 +222,9 @@ public final class Softmax {
      * the class probabilities in the {@code softmax} array.
      * 
      * @param softmax
-     *            a softmax (discrete probability) distribution
+     *            a softmax (discrete probability) distribution. It has to sum
+     *            to one: the roulette wheel this walks has no final fallback,
+     *            so whatever a short sum leaves over falls to index 0
      * @return class index {@code i} with probability {@code softmax[i]}
      */
     public static int sampleClass(double[] softmax) {
@@ -225,7 +238,9 @@ public final class Softmax {
      * reproduce the same index.
      *
      * @param softmax
-     *            a softmax (discrete probability) distribution
+     *            a softmax (discrete probability) distribution. It has to sum
+     *            to one: the roulette wheel this walks has no final fallback,
+     *            so whatever a short sum leaves over falls to index 0
      * @param prng
      *            the generator to draw from
      * @return class index {@code i} with probability {@code softmax[i]}
@@ -250,7 +265,9 @@ public final class Softmax {
      * the class probabilities in the {@code softmax} array.
      * 
      * @param softmax
-     *            a softmax (discrete probability) distribution
+     *            a softmax (discrete probability) distribution. It has to sum
+     *            to one: the roulette wheel this walks has no final fallback,
+     *            so whatever a short sum leaves over falls to index 0
      * @return class index {@code i} with probability {@code softmax[i]}
      */
     public static int sampleClassF(float[] softmax) {
@@ -264,7 +281,9 @@ public final class Softmax {
      * reproduce the same index.
      *
      * @param softmax
-     *            a softmax (discrete probability) distribution
+     *            a softmax (discrete probability) distribution. It has to sum
+     *            to one: the roulette wheel this walks has no final fallback,
+     *            so whatever a short sum leaves over falls to index 0
      * @param prng
      *            the generator to draw from
      * @return class index {@code i} with probability {@code softmax[i]}
