@@ -27,12 +27,16 @@ public final class Swish {
      * @return Swish value at x
      */
     public static double swish(double x) {
-        // Asymptotic limit for extremely negative inputs
-        if (x < -17.0) {
+        // measured by bisection: the result reaches -0.0 at -709.782713,
+        // where Math.exp(-x) overflows, and is exactly x from 36.736801 up.
+        // The cutoffs used to sit at +/-17, a single precision choice:
+        // swish(-17.0000001) answered -0.0 for a true -7.038e-07, and
+        // swish(17) answered 17.0 for a true 16.999999296210614. The lower
+        // one is also what keeps -Infinity out of the result
+        if (x < -709.78) {
             return -0.0;
         }
-        // For very large positive inputs, Swish approaches exactly x
-        if (x > 17.0) {
+        if (x > 36.736801) {
             return x;
         }
         return x / (1.0 + Math.exp(-x));
@@ -55,11 +59,12 @@ public final class Swish {
      * @return Swish derivative at x
      */
     public static double dswish_dx(double x) {
-        // Fast path for saturated derivative
-        if (x < -17.0) {
+        // measured by bisection: 0.0 from -709.782713 down, exactly 1.0 from
+        // 40.436534 up
+        if (x < -709.78) {
             return 0.0;
         }
-        if (x > 17.0) {
+        if (x > 40.436534) {
             return 1.0;
         }
 

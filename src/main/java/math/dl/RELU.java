@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Stefan Zobel
+ * Copyright 2024, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ public final class RELU {
      * @return RELU value at x
      */
     public static double relu(double x) {
-        if (x > 0.0) {
-            return x;
-        }
-        return 0.0;
+        // Math.max rather than a comparison: x > 0.0 is false for a NaN, so
+        // the plain form answered 0.0 for one and hid whatever produced it.
+        // Math.max propagates it, and still answers 0.0 for -0.0
+        return Math.max(x, 0.0);
     }
 
     /**
@@ -42,10 +42,7 @@ public final class RELU {
      * @return RELU value at x
      */
     public static float reluF(float x) {
-        if (x > 0.0f) {
-            return x;
-        }
-        return 0.0f;
+        return Math.max(x, 0.0f);
     }
 
     /**
@@ -56,10 +53,10 @@ public final class RELU {
      * @return RELU derivative at x
      */
     public static double drelu_dx(double x) {
-        if (x > 0.0) {
-            return 1.0;
+        if (Double.isNaN(x)) {
+            return Double.NaN;
         }
-        return 0.0;
+        return (x > 0.0) ? 1.0 : 0.0;
     }
 
     /**
@@ -70,10 +67,10 @@ public final class RELU {
      * @return RELU derivative at x
      */
     public static float dreluF_dx(float x) {
-        if (x > 0.0f) {
-            return 1.0f;
+        if (Float.isNaN(x)) {
+            return Float.NaN;
         }
-        return 0.0f;
+        return (x > 0.0f) ? 1.0f : 0.0f;
     }
 
     private RELU() {
