@@ -2,15 +2,21 @@ package math.stats;
 
 import java.util.Arrays;
 
+import math.MathConsts;
 import math.cern.ProbabilityFuncs;
 import math.distribution.ContinuousDistribution;
 import math.distribution.FisherF;
 import math.distribution.Hypergeometric;
 import math.distribution.StudentT;
+import math.linalg.DMatrix;
+import math.linalg.LSSummary;
+import math.list.DoubleList;
+import math.stats.gof.AndersonDarling;
+import math.stats.gof.DurbinWatson;
 import math.stats.gof.KolmogorovSmirnov;
-import math.stats.gof.Lilliefors;
 import math.stats.gof.KolmogorovSmirnovPlus;
 import math.stats.gof.KolmogorovSmirnovTwoSample;
+import math.stats.gof.Lilliefors;
 
 /**
  * Classical hypothesis tests, fronting the distributions in
@@ -687,6 +693,87 @@ public final class HypothesisTests {
     }
 
     /**
+     * Tests whether a sample was drawn from a given continuous distribution,
+     * weighting the tails.
+     * <p>
+     * The sample is carried into {@code (0, 1)} by the distribution function
+     * the way {@link #kolmogorovSmirnov} carries it, but the statistic is the
+     * integrated squared distance divided by {@code u (1 - u)} rather than the
+     * largest gap:
+     * <p>
+     * {@code A_n^2 = -n - (1/n) sum (2i - 1) (ln u_i + ln(1 - u_(n+1-i)))}
+     * <p>
+     * That divisor is the whole point. {@code D_n} is a supremum of an
+     * unweighted difference, and near the ends of the range there is almost no
+     * room for a difference to be large, so a sample that departs only in its
+     * tails moves {@code D_n} very little. Measured on a unit exponential
+     * contaminated with five percent of a five times longer one, this test
+     * rejects 24 percent of samples of 200 at the five percent level where
+     * {@link #kolmogorovSmirnov} rejects 11 percent. The advantage is not
+     * universal -- for a standardized {@code t(5)} at {@code n <= 100} it was
+     * measured slightly the other way -- but where the two disagree it is
+     * usually this one that sees the departure.
+     * <p>
+     * There is no {@code alternative} parameter: the statistic squares the
+     * difference, so it has no one-sided form, and the result carries
+     * {@link Alternative#TWO_SIDED}.
+     * <p>
+     * <b>The distribution has to be fully specified before the sample is
+     * seen</b>, for the reason {@link #kolmogorovSmirnov} gives at more length;
+     * {@link #andersonDarling(double[], Lilliefors.Family)} is the test for a
+     * distribution fitted to the same sample. Against a fitted normal this
+     * method rejected none of 6000 samples that really were normal.
+     * <p>
+     * The p-value comes from {@link AndersonDarling#barF}, which is an
+     * interpolation of a numerically integrated asymptotic distribution with an
+     * empirical correction in {@code 1/n}, good to about three decimal digits.
+     * It is not exact the way the Kolmogorov-Smirnov p-value is.
+     *
+     * @param x
+     *            the sample, at least one finite observation
+     * @param nullDistribution
+     *            the distribution the sample is tested against, with every
+     *            parameter fixed independently of {@code x}
+     * @return the statistic, its p-value and no degrees of freedom, the null
+     *         distribution of {@code A_n^2} having none
+     * @throws IllegalArgumentException
+     *             if {@code x} is {@code null}, is empty or holds a value that
+     *             is not finite; or if {@code nullDistribution} is {@code null}
+     */
+    public static TestResult andersonDarling(double[] x, ContinuousDistribution nullDistribution) {
+        int n = requireFiniteSample(x, "x");
+        if (nullDistribution == null) {
+            throw new IllegalArgumentException("nullDistribution must not be null");
+        }
+
+        double[] uniform = new double[n];
+        for (int i = 0; i < n; i++) {
+            uniform[i] = nullDistribution.cdf(x[i]);
+        }
+        Arrays.sort(uniform);
+
+        // the i-th term pairs the i-th smallest transformed value with the i-th
+        // largest, which is what puts the weight on both tails at once
+        double sum = 0.0;
+        for (int i = 0; i < n; i++) {
+            double lower = uniform[i];
+            double upper = 1.0 - uniform[n - 1 - i];
+            if (lower < UNIFORM_FLOOR) {
+                lower = UNIFORM_FLOOR;
+            }
+            if (upper < UNIFORM_FLOOR) {
+                upper = UNIFORM_FLOOR;
+            }
+            sum += (2 * i + 1) * (Math.log(lower) + Math.log(upper));
+        }
+
+        double statistic = -n - sum / n;
+        double pValue = AndersonDarling.barF(n, statistic);
+        return new TestResult("Anderson-Darling", statistic, Math.min(1.0, Math.max(0.0, pValue)),
+                Alternative.TWO_SIDED, Double.NaN);
+    }
+
+    /**
      * Tests whether two samples were drawn from the same continuous
      * distribution, naming neither of them.
      * <p>
@@ -802,7 +889,7 @@ public final class HypothesisTests {
      * the situation the real one is in.
      * <p>
      * That makes the p-value a <b>simulation</b>, with an uncertainty of its own
-     * that {@link LillieforsResult#monteCarloStandardError} reports. The short
+     * that {@link SimulatedTestResult#monteCarloStandardError} reports. The short
      * form uses {@link Lilliefors#DEFAULT_REPLICATIONS} replications and a fixed
      * seed, so the same sample always gives the same answer; the long form is
      * there to buy more accuracy, or to see how much the answer moves when the
@@ -821,7 +908,7 @@ public final class HypothesisTests {
      *             that is not finite or not in the support of the family; or if
      *             {@code family} is {@code null}
      */
-    public static LillieforsResult lilliefors(double[] x, Lilliefors.Family family) {
+    public static SimulatedTestResult lilliefors(double[] x, Lilliefors.Family family) {
         return lilliefors(x, family, Lilliefors.DEFAULT_REPLICATIONS, Lilliefors.DEFAULT_SEED);
     }
 
@@ -852,15 +939,218 @@ public final class HypothesisTests {
      *             {@code family} is {@code null}; or if {@code replications} is
      *             not strictly positive
      */
-    public static LillieforsResult lilliefors(double[] x, Lilliefors.Family family, int replications,
+    public static SimulatedTestResult lilliefors(double[] x, Lilliefors.Family family, int replications,
             long seed) {
+        return fitted(Lilliefors.Statistic.KOLMOGOROV_SMIRNOV, "Lilliefors", x, family, replications, seed);
+    }
+
+    /**
+     * Tests whether a sample was drawn from a family of distributions,
+     * weighting the tails, with the parameters of that family estimated from
+     * the sample itself.
+     * <p>
+     * This is to {@link #andersonDarling(double[], ContinuousDistribution)} what
+     * {@link #lilliefors(double[], Lilliefors.Family)} is to
+     * {@link #kolmogorovSmirnov}, and it is the test usually meant by "the
+     * Anderson-Darling normality test": the fit has already moved towards the
+     * sample, so the tabulated null distribution is far too generous and the
+     * null has to be drawn instead. Against a fitted normal the fully specified
+     * test rejected none of 6000 samples that really were normal.
+     * <p>
+     * The p-value is a <b>simulation</b>, with an uncertainty of its own that
+     * {@link SimulatedTestResult#monteCarloStandardError} reports. The short form
+     * uses {@link Lilliefors#DEFAULT_REPLICATIONS} replications and a fixed seed,
+     * so the same sample always gives the same answer.
+     *
+     * @param x
+     *            the sample, at least {@link Lilliefors#MINIMUM_SAMPLE} finite
+     *            observations, strictly positive for the two families that need
+     *            it
+     * @param family
+     *            the family to fit and test against
+     * @return the statistic, its simulated p-value, and how many replications
+     *         went into it
+     * @throws IllegalArgumentException
+     *             if {@code x} is {@code null}, is too short or holds a value
+     *             that is not finite or not in the support of the family; or if
+     *             {@code family} is {@code null}
+     */
+    public static SimulatedTestResult andersonDarling(double[] x, Lilliefors.Family family) {
+        return andersonDarling(x, family, Lilliefors.DEFAULT_REPLICATIONS, Lilliefors.DEFAULT_SEED);
+    }
+
+    /**
+     * Tests whether a sample was drawn from a fitted family, weighting the tails,
+     * drawing the null distribution from {@code replications} samples seeded by
+     * {@code seed}.
+     * <p>
+     * See {@link #andersonDarling(double[], Lilliefors.Family)} for what the test
+     * does. The p-value is reproducible from {@code seed} alone, whether or not
+     * the replications end up spread over several threads.
+     *
+     * @param x
+     *            the sample, at least {@link Lilliefors#MINIMUM_SAMPLE} finite
+     *            observations, strictly positive for the two families that need
+     *            it
+     * @param family
+     *            the family to fit and test against
+     * @param replications
+     *            how many samples the null distribution is drawn from,
+     *            {@code 1} or more
+     * @param seed
+     *            the seed the replications are derived from
+     * @return the statistic, its simulated p-value, and how many replications
+     *         went into it
+     * @throws IllegalArgumentException
+     *             if {@code x} is {@code null}, is too short or holds a value
+     *             that is not finite or not in the support of the family; if
+     *             {@code family} is {@code null}; or if {@code replications} is
+     *             not strictly positive
+     */
+    public static SimulatedTestResult andersonDarling(double[] x, Lilliefors.Family family, int replications,
+            long seed) {
+        return fitted(Lilliefors.Statistic.ANDERSON_DARLING, "Anderson-Darling", x, family, replications,
+                seed);
+    }
+
+    /**
+     * The body both fitted tests share: measure the sample against its own fit,
+     * then draw the null distribution of that measurement.
+     */
+    private static SimulatedTestResult fitted(Lilliefors.Statistic which, String name, double[] x,
+            Lilliefors.Family family, int replications, long seed) {
         int n = requireFiniteSample(x, "x");
-        double statistic = Lilliefors.statistic(family, x);
-        double pValue = Lilliefors.barF(family, n, statistic, replications, seed);
-        TestResult test = new TestResult("Lilliefors, " + fittedName(family), statistic, pValue,
+        double statistic = Lilliefors.statistic(which, family, x);
+        double pValue = Lilliefors.barF(which, family, n, statistic, replications, seed);
+        TestResult test = new TestResult(name + ", " + fittedName(family) + " fitted", statistic, pValue,
                 Alternative.TWO_SIDED, Double.NaN);
-        return new LillieforsResult(test, replications,
+        return new SimulatedTestResult(test, replications,
                 Math.sqrt(pValue * (1.0 - pValue) / replications));
+    }
+
+    /**
+     * Tests whether the errors behind a linear least squares fit are
+     * autocorrelated at lag one.
+     * <p>
+     * The statistic is
+     * {@code d = sum (e_i - e_(i-1))^2 / sum e_i^2}, which is near {@code 2}
+     * when successive residuals are unrelated, near {@code 0} when each one
+     * follows the last and near {@code 4} when each one reverses it.
+     * <p>
+     * <b>The alternatives are about the autocorrelation, not about the
+     * statistic, and the two run opposite ways.</b>
+     * {@link Alternative#GREATER} asks whether the errors are <em>positively</em>
+     * autocorrelated, which is a <em>small</em> {@code d} and therefore the
+     * lower tail of the null distribution; {@link Alternative#LESS} asks the
+     * other question and reads the upper tail. {@link Alternative#TWO_SIDED} is
+     * twice the smaller of the two.
+     * <p>
+     * The p-value is exact rather than a pair of bounds, and that is what the
+     * design matrix is for: {@code d} is a ratio of quadratic forms whose null
+     * distribution depends on the column space of {@code X}, so there is no
+     * table to look it up in. The work is dominated by an eigendecomposition of
+     * an {@code n x n} matrix, which is cubic in the number of observations and
+     * is repeated on every call. A caller testing many fits against one design
+     * should compute {@link DurbinWatson#nullEigenvalues} once and read the
+     * tails off {@link DurbinWatson#cdf} and {@link DurbinWatson#barF} instead.
+     * <p>
+     * <b>The test assumes normal errors and a design that does not contain a
+     * lagged regressand.</b> The first is what makes the null distribution the
+     * one computed here; the second is the classical way this test misleads,
+     * and no computation on {@code X} can detect it.
+     *
+     * @param residuals
+     *            the residuals of the fit, in the order the observations were
+     *            taken, at least two of them and all finite
+     * @param designMatrix
+     *            the design matrix the fit went through, with as many rows as
+     *            there are residuals and full column rank
+     * @param alternative
+     *            which departure to look for, stated about the autocorrelation
+     * @return the statistic, its p-value and no degrees of freedom
+     * @throws IllegalArgumentException
+     *             if {@code residuals} is {@code null}, is shorter than two or
+     *             holds a value that is not finite; if every residual is zero;
+     *             if {@code designMatrix} is {@code null}, has the wrong number
+     *             of rows, has at least as many columns as rows, or does not
+     *             have full column rank; or if {@code alternative} is
+     *             {@code null}
+     */
+    public static TestResult durbinWatson(double[] residuals, DMatrix designMatrix,
+            Alternative alternative) {
+        int n = requireFiniteSample(residuals, "residuals");
+        requireAtLeastTwo(n, "residuals");
+        if (designMatrix == null) {
+            throw new IllegalArgumentException("designMatrix must not be null");
+        }
+        requireAlternative(alternative);
+        if (designMatrix.numRows() != n) {
+            throw new IllegalArgumentException("the design matrix has " + designMatrix.numRows()
+                    + " rows against " + n + " residuals");
+        }
+
+        double statistic = durbinWatsonStatistic(residuals);
+        double[] nullEigenvalues = DurbinWatson.nullEigenvalues(designMatrix.getArrayUnsafe(), n,
+                designMatrix.numColumns());
+        double pValue;
+        switch (alternative) {
+        case GREATER:
+            // positive autocorrelation drives the statistic down
+            pValue = DurbinWatson.cdf(nullEigenvalues, statistic);
+            break;
+        case LESS:
+            pValue = DurbinWatson.barF(nullEigenvalues, statistic);
+            break;
+        default:
+            pValue = Math.min(1.0, 2.0 * Math.min(DurbinWatson.cdf(nullEigenvalues, statistic),
+                    DurbinWatson.barF(nullEigenvalues, statistic)));
+            break;
+        }
+        return new TestResult("Durbin-Watson", statistic, pValue, alternative, Double.NaN);
+    }
+
+    /**
+     * Tests the residuals of a fit that {@code math.linalg.OLS} produced.
+     * <p>
+     * See {@link #durbinWatson(double[], DMatrix, Alternative)} for what the
+     * test does and which way the alternatives point.
+     * <p>
+     * A <b>weighted</b> fit is refused. {@code LSSummary.getResiduals()} returns
+     * the raw {@code y - X beta} for a weighted fit as well as for an unweighted
+     * one, and those are not the residuals whose null distribution this is --
+     * the weighted ones are, against the row-scaled design. Passing the raw
+     * pair would give a number that looks like a p-value and is not one.
+     *
+     * @param fit
+     *            an unweighted least squares summary that still holds its
+     *            residuals and its design matrix
+     * @param alternative
+     *            which departure to look for, stated about the autocorrelation
+     * @return the statistic, its p-value and no degrees of freedom
+     * @throws IllegalArgumentException
+     *             if {@code fit} is {@code null}, came from a weighted fit, or
+     *             has had {@code clearTemporaries()} called on it; or for any
+     *             of the reasons the other overload throws
+     */
+    public static TestResult durbinWatson(LSSummary fit, Alternative alternative) {
+        if (fit == null) {
+            throw new IllegalArgumentException("fit must not be null");
+        }
+        if (fit.getWeights() != null) {
+            throw new IllegalArgumentException("this is a weighted fit, whose raw residuals are not the "
+                    + "ones this null distribution belongs to");
+        }
+        DoubleList residuals = fit.getResiduals();
+        DMatrix designMatrix = fit.getXMatrix();
+        if (residuals == null || designMatrix == null) {
+            throw new IllegalArgumentException("the fit no longer holds its residuals or its design "
+                    + "matrix; clearTemporaries() releases both");
+        }
+        double[] e = new double[residuals.size()];
+        for (int i = 0; i < e.length; i++) {
+            e[i] = residuals.get(i);
+        }
+        return durbinWatson(e, designMatrix, alternative);
     }
 
     // ------------------------------------------------------- the assembly --
@@ -1033,6 +1323,21 @@ public final class HypothesisTests {
                 Math.scalb(Math.sqrt(corrected(sumSqrDev, sumDev, n)), -k) };
     }
 
+    /** {@code sum (e_i - e_(i-1))^2 / sum e_i^2}, in one pass. */
+    private static double durbinWatsonStatistic(double[] e) {
+        double numerator = 0.0;
+        double denominator = e[0] * e[0];
+        for (int i = 1; i < e.length; i++) {
+            double step = e[i] - e[i - 1];
+            numerator += step * step;
+            denominator += e[i] * e[i];
+        }
+        if (denominator == 0.0) {
+            throw new IllegalArgumentException("every residual is zero, so the statistic is 0/0");
+        }
+        return numerator / denominator;
+    }
+
     /** The two-pass variance, corrected by the residual sum of the deviations. */
     private static double corrected(double sumSqrDev, double sumDev, int n) {
         double variance = (sumSqrDev - (sumDev * sumDev) / n) / (n - 1);
@@ -1092,6 +1397,19 @@ public final class HypothesisTests {
      * relative.
      */
     private static final double LIKELIHOOD_TOLERANCE = 1.0e-9;
+
+    /**
+     * How close to the ends of {@code (0, 1)} a transformed observation is
+     * allowed to come before {@link #andersonDarling} pulls it back.
+     * <p>
+     * A distribution function written in {@code double} arithmetic returns
+     * exactly {@code 0} or {@code 1} far more often than the mathematics says
+     * it should -- 1310 of 80000 draws from a {@code t(1.5)} read through a
+     * standard normal did -- and the logarithm of either end is infinite. The
+     * floor turns an infinite statistic into a merely enormous one, which is
+     * the same decision with a number attached.
+     */
+    private static final double UNIFORM_FLOOR = MathConsts.BIG_INV / 2.0;
 
     /**
      * Whether the sorted {@code sample} repeats a value from {@code from}

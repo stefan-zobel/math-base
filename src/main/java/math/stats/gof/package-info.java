@@ -11,6 +11,14 @@
  * weights the tails, where the Kolmogorov-Smirnov statistic is least
  * sensitive.
  * <p>
+ * Three of them are not distributions of a uniform sample at all, because
+ * the situations they describe have no such reduction:
+ * {@link math.stats.gof.KolmogorovSmirnovTwoSample} conditions on the pooled
+ * order of two samples, {@link math.stats.gof.Lilliefors} draws the null of a
+ * statistic measured against a distribution fitted to the same sample, and
+ * {@link math.stats.gof.DurbinWatson} inverts the characteristic function of
+ * a ratio of quadratic forms whose eigenvalues come from a design matrix.
+ * <p>
  * The tests themselves are in {@link math.stats.HypothesisTests}. This
  * package holds the distributions and nothing else.
  */

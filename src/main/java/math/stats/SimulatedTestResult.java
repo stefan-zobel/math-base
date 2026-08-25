@@ -3,14 +3,14 @@ package math.stats;
 import java.util.Locale;
 
 /**
- * The result of a Lilliefors test: the test itself, and how much of its p-value
- * is simulation noise.
+ * The result of a test whose null distribution was drawn rather than computed:
+ * the test itself, and how much of its p-value is simulation noise.
  *
  * @since 1.5.3
  */
-public final class LillieforsResult {
+public final class SimulatedTestResult {
 
-    /** The statistic, its p-value and the family that was fitted. */
+    /** The statistic, its p-value and what was fitted. */
     public final TestResult test;
 
     /** How many samples the null distribution was drawn from. */
@@ -24,7 +24,7 @@ public final class LillieforsResult {
      */
     public final double monteCarloStandardError;
 
-    LillieforsResult(TestResult test, int replications, double monteCarloStandardError) {
+    SimulatedTestResult(TestResult test, int replications, double monteCarloStandardError) {
         this.test = test;
         this.replications = replications;
         this.monteCarloStandardError = monteCarloStandardError;

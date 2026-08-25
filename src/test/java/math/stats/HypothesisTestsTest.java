@@ -16,7 +16,14 @@ import math.distribution.Hypergeometric;
 import math.distribution.Normal;
 import math.distribution.StudentT;
 import math.distribution.Uniform;
+import math.linalg.DMatrix;
+import math.linalg.LSSummary;
+import math.linalg.OLS;
+import math.linalg.Wls;
 import math.list.DoubleArrayList;
+import math.stats.gof.AndersonDarling;
+import math.stats.gof.DurbinWatson;
+import math.stats.gof.GoodnessOfFit;
 import math.stats.gof.KolmogorovSmirnov;
 import math.stats.gof.KolmogorovSmirnovTwoSample;
 import math.stats.gof.Lilliefors;
@@ -305,10 +312,10 @@ public final class HypothesisTestsTest {
             assertEquals("TTestResult.toString", root, r.toString());
             assertEquals("TestResult.toString", rootTest, r.test.toString());
             Locale.setDefault(Locale.ROOT);
-            LillieforsResult fitted = HypothesisTests.lilliefors(x, Lilliefors.Family.NORMAL, 200, 3L);
+            SimulatedTestResult fitted = HypothesisTests.lilliefors(x, Lilliefors.Family.NORMAL, 200, 3L);
             String rootFitted = fitted.toString();
             Locale.setDefault(Locale.GERMANY);
-            assertEquals("LillieforsResult.toString", rootFitted, fitted.toString());
+            assertEquals("SimulatedTestResult.toString", rootFitted, fitted.toString());
         } finally {
             Locale.setDefault(before);
         }
@@ -1156,6 +1163,246 @@ public final class HypothesisTestsTest {
         }
     }
 
+    // ----------------------------------------------------- Anderson-Darling --
+
+    @Test
+    public void testTheAndersonDarlingStatisticIsTheDefinition() {
+        Normal standard = new Normal(0.0, 1.0);
+        double worst = 0.0;
+        int saturated = 0;
+        int compared = 0;
+        for (int n : new int[] { 1, 2, 3, 9, 60, 400 }) {
+            for (long seed = 1; seed <= 40; seed++) {
+                // a wide sample read through a narrow distribution, so that
+                // some of the transformed values land on 0 or 1 exactly
+                double[] x = sample(new Normal(2.0, 3.0), n, seed * 7919L + 1);
+                double[] u = new double[n];
+                for (int i = 0; i < n; i++) {
+                    u[i] = standard.cdf(x[i]);
+                }
+                Arrays.sort(u);
+                double sum = 0.0;
+                for (int i = 0; i < n; i++) {
+                    sum += (2 * i + 1) * (Math.log(u[i]) + Math.log(1.0 - u[n - 1 - i]));
+                }
+                double definition = -n - sum / n;
+                String at = "n=" + n + " seed=" + seed;
+                double got = HypothesisTests.andersonDarling(x, standard).statistic;
+
+                if (Double.isInfinite(definition)) {
+                    // the definition itself has no value here; what the
+                    // method must not do is pass the infinity on
+                    saturated++;
+                    assertTrue(at + ": a saturated sample gave " + got,
+                            got > 0.0 && !Double.isInfinite(got) && !Double.isNaN(got));
+                } else {
+                    compared++;
+                    assertEquals(at, definition, got, 1.0e-12);
+                }
+
+                // and against the other implementation in the tree, which
+                // reaches the same statistic by its own route. It has no
+                // answer for a single observation
+                if (n > 1) {
+                    double independent = GoodnessOfFit.computeStatistics(x, standard).AD;
+                    worst = Math.max(worst,
+                            Math.abs(got - independent) / Math.max(1.0, Math.abs(independent)));
+                }
+            }
+        }
+        // measured: 163 of the 240 samples have a value the definition can
+        // state, and 77 do not
+        assertTrue("nothing was compared against the definition", compared > 150);
+        assertTrue("no sample saturated the distribution function", saturated > 0);
+        // measured over the 200 samples of two or more: 2.9e-15
+        assertTrue("the two implementations differ by " + worst, worst < 1.0e-13);
+    }
+
+    @Test
+    public void testTheAndersonDarlingNullDistributionAgreesWithASimulatedOne() {
+        // the tabulated null distribution is an interpolation with an
+        // empirical correction in 1/n, so it is checked against the only
+        // thing that is not an approximation: the statistic itself, drawn
+        Uniform uniform = new Uniform(0.0, 1.0);
+        int reps = 100000;
+        double worst = 0.0;
+        for (int n : new int[] { 2, 5, 20, 100 }) {
+            double[] drawn = new double[reps];
+            for (int b = 0; b < reps; b++) {
+                drawn[b] = HypothesisTests.andersonDarling(sample(uniform, n, (b + 1L) * 7919L + 1),
+                        uniform).statistic;
+            }
+            Arrays.sort(drawn);
+            for (double tail : new double[] { 0.50, 0.25, 0.10, 0.05, 0.01 }) {
+                double quantile = drawn[(int) ((1.0 - tail) * reps)];
+                worst = Math.max(worst, Math.abs(AndersonDarling.barF(n, quantile) - tail));
+            }
+        }
+        // measured over three independent runs: 0.0045, and the largest
+        // deviations are at n = 2 where the correction has least to work with
+        assertTrue("the tabulated tail is off by " + worst, worst < 0.008);
+    }
+
+    @Test
+    public void testTheAndersonDarlingRejectsAtItsLevelUnderTheNullHypothesis() {
+        Uniform uniform = new Uniform(0.0, 1.0);
+        for (int n : new int[] { 1, 5, 30, 200 }) {
+            int reps = 4000;
+            int atFive = 0;
+            int atOne = 0;
+            for (long seed = 1; seed <= reps; seed++) {
+                TestResult result = HypothesisTests.andersonDarling(sample(uniform, n, seed * 7919L + 1),
+                        uniform);
+                if (result.rejectsAt(0.05)) {
+                    atFive++;
+                }
+                if (result.rejectsAt(0.01)) {
+                    atOne++;
+                }
+            }
+            // measured: 0.0460 .. 0.0525 and 0.0095 .. 0.0105
+            assertRate("n=" + n + " at 0.05", atFive / (double) reps, 0.05, 0.018);
+            assertRate("n=" + n + " at 0.01", atOne / (double) reps, 0.01, 0.008);
+        }
+    }
+
+    @Test
+    public void testTheAndersonDarlingSeesATailDepartureTheKolmogorovSmirnovMisses() {
+        // this is the reason the test exists. The contamination lengthens
+        // five percent of the observations and leaves the rest alone, so it
+        // shows up where the empirical distribution function has almost no
+        // room to move and the supremum of an unweighted difference is blind
+        Exponential unit = new Exponential(1.0);
+        for (int n : new int[] { 50, 200 }) {
+            int reps = 2000;
+            int andersonDarling = 0;
+            int kolmogorovSmirnov = 0;
+            for (long seed = 1; seed <= reps; seed++) {
+                double[] x = contaminatedExponential(n, seed * 7919L + 1);
+                if (HypothesisTests.andersonDarling(x, unit).rejectsAt(0.05)) {
+                    andersonDarling++;
+                }
+                if (HypothesisTests.kolmogorovSmirnov(x, unit, Alternative.TWO_SIDED).rejectsAt(0.05)) {
+                    kolmogorovSmirnov++;
+                }
+            }
+            // measured: 0.1270 against 0.0670 at n = 50, 0.2415 against
+            // 0.1080 at n = 200
+            assertTrue("n=" + n + ": AD rejected " + andersonDarling + " of " + reps + ", KS "
+                    + kolmogorovSmirnov, andersonDarling > kolmogorovSmirnov * 1.5);
+        }
+    }
+
+    /** A unit exponential with five percent of a five times longer one mixed in. */
+    private static double[] contaminatedExponential(int n, long seed) {
+        Lcg lcg = new Lcg(seed);
+        double[] x = new double[n];
+        for (int i = 0; i < n; i++) {
+            double u = lcg.next();
+            double scale = lcg.next() < 0.05 ? 5.0 : 1.0;
+            x[i] = -scale * Math.log1p(-u);
+        }
+        return x;
+    }
+
+    @Test
+    public void testTheAndersonDarlingStatisticDoesNotDependOnTheOrderOfTheSample() {
+        Normal standard = new Normal(0.0, 1.0);
+        for (long seed = 1; seed <= 40; seed++) {
+            double[] x = sample(new Normal(1.0, 2.0), 40, seed * 7919L + 1);
+            double reference = HypothesisTests.andersonDarling(x, standard).statistic;
+
+            double[] reversed = new double[x.length];
+            for (int i = 0; i < x.length; i++) {
+                reversed[i] = x[x.length - 1 - i];
+            }
+            double[] sorted = x.clone();
+            Arrays.sort(sorted);
+
+            // the statistic reads the sample only through its order
+            // statistics, so these do identical arithmetic
+            assertEquals("reversed, seed=" + seed, reference,
+                    HypothesisTests.andersonDarling(reversed, standard).statistic, 0.0);
+            assertEquals("sorted, seed=" + seed, reference,
+                    HypothesisTests.andersonDarling(sorted, standard).statistic, 0.0);
+        }
+    }
+
+    @Test
+    public void testTheAndersonDarlingSurvivesADistributionFunctionThatSaturates() {
+        // a double-valued distribution function reaches 0 and 1 long before
+        // the mathematics does, and the logarithm of either is infinite. An
+        // infinite statistic would be a p-value of exactly zero, which says
+        // more than the arithmetic knows
+        Normal standard = new Normal(0.0, 1.0);
+        double[] extreme = { -50.0, -40.0, 0.0, 40.0, 50.0 };
+        TestResult result = HypothesisTests.andersonDarling(extreme, standard);
+        assertTrue("the statistic is " + result.statistic, result.statistic > 0.0
+                && !Double.isInfinite(result.statistic) && !Double.isNaN(result.statistic));
+        // measured: 55.1652 and 6.4e-25
+        assertTrue("the p-value is " + result.pValue, result.pValue > 0.0 && result.pValue < 1.0e-20);
+
+        // and the sample really does saturate the distribution function
+        assertEquals("the far left of a standard normal", 0.0, standard.cdf(-50.0), 0.0);
+        assertEquals("the far right of a standard normal", 1.0, standard.cdf(50.0), 0.0);
+    }
+
+    @Test
+    public void testTheAndersonDarlingTailFallsExceptAtOneSeam() {
+        // the tabulated null distribution changes method at A2 = 5, and the
+        // two pieces do not meet: the tail steps back up there. It is pinned
+        // rather than fixed because the file is a port that is kept as it was,
+        // and the step is far smaller than the accuracy the port claims
+        for (int n : new int[] { 2, 6, 20, 100 }) {
+            double previous = Double.MAX_VALUE;
+            double worstRise = 0.0;
+            double at = Double.NaN;
+            for (int step = 1; step < 30000; step++) {
+                double a2 = step * 0.001;
+                double tail = AndersonDarling.barF(n, a2);
+                if (tail > previous && tail - previous > worstRise) {
+                    worstRise = tail - previous;
+                    at = a2;
+                }
+                previous = tail;
+            }
+            // measured: 1.7e-4 at n = 2 falling to 1.1e-8 at n = 100, always
+            // at A2 = 5 exactly
+            assertTrue("n=" + n + ": the tail rose by " + worstRise + " near A2=" + at,
+                    worstRise < 2.0e-4);
+            assertTrue("n=" + n + ": the rise is not at the seam but at " + at,
+                    Double.isNaN(at) || Math.abs(at - 5.0) < 0.002);
+        }
+    }
+
+    @Test
+    public void testAndersonDarlingRejectsWhatItCannotTest() {
+        Normal standard = new Normal(0.0, 1.0);
+        rejectsAndersonDarling("a null sample", null, standard);
+        rejectsAndersonDarling("an empty sample", new double[0], standard);
+        rejectsAndersonDarling("a NaN observation", new double[] { 1.0, Double.NaN }, standard);
+        rejectsAndersonDarling("an infinite observation", new double[] { 1.0, Double.POSITIVE_INFINITY },
+                standard);
+        rejectsAndersonDarling("a null distribution", new double[] { 1.0, 2.0 }, null);
+
+        // and the null distribution on its own
+        try {
+            AndersonDarling.barF(0, 1.0);
+            fail("barF accepted a sample size of zero");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
+    private static void rejectsAndersonDarling(String what, double[] x, ContinuousDistribution d) {
+        try {
+            HypothesisTests.andersonDarling(x, d);
+            fail("andersonDarling accepted " + what);
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
     // --------------------------------------------------------- Fisher exact --
 
     @Test
@@ -1788,8 +2035,8 @@ public final class HypothesisTestsTest {
     @Test
     public void testTheSimulatedPValueIsReproducibleAndSaysHowUncertainItIs() {
         double[] x = sample(new Normal(0.0, 1.0), 40, 11L);
-        LillieforsResult first = HypothesisTests.lilliefors(x, Lilliefors.Family.NORMAL);
-        LillieforsResult second = HypothesisTests.lilliefors(x, Lilliefors.Family.NORMAL);
+        SimulatedTestResult first = HypothesisTests.lilliefors(x, Lilliefors.Family.NORMAL);
+        SimulatedTestResult second = HypothesisTests.lilliefors(x, Lilliefors.Family.NORMAL);
         assertEquals("the short form is a function of the sample", first.test.pValue,
                 second.test.pValue, 0.0);
         assertEquals("and it says how many replications went into it", Lilliefors.DEFAULT_REPLICATIONS,
@@ -1827,9 +2074,16 @@ public final class HypothesisTestsTest {
             for (long seed = 1; seed <= 200; seed++) {
                 double[] x = sample(new Normal(1.0, 3.0), n, seed * 7919L + 1);
                 ParNormal fit = MLE.getNormalMLE(x);
-                assertEquals("the fitted distance", HypothesisTests.kolmogorovSmirnov(x,
-                        new Normal(fit.mean, fit.stdDev), Alternative.TWO_SIDED).statistic,
+                Normal fitted = new Normal(fit.mean, fit.stdDev);
+                assertEquals("the fitted distance",
+                        HypothesisTests.kolmogorovSmirnov(x, fitted, Alternative.TWO_SIDED).statistic,
                         Lilliefors.statistic(Lilliefors.Family.NORMAL, x), 0.0);
+                // the same for the second statistic, which is written out
+                // twice: once in the facade and once in the simulation
+                assertEquals("the fitted tail-weighted distance",
+                        HypothesisTests.andersonDarling(x, fitted).statistic,
+                        Lilliefors.statistic(Lilliefors.Statistic.ANDERSON_DARLING,
+                                Lilliefors.Family.NORMAL, x), 0.0);
             }
         }
     }
@@ -1849,6 +2103,12 @@ public final class HypothesisTestsTest {
                 assertEquals("the p-value",
                         HypothesisTests.lilliefors(normal, Lilliefors.Family.NORMAL, 500, 5L).test.pValue,
                         HypothesisTests.lilliefors(exponentiated, Lilliefors.Family.LOGNORMAL, 500, 5L)
+                                .test.pValue,
+                        0.0);
+                assertEquals("the tail-weighted p-value",
+                        HypothesisTests.andersonDarling(normal, Lilliefors.Family.NORMAL, 500, 5L)
+                                .test.pValue,
+                        HypothesisTests.andersonDarling(exponentiated, Lilliefors.Family.LOGNORMAL, 500, 5L)
                                 .test.pValue,
                         0.0);
             }
@@ -1909,6 +2169,621 @@ public final class HypothesisTestsTest {
         try {
             HypothesisTests.lilliefors(x, family, replications, seed);
             fail("lilliefors accepted " + what);
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
+    // --------------------------------------------- Anderson-Darling, fitted --
+
+    @Test
+    public void testTheFittedAndersonDarlingHoldsItsLevelWhereTheFullySpecifiedOneCollapses() {
+        for (int n : new int[] { 5, 10, 30, 100 }) {
+            int reps = 1500;
+            int fitted = 0;
+            int specified = 0;
+            for (long seed = 1; seed <= reps; seed++) {
+                double[] x = sample(new Normal(3.0, 2.0), n, seed * 7919L + 1);
+                if (HypothesisTests.andersonDarling(x, Lilliefors.Family.NORMAL, 2000, 7L).test
+                        .rejectsAt(0.05)) {
+                    fitted++;
+                }
+                // the same statistic, read against the same fit, but through
+                // the null distribution that assumes the fit was not looked at
+                ParNormal fit = MLE.getNormalMLE(x);
+                if (HypothesisTests.andersonDarling(x, new Normal(fit.mean, fit.stdDev)).rejectsAt(0.05)) {
+                    specified++;
+                }
+            }
+            // measured: 0.0440 .. 0.0547 fitted, and 0 of 6000 for the other
+            assertRate("n=" + n + " fitted", fitted / (double) reps, 0.05, 0.018);
+            assertTrue("n=" + n + ": the fully specified test rejected " + specified + " of " + reps
+                    + " true normals", specified == 0);
+        }
+    }
+
+    @Test
+    public void testTheFittedAndersonDarlingReproducesStephensPointsUnderTheirOwnConvention() {
+        // Stephens (1974) tabulates A2 (1 + 0.75/n + 2.25/n^2) for a normal
+        // fitted in both parameters. The table is built on the n - 1 standard
+        // deviation and math.stats.mle fits by maximum likelihood, so the
+        // construction is checked by simulating it the way the table was
+        // built, and the difference the library convention makes is measured
+        // rather than assumed
+        double[] levels = { 0.10, 0.05, 0.025, 0.01 };
+        double[] points = { 0.631, 0.752, 0.873, 1.035 };
+        Normal standard = new Normal(0.0, 1.0);
+        int reps = 40000;
+        for (int n : new int[] { 20, 100 }) {
+            double modifier = 1.0 + 0.75 / n + 2.25 / (n * (double) n);
+            double[] drawn = new double[reps];
+            for (int b = 0; b < reps; b++) {
+                drawn[b] = besselFittedAndersonDarling(sample(standard, n, (b + 1L) * 7919L + 1)) * modifier;
+            }
+            Arrays.sort(drawn);
+            for (int i = 0; i < levels.length; i++) {
+                double simulated = upperTail(drawn, points[i]);
+                // measured over three independent runs: 0.0021 at worst
+                assertEquals("n=" + n + " at the " + levels[i] + " point", levels[i], simulated, 0.005);
+            }
+        }
+
+        // and now the convention. At n = 20 the library null, fitted by
+        // maximum likelihood, puts more mass beyond the tabulated points than
+        // the table says: reading a maximum likelihood fit off that table
+        // rejects about eleven percent of the time at the ten percent point
+        double modifier = 1.0 + 0.75 / 20.0 + 2.25 / 400.0;
+        double atTen = Lilliefors.barF(Lilliefors.Statistic.ANDERSON_DARLING, Lilliefors.Family.NORMAL, 20,
+                0.631 / modifier, 40000, 3L);
+        double atFive = Lilliefors.barF(Lilliefors.Statistic.ANDERSON_DARLING, Lilliefors.Family.NORMAL, 20,
+                0.752 / modifier, 40000, 3L);
+        // measured: 0.1106 and 0.0553
+        assertTrue("the maximum likelihood null gives " + atTen + " at the 0.10 point",
+                atTen > 0.10 && atTen < 0.13);
+        assertTrue("the maximum likelihood null gives " + atFive + " at the 0.05 point",
+                atFive > 0.05 && atFive < 0.065);
+
+        // by n = 100 the two conventions have almost met
+        double wide = 1.0 + 0.75 / 100.0 + 2.25 / 10000.0;
+        double atFiveWide = Lilliefors.barF(Lilliefors.Statistic.ANDERSON_DARLING, Lilliefors.Family.NORMAL,
+                100, 0.752 / wide, 40000, 3L);
+        // measured: 0.0504
+        assertEquals("at n = 100 the convention hardly matters", 0.05, atFiveWide, 0.006);
+    }
+
+    /** {@code A_n^2} against a normal fitted with the {@code n - 1} standard deviation. */
+    private static double besselFittedAndersonDarling(double[] x) {
+        int n = x.length;
+        double mean = 0.0;
+        for (int i = 0; i < n; i++) {
+            mean += x[i];
+        }
+        mean /= n;
+        double sumSquares = 0.0;
+        for (int i = 0; i < n; i++) {
+            double deviation = x[i] - mean;
+            sumSquares += deviation * deviation;
+        }
+        return HypothesisTests.andersonDarling(x, new Normal(mean, Math.sqrt(sumSquares / (n - 1.0))))
+                .statistic;
+    }
+
+    /** The share of a sorted array at or beyond {@code at}. */
+    private static double upperTail(double[] sorted, double at) {
+        int count = 0;
+        for (int i = sorted.length - 1; i >= 0 && sorted[i] >= at; i--) {
+            count++;
+        }
+        return count / (double) sorted.length;
+    }
+
+    @Test
+    public void testTheFittedAndersonDarlingSeesAHeavyTailSoonerThanLilliefors() {
+        for (int n : new int[] { 20, 50, 200 }) {
+            int reps = 800;
+            int andersonDarling = 0;
+            int lilliefors = 0;
+            for (long seed = 1; seed <= reps; seed++) {
+                double[] heavy = sample(new StudentT(3.0), n, seed * 7919L + 1);
+                if (HypothesisTests.andersonDarling(heavy, Lilliefors.Family.NORMAL, 1000, 5L).test
+                        .rejectsAt(0.05)) {
+                    andersonDarling++;
+                }
+                if (HypothesisTests.lilliefors(heavy, Lilliefors.Family.NORMAL, 1000, 5L).test
+                        .rejectsAt(0.05)) {
+                    lilliefors++;
+                }
+            }
+            // measured: 0.2975 against 0.2300, 0.5638 against 0.4675, 0.9875
+            // against 0.9413
+            assertTrue("n=" + n + ": the tail-weighted test found " + andersonDarling + " of " + reps
+                    + " and the other " + lilliefors, andersonDarling > lilliefors);
+        }
+    }
+
+    @Test
+    public void testTheFittedAndersonDarlingIsReproducibleAndSaysHowUncertainItIs() {
+        double[] x = sample(new Normal(0.0, 1.0), 40, 11L);
+        SimulatedTestResult first = HypothesisTests.andersonDarling(x, Lilliefors.Family.NORMAL);
+        SimulatedTestResult second = HypothesisTests.andersonDarling(x, Lilliefors.Family.NORMAL);
+        assertEquals("the short form is a function of the sample", first.test.pValue, second.test.pValue,
+                0.0);
+        assertEquals("and it says how many replications went into it", Lilliefors.DEFAULT_REPLICATIONS,
+                first.replications);
+        assertEquals("the standard error is the binomial one",
+                Math.sqrt(first.test.pValue * (1.0 - first.test.pValue) / first.replications),
+                first.monteCarloStandardError, 0.0);
+        assertTrue("the result names the statistic and the family: " + first.test.test,
+                first.test.test.contains("Anderson-Darling") && first.test.test.contains("normal"));
+
+        // the two fitted tests measure different things, so they must not
+        // return the same statistic
+        assertTrue("the two fitted statistics coincide",
+                first.test.statistic != HypothesisTests.lilliefors(x, Lilliefors.Family.NORMAL)
+                        .test.statistic);
+    }
+
+    @Test
+    public void testTheFittedAndersonDarlingRejectsWhatItCannotTest() {
+        double[] ok = { 1.0, 2.0, 3.0, 4.0 };
+        rejectsFittedAndersonDarling("a null sample", null, Lilliefors.Family.NORMAL, 100, 1L);
+        rejectsFittedAndersonDarling("a null family", ok, null, 100, 1L);
+        rejectsFittedAndersonDarling("two observations and two parameters", new double[] { 1.0, 2.0 },
+                Lilliefors.Family.NORMAL, 100, 1L);
+        rejectsFittedAndersonDarling("a NaN observation", new double[] { 1.0, 2.0, Double.NaN },
+                Lilliefors.Family.NORMAL, 100, 1L);
+        rejectsFittedAndersonDarling("no replications", ok, Lilliefors.Family.NORMAL, 0, 1L);
+        rejectsFittedAndersonDarling("a negative observation in a positive family",
+                new double[] { 1.0, 2.0, -3.0 }, Lilliefors.Family.EXPONENTIAL, 100, 1L);
+
+        // and the null distribution on its own
+        try {
+            Lilliefors.barF(null, Lilliefors.Family.NORMAL, 10, 0.3, 100, 1L);
+            fail("barF accepted a null statistic");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            Lilliefors.statistic(null, Lilliefors.Family.NORMAL, ok);
+            fail("statistic accepted a null statistic");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
+    private static void rejectsFittedAndersonDarling(String what, double[] x, Lilliefors.Family family,
+            int replications, long seed) {
+        try {
+            HypothesisTests.andersonDarling(x, family, replications, seed);
+            fail("andersonDarling accepted " + what);
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
+    // --------------------------------------------------------- Durbin-Watson --
+
+    /** An intercept, a trend and however many smooth columns are wanted. */
+    private static DMatrix durbinWatsonDesign(int n, int k, long seed) {
+        Lcg lcg = new Lcg(seed);
+        Normal standard = new Normal(0.0, 1.0);
+        DMatrix X = new DMatrix(n, k);
+        for (int i = 0; i < n; i++) {
+            X.set(i, 0, 1.0);
+        }
+        for (int column = 1; column < k; column++) {
+            for (int i = 0; i < n; i++) {
+                X.set(i, column, column == 1 ? i / (double) n : standard.inverseCdf(lcg.next()));
+            }
+        }
+        return X;
+    }
+
+    private static double[] olsResiduals(DMatrix X, double[] y) {
+        DMatrix regressand = new DMatrix(y.length, 1);
+        for (int i = 0; i < y.length; i++) {
+            regressand.set(i, 0, y[i]);
+        }
+        LSSummary fit = OLS.estimate(0.05, X, regressand);
+        double[] e = new double[y.length];
+        for (int i = 0; i < e.length; i++) {
+            e[i] = fit.getResiduals().get(i);
+        }
+        return e;
+    }
+
+    /** Errors from a first-order autoregression with the given correlation. */
+    private static double[] autocorrelated(int n, double rho, long seed) {
+        double[] innovation = sample(new Normal(0.0, 1.0), n, seed);
+        double[] e = new double[n];
+        e[0] = innovation[0] / Math.sqrt(1.0 - rho * rho);
+        for (int i = 1; i < n; i++) {
+            e[i] = rho * e[i - 1] + innovation[i];
+        }
+        return e;
+    }
+
+    @Test
+    public void testTheDurbinWatsonStatisticIsTheDefinition() {
+        for (int n : new int[] { 8, 25, 60 }) {
+            DMatrix X = durbinWatsonDesign(n, 2, 5L);
+            for (long seed = 1; seed <= 40; seed++) {
+                double[] e = sample(new Normal(0.0, 3.0), n, seed * 7919L + 1);
+                double numerator = 0.0;
+                double denominator = e[0] * e[0];
+                for (int i = 1; i < n; i++) {
+                    double step = e[i] - e[i - 1];
+                    numerator += step * step;
+                    denominator += e[i] * e[i];
+                }
+                assertEquals("n=" + n + " seed=" + seed, numerator / denominator,
+                        HypothesisTests.durbinWatson(e, X, Alternative.TWO_SIDED).statistic, 0.0);
+            }
+        }
+    }
+
+    @Test
+    public void testTheDurbinWatsonSpectrumOfAnInterceptOnlyDesignHasAClosedForm() {
+        // the column space of a design that is only an intercept is spanned by
+        // the eigenvector of the zero eigenvalue of A, so what is left is the
+        // rest of the spectrum of A itself, which is known in closed form. This
+        // checks the decomposition, the assembly and the ordering at once
+        double worst = 0.0;
+        for (int n : new int[] { 6, 20, 60 }) {
+            double[] intercept = new double[n];
+            Arrays.fill(intercept, 1.0);
+            double[] nu = DurbinWatson.nullEigenvalues(intercept, n, 1);
+            assertEquals("n=" + n + ": there are n - 1 of them", n - 1, nu.length);
+            for (int i = 0; i < nu.length; i++) {
+                // they come back descending, so nu[i] belongs to j = n - 1 - i
+                double closedForm = 2.0 * (1.0 - Math.cos(Math.PI * (n - 1 - i) / (double) n));
+                worst = Math.max(worst, Math.abs(nu[i] - closedForm));
+            }
+            // and their sum is the trace of A, which the intercept takes nothing
+            // from because its eigenvalue is zero
+            double sum = 0.0;
+            for (int i = 0; i < nu.length; i++) {
+                sum += nu[i];
+            }
+            assertEquals("n=" + n + ": the trace", 2.0 * n - 2.0, sum, 1.0e-12);
+        }
+        // measured: 4.9e-15
+        assertTrue("the spectrum is off by " + worst, worst < 1.0e-13);
+    }
+
+    @Test
+    public void testTheDurbinWatsonTailAgreesWithTheArcsineLaw() {
+        // with two eigenvalues d is nu2 + (nu1 - nu2) w with w ~ Beta(1/2, 1/2),
+        // so the distribution function is an arcsine and Imhof can be checked
+        // against algebra rather than against another approximation
+        double[] nu = { 3.0, 1.0 };
+        for (double p : new double[] { 0.5, 0.1, 1.0e-2, 1.0e-3, 1.0e-4 }) {
+            double share = Math.sin(0.5 * Math.PI * p);
+            share = share * share;
+            double exact = 2.0 / Math.PI * Math.asin(Math.sqrt(share));
+            double got = DurbinWatson.cdf(nu, 1.0 + 2.0 * share);
+            // measured: 4.9e-14 at 1e-2, 7.0e-10 at 1e-4
+            assertEquals("at p = " + p, exact, got, 1.0e-8 * exact);
+        }
+
+        // and this is where it stops: the tails are 1/2 minus the same integral,
+        // so a p-value far below the level anyone decides at is only an order of
+        // magnitude. The floor is pinned so that it cannot quietly rise
+        double share = Math.sin(0.5 * Math.PI * 1.0e-6);
+        share = share * share;
+        double deep = DurbinWatson.cdf(nu, 1.0 + 2.0 * share);
+        double exactDeep = 2.0 / Math.PI * Math.asin(Math.sqrt(share));
+        // measured: 8.4e-6 relative
+        assertEquals("at p = 1e-6", exactDeep, deep, 1.0e-4 * exactDeep);
+    }
+
+    @Test
+    public void testTheDurbinWatsonTailAgreesWithASimulationOfTheRatio() {
+        // Imhof against the definition it inverts: draw z, form the ratio
+        Normal standard = new Normal(0.0, 1.0);
+        int reps = 100000;
+        double worst = 0.0;
+        for (int[] shape : new int[][] { { 15, 1 }, { 20, 3 } }) {
+            DMatrix X = durbinWatsonDesign(shape[0], shape[1], 5L);
+            double[] nu = DurbinWatson.nullEigenvalues(X.getArrayUnsafe(), shape[0], shape[1]);
+            double[] drawn = new double[reps];
+            for (int b = 0; b < reps; b++) {
+                double[] z = sample(standard, nu.length, (b + 1L) * 7919L + 1);
+                double numerator = 0.0;
+                double denominator = 0.0;
+                for (int i = 0; i < nu.length; i++) {
+                    double square = z[i] * z[i];
+                    numerator += nu[i] * square;
+                    denominator += square;
+                }
+                drawn[b] = numerator / denominator;
+            }
+            Arrays.sort(drawn);
+            for (double tail : new double[] { 0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99 }) {
+                worst = Math.max(worst,
+                        Math.abs(DurbinWatson.cdf(nu, drawn[(int) (tail * reps)]) - tail));
+            }
+        }
+        // measured: 0.00154
+        assertTrue("the drawn distribution differs by " + worst, worst < 0.006);
+    }
+
+    @Test
+    public void testTheDurbinWatsonPValuesAreUniformUnderTheNullHypothesis() {
+        // the whole chain at once: a fit, its residuals, the decomposition of
+        // its design and the inversion. A p-value that is uniform is right for
+        // reasons no single value could show
+        Normal standard = new Normal(0.0, 1.0);
+        Uniform uniform = new Uniform(0.0, 1.0);
+        int reps = 2000;
+        for (int[] shape : new int[][] { { 15, 1 }, { 30, 3 } }) {
+            int n = shape[0];
+            DMatrix X = durbinWatsonDesign(n, shape[1], 5L);
+            double[] nu = DurbinWatson.nullEigenvalues(X.getArrayUnsafe(), n, shape[1]);
+            double[] p = new double[reps];
+            int atFive = 0;
+            int atOne = 0;
+            for (int b = 0; b < reps; b++) {
+                double[] e = olsResiduals(X, sample(standard, n, (b + 1L) * 7919L + 1));
+                double numerator = 0.0;
+                double denominator = e[0] * e[0];
+                for (int i = 1; i < n; i++) {
+                    double step = e[i] - e[i - 1];
+                    numerator += step * step;
+                    denominator += e[i] * e[i];
+                }
+                p[b] = DurbinWatson.cdf(nu, numerator / denominator);
+                if (p[b] <= 0.05) {
+                    atFive++;
+                }
+                if (p[b] <= 0.01) {
+                    atOne++;
+                }
+            }
+            String at = "n=" + n + " k=" + shape[1];
+            // measured over four designs: 0.0470 .. 0.0545 and 0.0085 .. 0.0140
+            assertRate(at + " at 0.05", atFive / (double) reps, 0.05, 0.018);
+            assertRate(at + " at 0.01", atOne / (double) reps, 0.01, 0.008);
+            // measured: 0.0347 at worst, against a 0.001 critical value of 0.043
+            assertTrue(at + ": the p-values are not uniform",
+                    HypothesisTests.kolmogorovSmirnov(p, uniform, Alternative.TWO_SIDED).statistic < 0.06);
+        }
+    }
+
+    @Test
+    public void testTheDurbinWatsonAlternativesAreAboutTheAutocorrelation() {
+        // GREATER asks whether the errors are positively autocorrelated, which
+        // is a SMALL statistic. Getting this backwards is a silent error, so it
+        // is pinned here against errors that really are autocorrelated
+        DMatrix X = durbinWatsonDesign(24, 3, 5L);
+        int reps = 400;
+        int[] greater = new int[3];
+        int[] less = new int[3];
+        double[] meanStatistic = new double[3];
+        double[] rhos = { 0.0, 0.5, -0.5 };
+        for (int r = 0; r < rhos.length; r++) {
+            for (long seed = 1; seed <= reps; seed++) {
+                double[] e = autocorrelated(24, rhos[r], seed * 7919L + 1);
+                double[] y = new double[24];
+                for (int i = 0; i < 24; i++) {
+                    y[i] = 1.0 + 2.0 * X.get(i, 1) + e[i];
+                }
+                double[] residuals = olsResiduals(X, y);
+                TestResult positive = HypothesisTests.durbinWatson(residuals, X, Alternative.GREATER);
+                TestResult negative = HypothesisTests.durbinWatson(residuals, X, Alternative.LESS);
+                meanStatistic[r] += positive.statistic;
+                if (positive.rejectsAt(0.05)) {
+                    greater[r]++;
+                }
+                if (negative.rejectsAt(0.05)) {
+                    less[r]++;
+                }
+            }
+            meanStatistic[r] /= reps;
+        }
+        // measured: mean d 2.0932 / 1.3207 / 2.8542, GREATER rejects
+        // 0.0625 / 0.6375 / 0.0000 and LESS 0.0325 / 0.0000 / 0.6600
+        assertRate("with no autocorrelation", greater[0] / (double) reps, 0.05, 0.035);
+        assertTrue("positive autocorrelation must push the statistic down, mean was " + meanStatistic[1],
+                meanStatistic[1] < 1.6);
+        assertTrue("and must be found by GREATER", greater[1] > 0.4 * reps);
+        assertTrue("and never by LESS", less[1] == 0);
+        assertTrue("negative autocorrelation must push it up, mean was " + meanStatistic[2],
+                meanStatistic[2] > 2.5);
+        assertTrue("and must be found by LESS", less[2] > 0.4 * reps);
+        assertTrue("and never by GREATER", greater[2] == 0);
+    }
+
+    @Test
+    public void testTheDurbinWatsonTailsPartitionTheDistribution() {
+        DMatrix X = durbinWatsonDesign(24, 3, 5L);
+        double[] nu = DurbinWatson.nullEigenvalues(X.getArrayUnsafe(), 24, 3);
+        double[] e = sample(new Normal(0.0, 1.0), 24, 17L);
+        double previous = -1.0;
+        for (double d : new double[] { 0.4, 0.8, 1.4, 2.0, 2.6, 3.2, 3.6 }) {
+            double lower = DurbinWatson.cdf(nu, d);
+            double upper = DurbinWatson.barF(nu, d);
+            assertEquals("the two tails at d = " + d, 1.0, lower + upper, 1.0e-12);
+            assertTrue("the lower tail is not increasing at d = " + d, lower > previous);
+            previous = lower;
+        }
+
+        // and the facade divides them the way it says it does
+        TestResult positive = HypothesisTests.durbinWatson(e, X, Alternative.GREATER);
+        TestResult negative = HypothesisTests.durbinWatson(e, X, Alternative.LESS);
+        TestResult both = HypothesisTests.durbinWatson(e, X, Alternative.TWO_SIDED);
+        assertEquals("the one-sided p-values partition", 1.0, positive.pValue + negative.pValue, 1.0e-12);
+        assertEquals("the two-sided one is twice the smaller",
+                Math.min(1.0, 2.0 * Math.min(positive.pValue, negative.pValue)), both.pValue, 0.0);
+        assertEquals("and they all report the same statistic", positive.statistic, both.statistic, 0.0);
+    }
+
+    @Test
+    public void testTheDurbinWatsonStatisticIsInvariantUnderScaleAndSign() {
+        DMatrix X = durbinWatsonDesign(30, 2, 5L);
+        for (long seed = 1; seed <= 30; seed++) {
+            double[] e = sample(new Normal(0.0, 1.0), 30, seed * 7919L + 1);
+            double reference = HypothesisTests.durbinWatson(e, X, Alternative.GREATER).statistic;
+            double[] scaled = new double[e.length];
+            double[] negated = new double[e.length];
+            for (int i = 0; i < e.length; i++) {
+                // a power of two changes the exponent and nothing else, so the
+                // ratio has to come back bit for bit
+                scaled[i] = e[i] * 1024.0;
+                negated[i] = -e[i];
+            }
+            assertEquals("scaled, seed=" + seed, reference,
+                    HypothesisTests.durbinWatson(scaled, X, Alternative.GREATER).statistic, 0.0);
+            assertEquals("negated, seed=" + seed, reference,
+                    HypothesisTests.durbinWatson(negated, X, Alternative.GREATER).statistic, 0.0);
+        }
+    }
+
+    @Test
+    public void testTheExactDurbinWatsonTailLiesBetweenTheInterlacingBounds() {
+        // Poincare separation: whatever the k columns of X are, the eigenvalues
+        // of the restriction interlace those of A itself, so the bottom m and
+        // the top m of 2 (1 - cos(pi j / n)) bound the distribution. That is the
+        // classical pair of bounds, and it holds without knowing the design
+        for (int n : new int[] { 20, 40 }) {
+            for (int k : new int[] { 1, 2, 4 }) {
+                DMatrix X = durbinWatsonDesign(n, k, 5L);
+                double[] exact = DurbinWatson.nullEigenvalues(X.getArrayUnsafe(), n, k);
+                int m = n - k;
+                double[] all = new double[n];
+                for (int index = 0; index < n; index++) {
+                    all[index] = 2.0 * (1.0 - Math.cos(Math.PI * index / (double) n));
+                }
+                Arrays.sort(all);
+                double[] bottom = new double[m];
+                double[] top = new double[m];
+                for (int i = 0; i < m; i++) {
+                    bottom[i] = all[i];
+                    top[i] = all[i + k];
+                }
+                // the eigenvalues themselves interlace, ascending
+                for (int i = 0; i < m; i++) {
+                    double ascending = exact[m - 1 - i];
+                    assertTrue("n=" + n + " k=" + k + " i=" + i + ": " + ascending + " left ["
+                            + bottom[i] + ", " + top[i] + "]",
+                            ascending >= bottom[i] - 1.0e-9 && ascending <= top[i] + 1.0e-9);
+                }
+                for (double d : new double[] { 1.0, 1.5, 2.0, 2.5 }) {
+                    double atMost = DurbinWatson.cdf(top, d);
+                    double atLeast = DurbinWatson.cdf(bottom, d);
+                    double got = DurbinWatson.cdf(exact, d);
+                    assertTrue("n=" + n + " k=" + k + " d=" + d + ": " + got + " left [" + atMost + ", "
+                            + atLeast + "]", got >= atMost - 1.0e-12 && got <= atLeast + 1.0e-12);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testTheTwoDurbinWatsonEntryPointsAgree() {
+        int n = 24;
+        DMatrix X = durbinWatsonDesign(n, 3, 5L);
+        DMatrix y = new DMatrix(n, 1);
+        double[] noise = sample(new Normal(0.0, 1.0), n, 13L);
+        for (int i = 0; i < n; i++) {
+            y.set(i, 0, 1.0 + 2.0 * X.get(i, 1) + noise[i]);
+        }
+        LSSummary fit = OLS.estimate(0.05, X, y);
+        double[] residuals = new double[n];
+        for (int i = 0; i < n; i++) {
+            residuals[i] = fit.getResiduals().get(i);
+        }
+        for (Alternative alternative : Alternative.values()) {
+            TestResult viaFit = HypothesisTests.durbinWatson(fit, alternative);
+            TestResult viaArrays = HypothesisTests.durbinWatson(residuals, X, alternative);
+            assertEquals(alternative + ": statistic", viaArrays.statistic, viaFit.statistic, 0.0);
+            assertEquals(alternative + ": p-value", viaArrays.pValue, viaFit.pValue, 0.0);
+            assertTrue(alternative + ": the result names the test", viaFit.test.contains("Durbin-Watson"));
+        }
+    }
+
+    @Test
+    public void testDurbinWatsonRejectsWhatItCannotTest() {
+        DMatrix X = durbinWatsonDesign(10, 2, 5L);
+        double[] ok = sample(new Normal(0.0, 1.0), 10, 3L);
+        rejectsDurbinWatson("a null residual vector", null, X, Alternative.GREATER);
+        rejectsDurbinWatson("one residual", new double[] { 1.0 }, durbinWatsonDesign(1, 1, 5L),
+                Alternative.GREATER);
+        rejectsDurbinWatson("a NaN residual", withNaN(ok), X, Alternative.GREATER);
+        rejectsDurbinWatson("a null design matrix", ok, null, Alternative.GREATER);
+        rejectsDurbinWatson("a null alternative", ok, X, null);
+        rejectsDurbinWatson("a design matrix of the wrong height", ok, durbinWatsonDesign(11, 2, 5L),
+                Alternative.GREATER);
+        rejectsDurbinWatson("residuals that are all zero", new double[10], X, Alternative.GREATER);
+
+        // a design matrix whose columns repeat has no residual space of the
+        // size the test assumes, and there is no honest answer to give
+        DMatrix repeated = new DMatrix(10, 2);
+        for (int i = 0; i < 10; i++) {
+            repeated.set(i, 0, 1.0);
+            repeated.set(i, 1, 2.0);
+        }
+        rejectsDurbinWatson("a rank deficient design", ok, repeated, Alternative.GREATER);
+
+        // the summary form
+        try {
+            HypothesisTests.durbinWatson((LSSummary) null, Alternative.GREATER);
+            fail("durbinWatson accepted a null fit");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+
+        DMatrix y = new DMatrix(10, 1);
+        for (int i = 0; i < 10; i++) {
+            y.set(i, 0, ok[i]);
+        }
+        double[] weights = new double[10];
+        Arrays.fill(weights, 1.0);
+        weights[3] = 4.0;
+        try {
+            HypothesisTests.durbinWatson(Wls.estimate(0.05, X, y, weights), Alternative.GREATER);
+            fail("durbinWatson accepted a weighted fit");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("the message does not say it was the weights: " + expected.getMessage(),
+                    expected.getMessage() != null && expected.getMessage().contains("weighted"));
+        }
+
+        LSSummary cleared = OLS.estimate(0.05, X, y);
+        cleared.clearTemporaries();
+        try {
+            HypothesisTests.durbinWatson(cleared, Alternative.GREATER);
+            fail("durbinWatson accepted a fit that had released its residuals");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("the message does not name clearTemporaries: " + expected.getMessage(),
+                    expected.getMessage() != null && expected.getMessage().contains("clearTemporaries"));
+        }
+
+        // and the null distribution on its own
+        try {
+            DurbinWatson.cdf(new double[0], 2.0);
+            fail("cdf accepted an empty spectrum");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            DurbinWatson.nullEigenvalues(new double[20], 10, 10);
+            fail("nullEigenvalues accepted as many columns as rows");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
+    private static double[] withNaN(double[] x) {
+        double[] broken = x.clone();
+        broken[2] = Double.NaN;
+        return broken;
+    }
+
+    private static void rejectsDurbinWatson(String what, double[] residuals, DMatrix X,
+            Alternative alternative) {
+        try {
+            HypothesisTests.durbinWatson(residuals, X, alternative);
+            fail("durbinWatson accepted " + what);
         } catch (IllegalArgumentException expected) {
             assertTrue("threw without saying what was wrong", expected.getMessage() != null);
         }
