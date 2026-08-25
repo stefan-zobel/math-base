@@ -36,7 +36,9 @@ public class MultiClassAccuracy implements Externalizable {
     }
 
     /**
-     * Get the average accuracy achieved so far.
+     * Get the average accuracy achieved so far, rounded to four decimals --
+     * 7 of 13 correct answers 0.5385, not 0.5384615384615384. Deliberate, and
+     * the reason this value is not usable as an optimisation target.
      * 
      * @return the current accuracy measure
      */
