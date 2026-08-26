@@ -477,6 +477,91 @@ public abstract class AbstractRng64 implements PseudoRandom {
         return doubleStream(new InverseGammaSpliterator(this, 0L, streamSize, alpha, beta));
     }
 
+    @Override
+    public IntStream categorical(double[] weights) {
+        return categorical(AliasTable.of(weights));
+    }
+
+    @Override
+    public IntStream categorical(long streamSize, double[] weights) {
+        return categorical(streamSize, AliasTable.of(weights));
+    }
+
+    @Override
+    public IntStream categorical(AliasTable table) {
+        return intStream(new CategoricalSpliterator(this, 0L, Long.MAX_VALUE, requireTable(table)));
+    }
+
+    @Override
+    public IntStream categorical(long streamSize, AliasTable table) {
+        checkStreamSize(streamSize);
+        return intStream(new CategoricalSpliterator(this, 0L, streamSize, requireTable(table)));
+    }
+
+    @Override
+    public IntStream poisson(double lambda) {
+        return intStream(new PoissonSpliterator(this, 0L, Long.MAX_VALUE, lambda));
+    }
+
+    @Override
+    public IntStream poisson(long streamSize, double lambda) {
+        checkStreamSize(streamSize);
+        return intStream(new PoissonSpliterator(this, 0L, streamSize, lambda));
+    }
+
+    @Override
+    public IntStream binomial(int n, double p) {
+        return intStream(new BinomialSpliterator(this, 0L, Long.MAX_VALUE, n, p));
+    }
+
+    @Override
+    public IntStream binomial(long streamSize, int n, double p) {
+        checkStreamSize(streamSize);
+        return intStream(new BinomialSpliterator(this, 0L, streamSize, n, p));
+    }
+
+    @Override
+    public IntStream geometric(double p) {
+        return intStream(new GeometricSpliterator(this, 0L, Long.MAX_VALUE, p));
+    }
+
+    @Override
+    public IntStream geometric(long streamSize, double p) {
+        checkStreamSize(streamSize);
+        return intStream(new GeometricSpliterator(this, 0L, streamSize, p));
+    }
+
+    @Override
+    public IntStream negativeBinomial(int r, double p) {
+        return intStream(new NegativeBinomialSpliterator(this, 0L, Long.MAX_VALUE, r, p));
+    }
+
+    @Override
+    public IntStream negativeBinomial(long streamSize, int r, double p) {
+        checkStreamSize(streamSize);
+        return intStream(new NegativeBinomialSpliterator(this, 0L, streamSize, r, p));
+    }
+
+    @Override
+    public IntStream hypergeometric(int population, int successes, int draws) {
+        return intStream(
+                new HypergeometricSpliterator(this, 0L, Long.MAX_VALUE, population, successes, draws));
+    }
+
+    @Override
+    public IntStream hypergeometric(long streamSize, int population, int successes, int draws) {
+        checkStreamSize(streamSize);
+        return intStream(
+                new HypergeometricSpliterator(this, 0L, streamSize, population, successes, draws));
+    }
+
+    private static AliasTable requireTable(AliasTable table) {
+        if (table == null) {
+            throw new IllegalArgumentException("table must not be null");
+        }
+        return table;
+    }
+
     protected void saveSeed(long[] seed) {
         initialSeed = Arrays.copyOf(seed, seed.length);
     }
