@@ -628,8 +628,8 @@ public final class HypothesisTestsTest {
                         double[] b = sample(new Normal(3.0, 2.0 * spread), ny, seed * 104729L + 3);
                         FTestResult ab = HypothesisTests.fVarianceRatio(a, b, Alternative.TWO_SIDED);
                         FTestResult ba = HypothesisTests.fVarianceRatio(b, a, Alternative.TWO_SIDED);
-                        assertEquals("the degrees of freedom did not swap", ab.numeratorDf, ba.denominatorDf);
-                        assertEquals("the degrees of freedom did not swap", ab.denominatorDf, ba.numeratorDf);
+                        assertEquals("the degrees of freedom did not swap", ab.numeratorDf, ba.denominatorDf, 0.0);
+                        assertEquals("the degrees of freedom did not swap", ab.denominatorDf, ba.numeratorDf, 0.0);
                         worstTwoSided = Math.max(worstTwoSided,
                                 Math.abs(ab.test.pValue - ba.test.pValue) / ab.test.pValue);
                         worstProduct = Math.max(worstProduct,

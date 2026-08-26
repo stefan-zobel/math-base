@@ -11,23 +11,32 @@ import java.util.Arrays;
  * looking at the whole family of p-values at once, which is what these methods
  * do.
  * <p>
- * Both procedures here control the <b>false discovery rate</b>, the expected
- * share of the rejections that are wrong. That is a different promise from the
- * family-wise error rate, which is the probability of <em>any</em> wrong
- * rejection, and it is the useful one when there are many tests and some of
- * them are expected to be real -- which is the situation that produces many
- * tests in the first place. Controlling the family-wise rate over a thousand
- * tests means finding almost nothing; controlling the false discovery rate at
- * ten percent means accepting that about one in ten of what is found is noise.
+ * There are two promises to choose between, and the choice is about how many
+ * tests there are.
+ * <p>
+ * {@link #benjaminiHochberg} and {@link #benjaminiYekutieli} control the
+ * <b>false discovery rate</b>, the expected share of the rejections that are
+ * wrong. That is the useful promise when there are many tests and some of them
+ * are expected to be real -- which is the situation that produces many tests in
+ * the first place. Controlling the false discovery rate at ten percent means
+ * accepting that about one in ten of what is found is noise.
+ * <p>
+ * {@link #holmBonferroni} controls the <b>family-wise error rate</b>, the
+ * probability of <em>any</em> wrong rejection at all. That is the promise worth
+ * having for the handful of comparisons that follow a rejected omnibus test --
+ * three groups make three pairs -- where one wrong answer out of three is not a
+ * rate one is willing to run at. Over a thousand tests the same promise means
+ * finding almost nothing, which is why it is not the only one here.
  * <p>
  * Each method returns <b>adjusted p-values in the order they were given in</b>.
  * Rejecting every hypothesis whose adjusted value is at most {@code alpha} is
- * exactly the original step-up decision at {@code alpha} -- the largest
- * {@code k} with {@code p_(k) <= k alpha / m}, then the {@code k} smallest
- * p-values -- so nothing is lost by handing back numbers rather than a verdict,
- * and the level no longer has to be chosen before the correction is applied.
+ * exactly the original sequential decision at {@code alpha}, so nothing is lost
+ * by handing back numbers rather than a verdict, and the level no longer has to
+ * be chosen before the correction is applied.
  * <p>
  * https://en.wikipedia.org/wiki/False_discovery_rate
+ * <p>
+ * https://en.wikipedia.org/wiki/Holm%E2%80%93Bonferroni_method
  *
  * @since 1.5.3
  */
@@ -87,7 +96,69 @@ public final class MultipleTesting {
     }
 
     /**
-     * The step-up sweep both procedures are:
+     * Holm-Bonferroni adjusted p-values, which control the family-wise error
+     * rate whatever the dependence between the p-values is.
+     * <p>
+     * This is the step-<em>down</em> counterpart of the two above: the smallest
+     * p-value is judged against {@code alpha / m}, the next against
+     * {@code alpha / (m - 1)}, and so on until one of them survives, after which
+     * nothing is rejected. In adjusted form that is
+     * {@code q_(k) = max over j <= k of (m - j + 1) p_(j)}, clamped at one.
+     * <p>
+     * <b>It is uniformly better than Bonferroni and there is no reason to prefer
+     * that one.</b> Every adjusted value here is at most
+     * {@code min(1, m p)} -- equal for the smallest p-value and smaller for all
+     * the others -- and the guarantee is the same, with no assumption about how
+     * the tests are related. The price against the false discovery rate
+     * procedures is the one the class comment describes: a stricter promise,
+     * fewer rejections.
+     * <p>
+     * The adjusted values are monotone in the p-values, equal p-values get equal
+     * adjusted values, and none is ever smaller than the p-value it came from.
+     *
+     * @param pValues
+     *            the p-values of the family, each in {@code [0, 1]}, at least
+     *            one of them. Not modified
+     * @return the adjusted p-values, in the order {@code pValues} were given in
+     * @throws IllegalArgumentException
+     *             if {@code pValues} is {@code null}, is empty, or holds a
+     *             value that is not a probability
+     */
+    public static double[] holmBonferroni(double[] pValues) {
+        int m = requireProbabilities(pValues, "pValues");
+        double[] ascending = pValues.clone();
+        Arrays.sort(ascending);
+
+        double[] byRank = new double[m];
+        double running = Double.NEGATIVE_INFINITY;
+        for (int k = 1; k <= m; k++) {
+            // walking the ranks upwards turns the inner maximum into a running
+            // one, and that running maximum is also what makes the result
+            // monotone and what makes tied p-values come out equal without a
+            // special case: where p_(k) equals p_(k+1) the later term is the
+            // smaller of the two, so the maximum does not move
+            double candidate = ascending[k - 1] * (m - k + 1);
+            if (candidate > running) {
+                running = candidate;
+            }
+            byRank[k - 1] = running;
+        }
+
+        double[] adjusted = new double[m];
+        for (int i = 0; i < m; i++) {
+            // as in stepUp: the p-values were copied, so the search always finds
+            // one of the positions holding this value, and which one does not
+            // matter. The multiplier is a whole number and never below one, so
+            // no candidate can round below the p-value it came from and there is
+            // nothing to repair here
+            double q = byRank[Arrays.binarySearch(ascending, pValues[i])];
+            adjusted[i] = q > 1.0 ? 1.0 : q;
+        }
+        return adjusted;
+    }
+
+    /**
+     * The step-up sweep the two false discovery rate procedures are:
      * {@code q_(k) = min(1, min over j >= k of p_(j) factor m / j)}.
      * <p>
      * Walking the ranks downwards turns the inner minimum into a running one,

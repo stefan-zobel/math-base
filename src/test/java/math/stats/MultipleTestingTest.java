@@ -371,6 +371,210 @@ public final class MultipleTestingTest {
         }
     }
 
+    // -------------------------------------------------------------- Holm --
+
+    @Test
+    public void testHolmRejectsExactlyWhatTheStepDownProcedureDoes() {
+        // Holm defined a decision, not an adjusted p-value: judge the smallest
+        // p-value against alpha / m, the next against alpha / (m - 1), and stop
+        // at the first one that survives. That loop is written out here and
+        // shares nothing with the implementation but its input
+        Lcg lcg = new Lcg(4242L);
+        int checked = 0;
+        for (int round = 0; round < 1500; round++) {
+            int m = 1 + (int) (lcg.next() * 30);
+            double[] p = awkwardFamily(m, lcg);
+            double[] adjusted = MultipleTesting.holmBonferroni(p);
+            for (double alpha : new double[] { 0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 0.9 }) {
+                int byDecision = stepDownRejectionCount(p, alpha);
+                int byAdjusted = 0;
+                for (int i = 0; i < m; i++) {
+                    if (adjusted[i] <= alpha) {
+                        byAdjusted++;
+                    }
+                }
+                assertEquals("m=" + m + " round=" + round + " alpha=" + alpha, byDecision, byAdjusted);
+                checked++;
+            }
+        }
+        assertTrue("nothing was checked", checked > 10000);
+    }
+
+    /** The original decision: how many of the ordered p-values are rejected. */
+    private static int stepDownRejectionCount(double[] p, double alpha) {
+        double[] ascending = p.clone();
+        Arrays.sort(ascending);
+        int m = ascending.length;
+        for (int k = 1; k <= m; k++) {
+            if (ascending[k - 1] > alpha / (m - k + 1)) {
+                return k - 1;
+            }
+        }
+        return m;
+    }
+
+    @Test
+    public void testHolmControlsTheFamilyWiseErrorRate() {
+        // the promise the other two do not make, measured rather than assumed:
+        // with every null hypothesis true, the probability of rejecting any of
+        // them at all stays at or below alpha. Uncorrected it is 1 - (1 - a)^m,
+        // which is 40 percent for ten tests at five
+        double alpha = 0.05;
+        int reps = 4000;
+        for (int m : new int[] { 3, 10, 40 }) {
+            int holmWrong = 0;
+            int uncorrectedWrong = 0;
+            Lcg lcg = new Lcg(20260826L + m);
+            for (int r = 0; r < reps; r++) {
+                // every p-value is a draw from the null, which is uniform
+                double[] p = new double[m];
+                for (int i = 0; i < m; i++) {
+                    p[i] = lcg.next();
+                }
+                double[] adjusted = MultipleTesting.holmBonferroni(p);
+                boolean anyHolm = false;
+                boolean anyRaw = false;
+                for (int i = 0; i < m; i++) {
+                    anyHolm |= adjusted[i] <= alpha;
+                    anyRaw |= p[i] <= alpha;
+                }
+                if (anyHolm) {
+                    holmWrong++;
+                }
+                if (anyRaw) {
+                    uncorrectedWrong++;
+                }
+            }
+            double holmRate = holmWrong / (double) reps;
+            double rawRate = uncorrectedWrong / (double) reps;
+            // measured at m = 3, 10 and 40: 0.048, 0.046 and 0.052 against an
+            // uncorrected 0.14, 0.40 and 0.87. Three standard errors of a rate
+            // of 0.05 over 4000 draws is 0.010
+            assertTrue("m=" + m + ": Holm was wrong " + holmRate + " of the time", holmRate < alpha + 0.012);
+            assertTrue("m=" + m + ": uncorrected was wrong " + rawRate + " of the time",
+                    rawRate > 1.0 - Math.pow(1.0 - alpha, m) - 0.03);
+        }
+    }
+
+    @Test
+    public void testHolmIsNeverWorseThanBonferroniAndNeverBetterThanBenjaminiHochberg() {
+        // the two procedures Holm sits between. It dominates Bonferroni
+        // uniformly, which is why there is no Bonferroni method here, and it is
+        // dominated by the false discovery rate procedures, which is the price
+        // of the stronger guarantee
+        Lcg lcg = new Lcg(13L);
+        for (int round = 0; round < 800; round++) {
+            int m = 1 + (int) (lcg.next() * 40);
+            double[] p = awkwardFamily(m, lcg);
+            double[] holm = MultipleTesting.holmBonferroni(p);
+            double[] bh = MultipleTesting.benjaminiHochberg(p);
+            for (int i = 0; i < m; i++) {
+                String at = "round=" + round + " i=" + i + " p=" + p[i];
+                assertTrue(at + ": " + holm[i] + " is below its own p-value", holm[i] >= p[i]);
+                assertTrue(at + ": " + holm[i] + " is above Bonferroni", holm[i] <= Math.min(1.0, m * p[i]));
+                assertTrue(at + ": " + holm[i] + " left [0, 1]", holm[i] >= 0.0 && holm[i] <= 1.0);
+                // measured over 4000 families: Holm fell below Benjamini-
+                // Hochberg by at most 1.1e-16, one unit in the last place at a
+                // rank where the two agree exactly
+                assertTrue(at + ": Holm undercut Benjamini-Hochberg", holm[i] >= bh[i] - 1.0e-15);
+            }
+        }
+    }
+
+    @Test
+    public void testHolmIsMonotoneAndTiesAgree() {
+        Lcg lcg = new Lcg(17L);
+        for (int round = 0; round < 800; round++) {
+            int m = 2 + (int) (lcg.next() * 40);
+            double[] p = awkwardFamily(m, lcg);
+            double[] holm = MultipleTesting.holmBonferroni(p);
+            for (int i = 0; i < m; i++) {
+                for (int k = 0; k < m; k++) {
+                    String at = "round=" + round + " i=" + i + " k=" + k;
+                    if (p[i] < p[k]) {
+                        assertTrue(at + ": " + holm[i] + " > " + holm[k], holm[i] <= holm[k]);
+                    }
+                    if (p[i] == p[k]) {
+                        // the running maximum gives this without a special
+                        // case: the later of two equal p-values carries the
+                        // smaller multiplier, so the maximum does not move
+                        assertEquals(at + ": tied p-values", holm[i], holm[k], 0.0);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testHolmOnASmallFamilyWorkedOutByHand() {
+        // the same six p-values the step-up example uses, with m = 6:
+        //   k=1  0.001 * 6 = 0.006   -> 0.006
+        //   k=2  0.008 * 5 = 0.040   -> 0.040
+        //   k=3  0.039 * 4 = 0.156   -> 0.156
+        //   k=4  0.041 * 3 = 0.123   -> 0.156   the running maximum holds
+        //   k=5  0.042 * 2 = 0.084   -> 0.156   and holds again
+        //   k=6  0.600 * 1 = 0.600   -> 0.600
+        // Ranks four and five are what the step-down shape exists for: once a
+        // p-value survives, nothing after it can be rejected however small its
+        // own product is
+        double[] p = { 0.001, 0.008, 0.039, 0.041, 0.042, 0.60 };
+        double[] wanted = { 0.006, 0.040, 0.156, 0.156, 0.156, 0.60 };
+        double[] got = MultipleTesting.holmBonferroni(p);
+        for (int i = 0; i < p.length; i++) {
+            assertEquals("i=" + i, wanted[i], got[i], 1.0e-15);
+        }
+
+        // five of the six were under 0.05 to begin with; two survive Holm, the
+        // same two Benjamini-Hochberg keeps -- on a family this small the two
+        // guarantees cost the same, and the adjusted values still differ
+        int corrected = 0;
+        for (int i = 0; i < p.length; i++) {
+            if (got[i] <= 0.05) {
+                corrected++;
+            }
+        }
+        assertEquals("corrected", 2, corrected);
+        double[] bh = MultipleTesting.benjaminiHochberg(p);
+        assertTrue("the third rank agreed with Benjamini-Hochberg", got[2] > bh[2]);
+    }
+
+    @Test
+    public void testHolmOfASingleTestIsTheTestItself() {
+        for (double p : new double[] { 0.0, 1.0e-12, 0.03, 0.5, 1.0 }) {
+            assertEquals("Holm of one", p, MultipleTesting.holmBonferroni(new double[] { p })[0], 0.0);
+        }
+    }
+
+    @Test
+    public void testTheOrderOfTheInputIsTheOrderOfHolmsOutput() {
+        Lcg lcg = new Lcg(23L);
+        for (int round = 0; round < 400; round++) {
+            int m = 2 + (int) (lcg.next() * 20);
+            double[] p = awkwardFamily(m, lcg);
+            double[] adjusted = MultipleTesting.holmBonferroni(p);
+
+            int[] where = new int[m];
+            for (int i = 0; i < m; i++) {
+                where[i] = i;
+            }
+            for (int i = m - 1; i > 0; i--) {
+                int at = (int) (lcg.next() * (i + 1));
+                int swap = where[i];
+                where[i] = where[at];
+                where[at] = swap;
+            }
+            double[] permuted = new double[m];
+            for (int i = 0; i < m; i++) {
+                permuted[i] = p[where[i]];
+            }
+            double[] adjustedPermuted = MultipleTesting.holmBonferroni(permuted);
+            for (int i = 0; i < m; i++) {
+                // the same arithmetic on the same multiset, so bit for bit
+                assertEquals("round=" + round + " i=" + i, adjusted[where[i]], adjustedPermuted[i], 0.0);
+            }
+        }
+    }
+
     // ------------------------------------------------------ the guard rail --
 
     @Test
@@ -396,6 +600,12 @@ public final class MultipleTestingTest {
         } catch (IllegalArgumentException expected) {
             assertTrue("threw without saying what was wrong", expected.getMessage() != null);
         }
+        try {
+            MultipleTesting.holmBonferroni(p);
+            fail("holmBonferroni accepted " + what);
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
     }
 
     @Test
@@ -404,6 +614,7 @@ public final class MultipleTestingTest {
         double[] before = p.clone();
         MultipleTesting.benjaminiHochberg(p);
         MultipleTesting.benjaminiYekutieli(p);
+        MultipleTesting.holmBonferroni(p);
         for (int i = 0; i < p.length; i++) {
             assertEquals("i=" + i, before[i], p[i], 0.0);
         }

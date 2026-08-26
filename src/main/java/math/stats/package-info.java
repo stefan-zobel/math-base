@@ -7,13 +7,25 @@
  * test, one- and two-sample Kolmogorov-Smirnov, Cramer-von Mises and
  * Anderson-Darling each in a fully specified and a fitted form, Lilliefors,
  * Durbin-Watson, the rank tests -- Mann-Whitney U, Wilcoxon signed rank and
- * Kruskal-Wallis -- for the samples the t family cannot be asked about, and
- * the three tests of zero correlation, Pearson beside Spearman and Kendall.
+ * Kruskal-Wallis -- for the samples the t family cannot be asked about, the
+ * three tests of zero correlation, Pearson beside Spearman and Kendall, and
+ * the parametric k-sample family: one-way ANOVA, Welch's ANOVA for groups
+ * that are not equally variable, and Bartlett, Levene and Brown-Forsythe for
+ * asking whether they are.
+ * <p>
+ * <b>Three groups are not three pairs of groups.</b> Running the t-test on
+ * every pair is the mistake this package is built not to make convenient:
+ * {@link math.stats.HypothesisTests#oneWayAnova(double[][])} and
+ * {@link math.stats.HypothesisTests#kruskalWallis(double[][])} ask the
+ * question once, and a rejection is followed by pairwise comparisons
+ * corrected through {@link math.stats.MultipleTesting}.
  * <p>
  * {@link math.stats.MultipleTesting} answers the question none of those can
  * answer on its own: twenty tests at five percent are wrong once on average,
  * which is not a defect of any one of them. Given the whole family of
- * p-values it returns adjusted ones that control the false discovery rate.
+ * p-values it returns adjusted ones -- controlling the false discovery rate
+ * where there are many tests, or the family-wise error rate where there are
+ * few and none of them may be wrong.
  * <p>
  * Three rules shape everything here.
  * <p>
