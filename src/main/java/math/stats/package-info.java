@@ -8,6 +8,11 @@
  * Anderson-Darling each in a fully specified and a fitted form, Lilliefors, and
  * Durbin-Watson.
  * <p>
+ * {@link math.stats.MultipleTesting} answers the question none of those can
+ * answer on its own: twenty tests at five percent are wrong once on average,
+ * which is not a defect of any one of them. Given the whole family of
+ * p-values it returns adjusted ones that control the false discovery rate.
+ * <p>
  * Three rules shape everything here.
  * <p>
  * <b>Every test returns a {@link math.stats.TestResult}</b>, or a type holding
