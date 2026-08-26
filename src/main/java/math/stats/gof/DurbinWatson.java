@@ -1,10 +1,8 @@
 package math.stats.gof;
 
 import math.MathConsts;
-import math.fun.DFunction;
 import math.linalg.FlatParallelJacobiSVD;
 import math.linalg.SymmetricJacobiEigen;
-import math.solve.AdaptiveGaussKronrod;
 
 /**
  * The null distribution of the Durbin-Watson statistic
@@ -21,39 +19,14 @@ import math.solve.AdaptiveGaussKronrod;
  * a pair of bounds that hold for every design rather than one p-value.
  * <p>
  * With the eigenvalues in hand the tail is exact:
- * {@code P[d <= t] = P[sum (nu_i - t) z_i^2 <= 0]}, and that is the probability
- * Imhof's inversion of the characteristic function computes.
+ * {@code P[d <= t] = P[sum (nu_i - t) z_i^2 <= 0]}, which is a weighted sum of
+ * chi-squares and therefore {@link WeightedChiSquare} at {@code x = 0}.
  * <p>
  * https://en.wikipedia.org/wiki/Durbin%E2%80%93Watson_statistic
  *
  * @since 1.5.3
  */
 public final class DurbinWatson {
-
-    /**
-     * The accuracy the quadrature behind {@link #cdf} and {@link #barF} is
-     * asked for, per panel.
-     * <p>
-     * It is an <em>absolute</em> tolerance, and both tails read the integral
-     * as {@code 1/2 - I/pi} and {@code 1/2 + I/pi}, so it also bounds how far
-     * down a p-value keeps its digits. Asking for less does not help: measured
-     * against a closed form, tightening it from {@code 1e-11} to {@code 1e-16}
-     * changed nothing at all, because what limits the answer is the
-     * subtraction and not the rule.
-     */
-    public static final double QUADRATURE_TOLERANCE = 1.0e-13;
-
-    /** The rule the panels are integrated with. */
-    private static final AdaptiveGaussKronrod.G7_K15 RULE = AdaptiveGaussKronrod.G7_K15.POINTS_15;
-
-    /** How deep a single panel may be bisected before its value is taken as it stands. */
-    private static final int MAX_DEPTH = 14;
-
-    /** The size of the tail of the integral that is dropped rather than integrated. */
-    private static final double TRUNCATION_TOLERANCE = 1.0e-15;
-
-    /** Bisections of the first panel taken before the error estimate is consulted. */
-    private static final int FORCED_SUBDIVISIONS = 3;
 
     /**
      * The eigenvalues that determine the null distribution for a given design
@@ -172,9 +145,9 @@ public final class DurbinWatson {
      * The lower tail {@code P[d <= t]} of the null distribution, which is the
      * p-value against positive autocorrelation.
      * <p>
-     * See {@link #barF} for how far down a small p-value here keeps its digits:
-     * the two tails are the same integral read from either side of one half, and
-     * the limit that puts on them is the same.
+     * See {@link WeightedChiSquare#barF} for how far down a small p-value here
+     * keeps its digits: the two tails are the same integral read from either
+     * side of one half, and the limit that puts on them is the same.
      *
      * @param eigenvalues
      *            the eigenvalues from
@@ -187,7 +160,7 @@ public final class DurbinWatson {
      *             {@code t} is not a number
      */
     public static double cdf(double[] eigenvalues, double t) {
-        return tail(eigenvalues, t, false);
+        return WeightedChiSquare.cdf(shifted(eigenvalues, t), 0.0);
     }
 
     /**
@@ -197,12 +170,10 @@ public final class DurbinWatson {
      * <b>Both tails are a number near one half plus or minus the same
      * integral</b>, so a small p-value here is a difference of two numbers near
      * one half -- the one thing the rest of this package is written to avoid,
-     * and here it is Imhof's formula rather than a choice. Measured against an
-     * exact closed form, the relative error was below {@code 1e-11} for a
-     * p-value of {@code 1e-3}, below {@code 1e-9} at {@code 1e-4} and below
-     * {@code 1e-5} at {@code 1e-6}; from about {@code 1e-8} downwards only the
-     * order of magnitude survives, and further down the answer is clamped to
-     * zero. Every conventional decision level is far above that.
+     * and here it is Imhof's formula rather than a choice.
+     * {@link WeightedChiSquare#barF} carries the measurement of how far down
+     * that leaves a p-value its digits; every conventional decision level is
+     * far above the floor.
      *
      * @param eigenvalues
      *            the eigenvalues from
@@ -215,125 +186,28 @@ public final class DurbinWatson {
      *             {@code t} is not a number
      */
     public static double barF(double[] eigenvalues, double t) {
-        return tail(eigenvalues, t, true);
+        return WeightedChiSquare.barF(shifted(eigenvalues, t), 0.0);
     }
 
     /**
-     * Either tail, from Imhof's inversion of the characteristic function of
-     * {@code Q = sum (nu_i - t) z_i^2}: {@code P[Q > 0]} is {@code 1/2 + I/pi}
-     * and {@code P[Q < 0]} is {@code 1/2 - I/pi}.
+     * The shifted eigenvalues {@code nu_i - t}, which turn the ratio into a
+     * plain sum: {@code d} is at most {@code t} exactly when
+     * {@code sum (nu_i - t) z_i^2} is at most zero, the denominator
+     * {@code sum z_i^2} being positive with probability one.
      * <p>
-     * The integral runs over a half line and is cut where Imhof's own bound on
-     * the remainder falls below {@link #TRUNCATION_TOLERANCE}. That point can be
-     * very far out when an eigenvalue sits close to {@code t}, so the range is
-     * covered by panels that double in width rather than by one interval.
+     * An eigenvalue sitting exactly at {@code t} shifts to zero and is dropped
+     * by {@link WeightedChiSquare}, which is why nothing is filtered here.
      */
-    private static double tail(double[] eigenvalues, double t, boolean upper) {
+    private static double[] shifted(double[] eigenvalues, double t) {
         if (eigenvalues == null || eigenvalues.length == 0) {
             throw new IllegalArgumentException("eigenvalues must not be null or empty");
         }
         if (Double.isNaN(t)) {
             throw new IllegalArgumentException("t must not be NaN");
         }
-        final double[] lambda = shifted(eigenvalues, t);
-        if (lambda.length == 0) {
-            // every eigenvalue sits exactly at t, so the statistic is t with
-            // no spread at all and neither tail excludes anything
-            return 1.0;
-        }
-        if (lambda.length == 1) {
-            // one term left, so the sign of that eigenvalue decides everything
-            return upper == (lambda[0] > 0.0) ? 1.0 : 0.0;
-        }
-        DFunction integrand = new DFunction() {
-            @Override
-            public double apply(double v) {
-                if (v <= 0.0) {
-                    // the limit at the origin, where sin(theta)/v is not yet
-                    // an expression a machine can evaluate
-                    double sum = 0.0;
-                    for (int i = 0; i < lambda.length; i++) {
-                        sum += lambda[i];
-                    }
-                    return 0.5 * sum;
-                }
-                double theta = 0.0;
-                for (int i = 0; i < lambda.length; i++) {
-                    theta += Math.atan(lambda[i] * v);
-                }
-                return Math.sin(0.5 * theta) * Math.exp(-Math.log(v) - logRho(lambda, v));
-            }
-        };
-
-        // one panel for the interval the integrand is O(1) on, then panels
-        // that double in width. A single panel over the whole range would
-        // not do: the rule would place its nodes so far apart that it never
-        // sees the part that carries the integral, and its own error
-        // estimate would agree that there was nothing there
-        double integral = AdaptiveGaussKronrod.integrate1DAdaptive(RULE, integrand, 0.0, 1.0,
-                QUADRATURE_TOLERANCE, MAX_DEPTH, FORCED_SUBDIVISIONS);
-        double upperLimit = truncationLimit(lambda);
-        double from = 1.0;
-        while (from < upperLimit) {
-            double to = 2.0 * from;
-            integral += AdaptiveGaussKronrod.integrate1DAdaptive(RULE, integrand, from, to,
-                    QUADRATURE_TOLERANCE, MAX_DEPTH, 0);
-            from = to;
-        }
-        return clamp(upper ? 0.5 + integral / Math.PI : 0.5 - integral / Math.PI);
-    }
-
-    /**
-     * The logarithm of Imhof's {@code rho(v) = prod (1 + lambda_i^2 v^2)^(1/4)}.
-     * <p>
-     * Written as a sum because the product passes the largest {@code double}
-     * for a few dozen eigenvalues, and each term avoids {@code log1p} of a
-     * square that would overflow before its logarithm would.
-     */
-    private static double logRho(double[] lambda, double v) {
-        double sum = 0.0;
-        for (int i = 0; i < lambda.length; i++) {
-            double lv = lambda[i] * v;
-            double magnitude = Math.abs(lv);
-            sum += magnitude > 1.0e8 ? 2.0 * Math.log(magnitude) : Math.log1p(lv * lv);
-        }
-        return 0.25 * sum;
-    }
-
-    /**
-     * Where the rest of the integral is smaller than
-     * {@link #TRUNCATION_TOLERANCE}.
-     * <p>
-     * Beyond {@code U} each factor of {@code rho} grows at least as
-     * {@code (v/U)^(1/2)}, so the remainder is bounded by
-     * {@code 2 / (pi m rho(U))} -- Imhof's own bound, which is why the half
-     * line does not have to be substituted away.
-     */
-    private static double truncationLimit(double[] lambda) {
-        double u = 1.0;
-        for (int doublings = 0; doublings < 200; doublings++) {
-            if (2.0 / (Math.PI * lambda.length * Math.exp(logRho(lambda, u))) < TRUNCATION_TOLERANCE) {
-                return u;
-            }
-            u *= 2.0;
-        }
-        return u;
-    }
-
-    /** The eigenvalues of the shifted form, with the exact zeros left out. */
-    private static double[] shifted(double[] eigenvalues, double t) {
-        int kept = 0;
+        double[] lambda = new double[eigenvalues.length];
         for (int i = 0; i < eigenvalues.length; i++) {
-            if (eigenvalues[i] != t) {
-                kept++;
-            }
-        }
-        double[] lambda = new double[kept];
-        int at = 0;
-        for (int i = 0; i < eigenvalues.length; i++) {
-            if (eigenvalues[i] != t) {
-                lambda[at++] = eigenvalues[i] - t;
-            }
+            lambda[i] = eigenvalues[i] - t;
         }
         return lambda;
     }
@@ -360,16 +234,6 @@ public final class DurbinWatson {
             a[(i + 1) * n + i] = -1.0;
             a[i * n + i + 1] = -1.0;
         }
-    }
-
-    private static double clamp(double p) {
-        if (p <= 0.0) {
-            return 0.0;
-        }
-        if (p >= 1.0) {
-            return 1.0;
-        }
-        return p;
     }
 
     private DurbinWatson() {

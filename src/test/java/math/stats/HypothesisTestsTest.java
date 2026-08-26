@@ -22,11 +22,12 @@ import math.linalg.OLS;
 import math.linalg.Wls;
 import math.list.DoubleArrayList;
 import math.stats.gof.AndersonDarling;
+import math.stats.gof.CramerVonMises;
 import math.stats.gof.DurbinWatson;
-import math.stats.gof.GoodnessOfFit;
 import math.stats.gof.KolmogorovSmirnov;
 import math.stats.gof.KolmogorovSmirnovTwoSample;
 import math.stats.gof.Lilliefors;
+import math.stats.gof.WeightedChiSquare;
 import math.stats.mle.MLE;
 import math.stats.mle.ParNormal;
 
@@ -1168,7 +1169,6 @@ public final class HypothesisTestsTest {
     @Test
     public void testTheAndersonDarlingStatisticIsTheDefinition() {
         Normal standard = new Normal(0.0, 1.0);
-        double worst = 0.0;
         int saturated = 0;
         int compared = 0;
         for (int n : new int[] { 1, 2, 3, 9, 60, 400 }) {
@@ -1199,23 +1199,42 @@ public final class HypothesisTestsTest {
                     compared++;
                     assertEquals(at, definition, got, 1.0e-12);
                 }
-
-                // and against the other implementation in the tree, which
-                // reaches the same statistic by its own route. It has no
-                // answer for a single observation
-                if (n > 1) {
-                    double independent = GoodnessOfFit.computeStatistics(x, standard).AD;
-                    worst = Math.max(worst,
-                            Math.abs(got - independent) / Math.max(1.0, Math.abs(independent)));
-                }
             }
         }
         // measured: 163 of the 240 samples have a value the definition can
         // state, and 77 do not
         assertTrue("nothing was compared against the definition", compared > 150);
         assertTrue("no sample saturated the distribution function", saturated > 0);
-        // measured over the 200 samples of two or more: 2.9e-15
-        assertTrue("the two implementations differ by " + worst, worst < 1.0e-13);
+    }
+
+    @Test
+    public void testTheAndersonDarlingNullAgreesWithAnInversionOfItsOwnLimit() {
+        // A_n^2 has the same shape as W_n^2 in the limit, a weighted sum of
+        // chi-squares, and its weights are 1 / (j (j + 1)). That gives a second
+        // route to the same distribution which shares nothing with the first:
+        // one is an interpolation table with an empirical correction in 1/n,
+        // the other an inversion of a characteristic function
+        int terms = 200;
+        double[] lambda = new double[terms];
+        double kept = 0.0;
+        for (int j = 1; j <= terms; j++) {
+            lambda[j - 1] = 1.0 / (j * (j + 1.0));
+            kept += lambda[j - 1];
+        }
+        // the whole series sums to one, and what is left out is subtracted
+        // from the argument rather than ignored
+        double dropped = 1.0 - kept;
+
+        double worst = 0.0;
+        double[] points = { 1.933, 2.492, 3.070, 3.857 };
+        for (int i = 0; i < points.length; i++) {
+            double viaTable = AndersonDarling.barF(100000, points[i]);
+            double viaInversion = WeightedChiSquare.barF(lambda, points[i] - dropped);
+            worst = Math.max(worst, Math.abs(viaTable - viaInversion));
+        }
+        // measured: 2.1e-6, which is well inside the three decimal digits the
+        // table claims for itself
+        assertTrue("the two routes to the limit differ by " + worst, worst < 1.0e-5);
     }
 
     @Test
@@ -2356,6 +2375,404 @@ public final class HypothesisTestsTest {
         try {
             HypothesisTests.andersonDarling(x, family, replications, seed);
             fail("andersonDarling accepted " + what);
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
+    // ----------------------------------------------------- Cramer-von Mises --
+
+    /**
+     * {@code W_n^2} of a sorted sample of transformed values, written out. The
+     * facade computes a p-value with it, and that costs twelve milliseconds,
+     * so anything drawing a null distribution measures the statistic directly.
+     */
+    private static double cramerVonMisesStatistic(double[] sortedUniform) {
+        int n = sortedUniform.length;
+        double sum = 1.0 / (12.0 * n);
+        for (int i = 0; i < n; i++) {
+            double gap = sortedUniform[i] - (2 * i + 1) / (2.0 * n);
+            sum += gap * gap;
+        }
+        return sum;
+    }
+
+    /** The value of the statistic whose upper tail is {@code alpha}. */
+    private static double cramerVonMisesCritical(int n, double alpha) {
+        double lo = 0.0;
+        double hi = 10.0;
+        for (int i = 0; i < 40; i++) {
+            double mid = 0.5 * (lo + hi);
+            if (CramerVonMises.barF(n, mid) > alpha) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        return 0.5 * (lo + hi);
+    }
+
+    @Test
+    public void testTheCramerVonMisesStatisticIsTheDefinition() {
+        Normal standard = new Normal(0.0, 1.0);
+        for (int n : new int[] { 1, 2, 7, 40 }) {
+            for (long seed = 1; seed <= 25; seed++) {
+                double[] x = sample(new Normal(0.5, 2.0), n, seed * 7919L + 1);
+                double[] u = new double[n];
+                for (int i = 0; i < n; i++) {
+                    u[i] = standard.cdf(x[i]);
+                }
+                Arrays.sort(u);
+                TestResult result = HypothesisTests.cramerVonMises(x, standard);
+                assertEquals("n=" + n + " seed=" + seed, cramerVonMisesStatistic(u), result.statistic,
+                        1.0e-14);
+                // and the facade reads its p-value off the null distribution
+                assertEquals("n=" + n + " seed=" + seed + ": the p-value",
+                        CramerVonMises.barF(n, result.statistic), result.pValue, 0.0);
+            }
+        }
+    }
+
+    @Test
+    public void testTheCramerVonMisesNullAgreesWithThePublishedPoints() {
+        // the asymptotic percentage points of W^2, which is the check that the
+        // eigenvalues 1 / (pi^2 j^2) and the dropped mean of the truncated
+        // series are both right
+        double[] levels = { 0.10, 0.05, 0.025, 0.01 };
+        double[] points = { 0.347, 0.461, 0.581, 0.743 };
+        double worst = 0.0;
+        for (int i = 0; i < levels.length; i++) {
+            worst = Math.max(worst, Math.abs(CramerVonMises.barF(100000, points[i]) - levels[i]));
+        }
+        // measured: 2.0e-4, and that is the table rounded to three decimals
+        assertTrue("the published points come back as " + worst + " off", worst < 5.0e-4);
+    }
+
+    @Test
+    public void testTheCramerVonMisesTailIsRightWhereItDecides() {
+        // Stephens' modification is a tail device: from the ten percent point
+        // down it is right to a fraction of a percent at every sample size, and
+        // above it it carries a small sample too far. Both halves are pinned,
+        // the second one loosely, so that neither can change unnoticed
+        Uniform uniform = new Uniform(0.0, 1.0);
+        int reps = 100000;
+        for (int n : new int[] { 5, 20, 100 }) {
+            double[] drawn = new double[reps];
+            for (int b = 0; b < reps; b++) {
+                double[] u = sample(uniform, n, (b + 1L) * 7919L + 1);
+                Arrays.sort(u);
+                drawn[b] = cramerVonMisesStatistic(u);
+            }
+            Arrays.sort(drawn);
+            for (double tail : new double[] { 0.10, 0.05, 0.025, 0.01 }) {
+                double quantile = drawn[(int) ((1.0 - tail) * reps)];
+                // measured over ten sample sizes: 0.0094 at worst, and that at
+                // n = 3; from n = 5 up it is 0.0025
+                assertEquals("n=" + n + " at the " + tail + " point", tail,
+                        CramerVonMises.barF(n, quantile), 0.006);
+            }
+            // and the body, where the modification is only a rough guide
+            double median = drawn[reps / 2];
+            double atMedian = CramerVonMises.barF(n, median);
+            // measured: 0.693 at n = 5, 0.554 at n = 20, 0.510 at n = 100
+            assertTrue("n=" + n + ": the median came back at " + atMedian,
+                    atMedian > 0.45 && atMedian < 0.75);
+        }
+    }
+
+    @Test
+    public void testTheCramerVonMisesRejectsAtItsLevel() {
+        Uniform uniform = new Uniform(0.0, 1.0);
+        for (int n : new int[] { 1, 5, 30 }) {
+            double atFive = cramerVonMisesCritical(n, 0.05);
+            double atOne = cramerVonMisesCritical(n, 0.01);
+            int reps = 4000;
+            int five = 0;
+            int one = 0;
+            for (long seed = 1; seed <= reps; seed++) {
+                double[] u = sample(uniform, n, seed * 7919L + 1);
+                Arrays.sort(u);
+                double statistic = cramerVonMisesStatistic(u);
+                if (statistic >= atFive) {
+                    five++;
+                }
+                if (statistic >= atOne) {
+                    one++;
+                }
+            }
+            // measured: 0.0498 .. 0.0580 and 0.0088 .. 0.0113
+            assertRate("n=" + n + " at 0.05", five / (double) reps, 0.05, 0.018);
+            assertRate("n=" + n + " at 0.01", one / (double) reps, 0.01, 0.008);
+        }
+    }
+
+    @Test
+    public void testTheCramerVonMisesSeesMoreThanTheSupremumDoes() {
+        // W^2 adds up the whole discrepancy where D_n keeps only its widest
+        // point, so it finds a departure that is spread out more often. It does
+        // not beat A_n^2 anywhere that was tried, including the shift this test
+        // uses -- that was measured rather than assumed, and the assertion says
+        // only what held
+        Normal standard = new Normal(0.0, 1.0);
+        for (int n : new int[] { 20, 50 }) {
+            double critical = cramerVonMisesCritical(n, 0.05);
+            int reps = 2000;
+            int kolmogorovSmirnov = 0;
+            int cramerVonMises = 0;
+            int andersonDarling = 0;
+            for (long seed = 1; seed <= reps; seed++) {
+                double[] x = sample(new Normal(0.35, 1.0), n, seed * 7919L + 1);
+                if (HypothesisTests.kolmogorovSmirnov(x, standard, Alternative.TWO_SIDED).rejectsAt(0.05)) {
+                    kolmogorovSmirnov++;
+                }
+                double[] u = new double[n];
+                for (int i = 0; i < n; i++) {
+                    u[i] = standard.cdf(x[i]);
+                }
+                Arrays.sort(u);
+                if (cramerVonMisesStatistic(u) >= critical) {
+                    cramerVonMises++;
+                }
+                if (HypothesisTests.andersonDarling(x, standard).rejectsAt(0.05)) {
+                    andersonDarling++;
+                }
+            }
+            // measured: 0.2675 / 0.3105 / 0.3220 at n = 20 and
+            // 0.5675 / 0.6410 / 0.6630 at n = 50
+            assertTrue("n=" + n + ": CvM found " + cramerVonMises + " of " + reps + " and KS "
+                    + kolmogorovSmirnov, cramerVonMises > kolmogorovSmirnov);
+            assertTrue("n=" + n + ": AD found " + andersonDarling + " and CvM " + cramerVonMises,
+                    andersonDarling >= cramerVonMises);
+        }
+    }
+
+    @Test
+    public void testTheFittedCramerVonMisesHoldsItsLevelWhereTheFullySpecifiedOneCollapses() {
+        for (int n : new int[] { 5, 30 }) {
+            double critical = cramerVonMisesCritical(n, 0.05);
+            int reps = 1200;
+            int fitted = 0;
+            int specified = 0;
+            for (long seed = 1; seed <= reps; seed++) {
+                double[] x = sample(new Normal(3.0, 2.0), n, seed * 7919L + 1);
+                if (HypothesisTests.cramerVonMises(x, Lilliefors.Family.NORMAL, 2000, 7L).test
+                        .rejectsAt(0.05)) {
+                    fitted++;
+                }
+                ParNormal fit = MLE.getNormalMLE(x);
+                Normal fitDistribution = new Normal(fit.mean, fit.stdDev);
+                double[] u = new double[n];
+                for (int i = 0; i < n; i++) {
+                    u[i] = fitDistribution.cdf(x[i]);
+                }
+                Arrays.sort(u);
+                if (cramerVonMisesStatistic(u) >= critical) {
+                    specified++;
+                }
+            }
+            // measured: 0.0460 .. 0.0573 fitted, and 0 of 6000 for the other
+            assertRate("n=" + n + " fitted", fitted / (double) reps, 0.05, 0.018);
+            assertTrue("n=" + n + ": the fully specified test rejected " + specified + " of " + reps,
+                    specified == 0);
+        }
+    }
+
+    @Test
+    public void testTheCramerVonMisesAtOneObservationIsExact() {
+        // W_1^2 = 1/12 + (u - 1/2)^2 lives on [1/12, 1/3] and its distribution
+        // function is 2 sqrt(x - 1/12) exactly, which is where the modification
+        // used above has nothing to say: read through the limit instead, a
+        // statistic of 0.5 would earn a p-value for a value it cannot reach
+        double worst = 0.0;
+        for (int step = 0; step <= 500; step++) {
+            double x = 1.0 / 12.0 + step * (0.25 / 500.0);
+            double exact = Math.min(1.0, 2.0 * Math.sqrt(x - 1.0 / 12.0));
+            worst = Math.max(worst, Math.abs(CramerVonMises.cdf(1, x) - exact));
+            worst = Math.max(worst, Math.abs(CramerVonMises.barF(1, x) - (1.0 - exact)));
+        }
+        // measured: 1.1e-16
+        assertTrue("the closed form is off by " + worst, worst < 1.0e-14);
+        assertEquals("below the support", 1.0, CramerVonMises.barF(1, 0.05), 0.0);
+        assertEquals("above the support", 0.0, CramerVonMises.barF(1, 0.4), 0.0);
+
+        // and the deep tail does not cancel: near 1/3 the complement is
+        // 4 (1/3 - x) / (1 + 2 sqrt(x - 1/12)), which stays positive
+        double tail = CramerVonMises.barF(1, 1.0 / 3.0 - 1.0e-12);
+        // measured: 2.0e-12
+        assertEquals("the deep tail at n = 1", 2.0e-12, tail, 1.0e-14);
+    }
+
+    @Test
+    public void testTheFittedCramerVonMisesMeasuresWhatTheFacadeMeasures() {
+        for (int n : new int[] { 5, 20, 100 }) {
+            for (long seed = 1; seed <= 60; seed++) {
+                double[] x = sample(new Normal(1.0, 3.0), n, seed * 7919L + 1);
+                ParNormal fit = MLE.getNormalMLE(x);
+                assertEquals("the fitted unweighted distance",
+                        HypothesisTests.cramerVonMises(x, new Normal(fit.mean, fit.stdDev)).statistic,
+                        Lilliefors.statistic(Lilliefors.Statistic.CRAMER_VON_MISES,
+                                Lilliefors.Family.NORMAL, x),
+                        0.0);
+            }
+        }
+
+        // exponentiating a sample and fitting a log-normal is fitting a normal
+        // to the logarithms, and this statistic is invariant under a monotone
+        // transformation too
+        for (long seed = 1; seed <= 60; seed++) {
+            double[] normal = sample(new Normal(0.5, 1.5), 20, seed * 7919L + 1);
+            double[] exponentiated = new double[normal.length];
+            for (int i = 0; i < normal.length; i++) {
+                exponentiated[i] = Math.exp(normal[i]);
+            }
+            assertEquals("the p-value",
+                    HypothesisTests.cramerVonMises(normal, Lilliefors.Family.NORMAL, 500, 5L).test.pValue,
+                    HypothesisTests.cramerVonMises(exponentiated, Lilliefors.Family.LOGNORMAL, 500, 5L)
+                            .test.pValue,
+                    0.0);
+        }
+    }
+
+    @Test
+    public void testCramerVonMisesRejectsWhatItCannotTest() {
+        Normal standard = new Normal(0.0, 1.0);
+        try {
+            HypothesisTests.cramerVonMises(null, standard);
+            fail("cramerVonMises accepted a null sample");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            HypothesisTests.cramerVonMises(new double[] { 1.0, Double.NaN }, standard);
+            fail("cramerVonMises accepted a NaN observation");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            HypothesisTests.cramerVonMises(new double[] { 1.0, 2.0 }, (ContinuousDistribution) null);
+            fail("cramerVonMises accepted a null distribution");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            HypothesisTests.cramerVonMises(new double[] { 1.0, 2.0 }, (Lilliefors.Family) null);
+            fail("cramerVonMises accepted a null family");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            CramerVonMises.barF(0, 0.5);
+            fail("barF accepted a sample size of zero");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+    }
+
+    // ----------------------------------------------------- WeightedChiSquare --
+
+    @Test
+    public void testTheWeightedChiSquareAgreesWithASingleChiSquare() {
+        // one weight leaves an ordinary chi-square with one degree of freedom,
+        // read through a scale that may be negative, and both tails of that are
+        // error functions
+        for (double weight : new double[] { 1.0, 3.5, 0.25, -2.0 }) {
+            for (double x : new double[] { -3.0, -0.5, 0.0, 0.5, 2.0, 9.0 }) {
+                double q = x / weight;
+                double lower;
+                if (q < 0.0) {
+                    lower = weight > 0.0 ? 0.0 : 1.0;
+                } else {
+                    // P[z^2 <= q] = 2 Phi(sqrt(q)) - 1, an independent route
+                    double chi = 2.0 * new Normal(0.0, 1.0).cdf(Math.sqrt(q)) - 1.0;
+                    lower = weight > 0.0 ? chi : 1.0 - chi;
+                }
+                String at = "weight=" + weight + " x=" + x;
+                assertEquals(at, lower, WeightedChiSquare.cdf(new double[] { weight }, x), 1.0e-12);
+                assertEquals(at + ": the tails partition", 1.0,
+                        WeightedChiSquare.cdf(new double[] { weight }, x)
+                                + WeightedChiSquare.barF(new double[] { weight }, x),
+                        1.0e-12);
+            }
+        }
+    }
+
+    @Test
+    public void testTheWeightedChiSquareIgnoresZeroWeights() {
+        double[] plain = { 2.0, 1.5, 1.0, 0.75, 0.5 };
+        double[] padded = { 2.0, 0.0, 1.5, 1.0, 0.0, 0.0, 0.75, 0.5 };
+        for (double x : new double[] { 1.5, 6.0 }) {
+            assertEquals("a zero weight contributes nothing at x = " + x,
+                    WeightedChiSquare.cdf(plain, x), WeightedChiSquare.cdf(padded, x), 0.0);
+        }
+        // and a sum of nothing is zero, which every tail has to answer
+        double[] allZero = { 0.0, 0.0 };
+        assertEquals("P[0 <= 1]", 1.0, WeightedChiSquare.cdf(allZero, 1.0), 0.0);
+        assertEquals("P[0 <= -1]", 0.0, WeightedChiSquare.cdf(allZero, -1.0), 0.0);
+        assertEquals("P[0 >= -1]", 1.0, WeightedChiSquare.barF(allZero, -1.0), 0.0);
+        assertEquals("P[0 >= 1]", 0.0, WeightedChiSquare.barF(allZero, 1.0), 0.0);
+    }
+
+    @Test
+    public void testTheWeightedChiSquareShiftMovesTheDistribution() {
+        // the shift is the one thing the Durbin-Watson form never exercises,
+        // since a ratio is the x = 0 case. Every call here is a quadrature, and
+        // with a shift and few weights each one is expensive -- see the class
+        // javadoc -- so this walks a handful of points rather than a grid
+        double[] lambda = { 2.0, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.1 };
+        double mean = 0.0;
+        for (int i = 0; i < lambda.length; i++) {
+            mean += lambda[i];
+        }
+        double previous = -1.0;
+        for (double x : new double[] { -1.0, 0.0, 2.0, 5.0, 7.35, 10.0, 16.0, 25.0 }) {
+            double lower = WeightedChiSquare.cdf(lambda, x);
+            assertTrue("the distribution function fell at x = " + x, lower >= previous - 1.0e-12);
+            assertEquals("the tails partition at x = " + x, 1.0,
+                    lower + WeightedChiSquare.barF(lambda, x), 1.0e-12);
+            previous = lower;
+        }
+        // every weight is positive, so the sum is too. The quadrature reaches
+        // that as the difference of two numbers near one half, so it is nothing
+        // to round-off rather than nothing exactly
+        assertEquals("nothing is below zero", 0.0, WeightedChiSquare.cdf(lambda, 0.0), 1.0e-15);
+        assertEquals("and everything is above it", 1.0, WeightedChiSquare.barF(lambda, 0.0), 1.0e-15);
+
+        // the mean of the sum is sum lambda, and a positive weighted sum of
+        // chi-squares is right-skewed, so its mean sits above its median
+        double atMean = WeightedChiSquare.cdf(lambda, mean);
+        assertTrue("the mean of " + mean + " came back at " + atMean, atMean > 0.5 && atMean < 0.8);
+    }
+
+    @Test
+    public void testTheWeightedChiSquareRejectsWhatItCannotCompute() {
+        double[] ok = { 1.0, 2.0 };
+        try {
+            WeightedChiSquare.cdf(null, 1.0);
+            fail("cdf accepted a null weight vector");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            WeightedChiSquare.cdf(new double[0], 1.0);
+            fail("cdf accepted an empty weight vector");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            WeightedChiSquare.cdf(new double[] { 1.0, Double.POSITIVE_INFINITY }, 1.0);
+            fail("cdf accepted a weight that is not finite");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            WeightedChiSquare.cdf(ok, Double.NaN);
+            fail("cdf accepted a threshold that is not a number");
+        } catch (IllegalArgumentException expected) {
+            assertTrue("threw without saying what was wrong", expected.getMessage() != null);
+        }
+        try {
+            WeightedChiSquare.cdf(ok, 1.0, 0.0);
+            fail("cdf accepted a tolerance of zero");
         } catch (IllegalArgumentException expected) {
             assertTrue("threw without saying what was wrong", expected.getMessage() != null);
         }

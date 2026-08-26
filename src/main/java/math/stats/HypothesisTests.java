@@ -12,6 +12,7 @@ import math.linalg.DMatrix;
 import math.linalg.LSSummary;
 import math.list.DoubleList;
 import math.stats.gof.AndersonDarling;
+import math.stats.gof.CramerVonMises;
 import math.stats.gof.DurbinWatson;
 import math.stats.gof.KolmogorovSmirnov;
 import math.stats.gof.KolmogorovSmirnovPlus;
@@ -774,6 +775,69 @@ public final class HypothesisTests {
     }
 
     /**
+     * Tests whether a sample was drawn from a given continuous distribution,
+     * weighting no part of it more than another.
+     * <p>
+     * The sample is carried into {@code (0, 1)} by the distribution function the
+     * way {@link #kolmogorovSmirnov} carries it, and the statistic is the
+     * integrated squared distance to the diagonal:
+     * <p>
+     * {@code W_n^2 = 1/(12n) + sum (u_(i) - (2i - 1)/(2n))^2}
+     * <p>
+     * It sits between the other two. {@code D_n} is decided by a single point,
+     * the one where the gap happens to be widest, and throws the rest of the
+     * sample away; {@code A_n^2} divides by {@code u (1 - u)} and listens
+     * hardest at the ends; this one adds up the whole discrepancy with every
+     * observation counting the same. Where a departure is spread out rather
+     * than concentrated, that is the one to have.
+     * <p>
+     * There is no {@code alternative} parameter, for the reason
+     * {@link #andersonDarling(double[], ContinuousDistribution)} gives.
+     * <p>
+     * <b>The distribution has to be fully specified before the sample is
+     * seen</b>; {@link #cramerVonMises(double[], Lilliefors.Family)} is the test
+     * for a distribution fitted to the same sample.
+     * <p>
+     * The p-value comes from {@link CramerVonMises#barF}, which inverts the
+     * characteristic function of the limit and corrects it for the sample size.
+     * Measured against a drawn null, it holds its level to within
+     * {@code 0.0015} for {@code n >= 20} and is a little conservative below
+     * that.
+     *
+     * @param x
+     *            the sample, at least one finite observation
+     * @param nullDistribution
+     *            the distribution the sample is tested against, with every
+     *            parameter fixed independently of {@code x}
+     * @return the statistic, its p-value and no degrees of freedom, the null
+     *         distribution of {@code W_n^2} having none
+     * @throws IllegalArgumentException
+     *             if {@code x} is {@code null}, is empty or holds a value that
+     *             is not finite; or if {@code nullDistribution} is {@code null}
+     */
+    public static TestResult cramerVonMises(double[] x, ContinuousDistribution nullDistribution) {
+        int n = requireFiniteSample(x, "x");
+        if (nullDistribution == null) {
+            throw new IllegalArgumentException("nullDistribution must not be null");
+        }
+
+        double[] uniform = new double[n];
+        for (int i = 0; i < n; i++) {
+            uniform[i] = nullDistribution.cdf(x[i]);
+        }
+        Arrays.sort(uniform);
+
+        double statistic = 1.0 / (12.0 * n);
+        for (int i = 0; i < n; i++) {
+            double gap = uniform[i] - (2 * i + 1) / (2.0 * n);
+            statistic += gap * gap;
+        }
+        double pValue = CramerVonMises.barF(n, statistic);
+        return new TestResult("Cramer-von Mises", statistic, Math.min(1.0, Math.max(0.0, pValue)),
+                Alternative.TWO_SIDED, Double.NaN);
+    }
+
+    /**
      * Tests whether two samples were drawn from the same continuous
      * distribution, naming neither of them.
      * <p>
@@ -1014,7 +1078,72 @@ public final class HypothesisTests {
     }
 
     /**
-     * The body both fitted tests share: measure the sample against its own fit,
+     * Tests whether a sample was drawn from a family of distributions, weighting
+     * no part of it more than another, with the parameters of that family
+     * estimated from the sample itself.
+     * <p>
+     * This is to {@link #cramerVonMises(double[], ContinuousDistribution)} what
+     * {@link #lilliefors(double[], Lilliefors.Family)} is to
+     * {@link #kolmogorovSmirnov}: the fit has already moved towards the sample,
+     * so the tabulated null distribution is far too generous and the null has to
+     * be drawn instead.
+     * <p>
+     * The p-value is a <b>simulation</b>, with an uncertainty of its own that
+     * {@link SimulatedTestResult#monteCarloStandardError} reports.
+     *
+     * @param x
+     *            the sample, at least {@link Lilliefors#MINIMUM_SAMPLE} finite
+     *            observations, strictly positive for the two families that need
+     *            it
+     * @param family
+     *            the family to fit and test against
+     * @return the statistic, its simulated p-value, and how many replications
+     *         went into it
+     * @throws IllegalArgumentException
+     *             if {@code x} is {@code null}, is too short or holds a value
+     *             that is not finite or not in the support of the family; or if
+     *             {@code family} is {@code null}
+     */
+    public static SimulatedTestResult cramerVonMises(double[] x, Lilliefors.Family family) {
+        return cramerVonMises(x, family, Lilliefors.DEFAULT_REPLICATIONS, Lilliefors.DEFAULT_SEED);
+    }
+
+    /**
+     * Tests whether a sample was drawn from a fitted family, weighting no part of
+     * it more than another, drawing the null distribution from
+     * {@code replications} samples seeded by {@code seed}.
+     * <p>
+     * See {@link #cramerVonMises(double[], Lilliefors.Family)} for what the test
+     * does. The p-value is reproducible from {@code seed} alone, whether or not
+     * the replications end up spread over several threads.
+     *
+     * @param x
+     *            the sample, at least {@link Lilliefors#MINIMUM_SAMPLE} finite
+     *            observations, strictly positive for the two families that need
+     *            it
+     * @param family
+     *            the family to fit and test against
+     * @param replications
+     *            how many samples the null distribution is drawn from,
+     *            {@code 1} or more
+     * @param seed
+     *            the seed the replications are derived from
+     * @return the statistic, its simulated p-value, and how many replications
+     *         went into it
+     * @throws IllegalArgumentException
+     *             if {@code x} is {@code null}, is too short or holds a value
+     *             that is not finite or not in the support of the family; if
+     *             {@code family} is {@code null}; or if {@code replications} is
+     *             not strictly positive
+     */
+    public static SimulatedTestResult cramerVonMises(double[] x, Lilliefors.Family family,
+            int replications, long seed) {
+        return fitted(Lilliefors.Statistic.CRAMER_VON_MISES, "Cramer-von Mises", x, family, replications,
+                seed);
+    }
+
+    /**
+     * The body the fitted tests share: measure the sample against its own fit,
      * then draw the null distribution of that measurement.
      */
     private static SimulatedTestResult fitted(Lilliefors.Statistic which, String name, double[] x,

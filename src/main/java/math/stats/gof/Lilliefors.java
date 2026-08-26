@@ -48,15 +48,19 @@ public final class Lilliefors {
     /**
      * The statistics this null distribution is available for.
      * <p>
-     * Both measure the same departure and weight it differently:
+     * All three measure the same departure and weight it differently:
      * {@link #KOLMOGOROV_SMIRNOV} takes the largest gap anywhere, which near
-     * the ends of the range is almost no gap at all, while
-     * {@link #ANDERSON_DARLING} integrates the squared gap against
-     * {@code 1 / (u (1 - u))} and so is the one that notices a tail.
+     * the ends of the range is almost no gap at all;
+     * {@link #CRAMER_VON_MISES} integrates the squared gap unweighted, so it
+     * hears the whole sample rather than its loudest point; and
+     * {@link #ANDERSON_DARLING} integrates it against {@code 1 / (u (1 - u))}
+     * and so is the one that notices a tail.
      */
     public enum Statistic {
         /** {@code D_n}, the largest gap between the two distribution functions. */
         KOLMOGOROV_SMIRNOV,
+        /** {@code W_n^2}, the unweighted integral of the squared gap. */
+        CRAMER_VON_MISES,
         /** {@code A_n^2}, the tail-weighted integral of the squared gap. */
         ANDERSON_DARLING
     }
@@ -306,6 +310,9 @@ public final class Lilliefors {
         if (statistic == Statistic.ANDERSON_DARLING) {
             return andersonDarling(uniform);
         }
+        if (statistic == Statistic.CRAMER_VON_MISES) {
+            return cramerVonMises(uniform);
+        }
         double dPlus = 0.0;
         double dMinus = 0.0;
         for (int i = 0; i < n; i++) {
@@ -313,6 +320,23 @@ public final class Lilliefors {
             dMinus = Math.max(dMinus, uniform[i] - i / (double) n);
         }
         return Math.max(dPlus, dMinus);
+    }
+
+    /**
+     * {@code W_n^2} of a sorted sample of transformed values.
+     * <p>
+     * No floor is needed here, unlike the statistic below: this one takes no
+     * logarithms, so a distribution function that saturates at {@code 0} or
+     * {@code 1} costs nothing.
+     */
+    private static double cramerVonMises(double[] uniform) {
+        int n = uniform.length;
+        double sum = 1.0 / (12.0 * n);
+        for (int i = 0; i < n; i++) {
+            double gap = uniform[i] - (2 * i + 1) / (2.0 * n);
+            sum += gap * gap;
+        }
+        return sum;
     }
 
     /**
