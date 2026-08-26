@@ -34,6 +34,7 @@ public class StudentT implements ContinuousDistribution {
 
     private final double df;
     private final double pdfConst;
+    private final double logPdfConst;
 
     public StudentT(double df) {
         if (df <= 0.0) {
@@ -46,6 +47,10 @@ public class StudentT implements ContinuousDistribution {
         // 16.92 is right at 1e15 -- and from df = 1e16 it is zero, because
         // (df + 1) / 2 and df / 2 are then the same double
         this.pdfConst = Math.exp(FastGamma.logGammaRatio(df / 2.0, 0.5)) / Math.sqrt(Math.PI * df);
+        // the logarithm of the line above, reached without the round trip
+        // through exp and back, and without forming Math.PI * df, which
+        // overflows for degrees of freedom above about 5.7e307
+        this.logPdfConst = FastGamma.logGammaRatio(df / 2.0, 0.5) - 0.5 * (Math.log(Math.PI) + Math.log(df));
         this.df = df;
     }
 
@@ -61,6 +66,19 @@ public class StudentT implements ContinuousDistribution {
     @Override
     public double pdf(double x) {
         return pdfConst * Math.exp(-(df + 1.0) * 0.5 * Math.log1p(x * x / df));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The expression {@link #pdf(double)} evaluates, with the normalizing
+     * constant taken as a logarithm rather than as its exponential. The
+     * density of a {@code t(3)} underflows to zero from about
+     * {@code x = 1.05e81}, where this is still answering.
+     */
+    @Override
+    public double logPdf(double x) {
+        return logPdfConst - (df + 1.0) * 0.5 * Math.log1p(x * x / df);
     }
 
     @Override

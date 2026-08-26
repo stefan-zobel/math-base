@@ -59,18 +59,31 @@ public class Binomial implements DiscreteDistribution {
 
     @Override
     public double pmf(int k) {
+        // the mass was already formed as the exponential of the logarithm, so
+        // this returns the bits it always did
+        return Math.exp(logPmf(k));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The form {@link #pmf(int)} is the exponential of. It answers where the
+     * mass itself cannot: {@code Binomial(2000, 0.5).pmf(0)} underflows to
+     * zero and the logarithm is {@code -1386.29}.
+     */
+    @Override
+    public double logPmf(int k) {
         if (k < 0 || k > n) {
-            return 0.0;
+            return Double.NEGATIVE_INFINITY;
         }
         if (p == 0.0) {
-            return k == 0 ? 1.0 : 0.0;
+            return k == 0 ? 0.0 : Double.NEGATIVE_INFINITY;
         }
         if (p == 1.0) {
-            return k == n ? 1.0 : 0.0;
+            return k == n ? 0.0 : Double.NEGATIVE_INFINITY;
         }
-        double logPmf = Arithmetic.logFactorial(n) - Arithmetic.logFactorial(k) - Arithmetic.logFactorial(n - k)
+        return Arithmetic.logFactorial(n) - Arithmetic.logFactorial(k) - Arithmetic.logFactorial(n - k)
                 + k * Math.log(p) + (n - k) * Math.log1p(-p);
-        return Math.exp(logPmf);
     }
 
     @Override

@@ -25,14 +25,19 @@ public class ContinuousDistributionContractTest {
      * Every implementation, at the parameter settings that separate the
      * branches inside them: a shape below, at and above one, one and two
      * degrees of freedom in either position of {@code FisherF}, and a rate
-     * large enough that {@code rate * x} overflows before {@code x} does.
+     * large enough that {@code rate * x} overflows before {@code x} does. The
+     * inverse gamma appears at a shape with no mean, one with a mean and no
+     * variance, one with both, and a scale small enough to push the mass down
+     * where the density is largest.
      */
     private static ContinuousDistribution[] all() {
         return new ContinuousDistribution[] { new Beta(0.5, 0.5), new Beta(2.0, 3.0), new Beta(0.3, 4.0),
                 new Cauchy(0.0, 1.0), new Cauchy(1000.0, 1.0), new ChiSquare(1.0), new ChiSquare(2.0),
                 new ChiSquare(7.0), new Exponential(1.0), new Exponential(1.0e-9), new FisherF(1, 1),
                 new FisherF(2, 2), new FisherF(5, 2), new FisherF(10, 20), new Gamma(0.5, 1.0), new Gamma(1.0, 1.0),
-                new Gamma(2.0, 1.0), new Gamma(9.0, 0.5), new Gamma(2.0, 1.0e-9), new LogNormal(0.0, 1.0),
+                new Gamma(2.0, 1.0), new Gamma(9.0, 0.5), new Gamma(2.0, 1.0e-9),
+                new InverseGamma(0.5, 1.0), new InverseGamma(1.0, 1.0), new InverseGamma(3.0, 2.0),
+                new InverseGamma(7.0, 1.0e-9), new LogNormal(0.0, 1.0),
                 new Normal(0.0, 1.0), new Normal(100.0, 5.0), new StudentT(1.0), new StudentT(30.0),
                 new Uniform(0.0, 1.0), new Uniform(-3.0, 7.0), new Weibull(1.0, 0.5), new Weibull(1.0, 1.0),
                 new Weibull(1.0, 2.0) };

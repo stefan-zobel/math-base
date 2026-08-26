@@ -100,6 +100,29 @@ public class FisherF implements ContinuousDistribution {
         return (scaled * beta.pdf(1.0 - w)) / d2;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The same substitution {@link #pdf(double)} uses, in logarithms. The
+     * prefactor {@code d1 * w * w} underflows to zero far out in the tail --
+     * which is the branch the density has to answer zero from -- while the sum
+     * of its logarithms is an ordinary number there.
+     */
+    @Override
+    public double logPdf(double x) {
+        if (x < 0.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        if (x == 0.0) {
+            if (d1 < 2.0) {
+                return Double.POSITIVE_INFINITY;
+            }
+            return (d1 == 2.0) ? 0.0 : Double.NEGATIVE_INFINITY;
+        }
+        final double w = d2 / (d2 + (d1 * x));
+        return Math.log(d1) + 2.0 * Math.log(w) + beta.logPdf(1.0 - w) - Math.log(d2);
+    }
+
     @Override
     public double cdf(double x) {
         if (x <= 0.0) {

@@ -45,6 +45,17 @@ public class Exponential implements ContinuousDistribution {
         return x < 0.0 ? 0.0 : lambda * Math.exp(-lambda * x);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double logPdf(double x) {
+        if (x < 0.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        return Math.log(lambda) - lambda * x;
+    }
+
     @Override
     public double cdf(double x) {
         if (x <= 0.0) {

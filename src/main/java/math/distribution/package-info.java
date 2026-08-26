@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 /**
- * Continuous and discrete distributions
+ * Continuous and discrete distributions.
+ * <p>
+ * Every one of them answers in logarithms as well as in probabilities:
+ * {@link math.distribution.ContinuousDistribution#logPdf(double)} and
+ * {@link math.distribution.DiscreteDistribution#logPmf(int)} go on answering
+ * where the density or the mass has underflowed to zero, which is where a
+ * likelihood over more than a few hundred observations lives. Both are
+ * {@code default} methods taking the logarithm of the density, and every
+ * implementation here overrides that with a closed form.
  */
 package math.distribution;

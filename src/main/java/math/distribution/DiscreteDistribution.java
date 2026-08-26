@@ -43,6 +43,27 @@ public interface DiscreteDistribution {
     double pmf(int k);
 
     /**
+     * The natural logarithm of the probability mass at {@code k}.
+     * <p>
+     * The counterpart of {@link ContinuousDistribution#logPdf(double)}, and
+     * needed for the same reason: two thousand fair coin flips land on no
+     * heads at all with probability {@code 2^-2000}, so
+     * {@code Binomial(2000, 0.5).pmf(0)} is <b>exactly zero</b> where the
+     * logarithm answers {@code -1386.29}.
+     * <p>
+     * The default takes the logarithm of the mass, which is correct wherever
+     * the mass is. Every implementation in this package overrides it.
+     *
+     * @param k
+     *            where to compute the log mass
+     * @return the natural logarithm of the mass at {@code k}, which is
+     *         {@link Double#NEGATIVE_INFINITY} outside the support
+     */
+    default double logPmf(int k) {
+        return Math.log(pmf(k));
+    }
+
+    /**
      * For a random variable {@code X} whose values are distributed according to
      * this distribution, this method returns {@code P(X <= k)}, i.e. the
      * (cumulative) distribution function (CDF) of this distribution.

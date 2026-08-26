@@ -51,6 +51,20 @@ public class ChiSquare implements ContinuousDistribution {
         return gamma.pdf(x);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Delegated, as the density is: a chi-squared is a gamma with shape
+     * {@code k/2} and scale two.
+     */
+    @Override
+    public double logPdf(double x) {
+        if (x <= 0.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        return gamma.logPdf(x);
+    }
+
     @Override
     public double cdf(double x) {
         if (x <= 0.0) {

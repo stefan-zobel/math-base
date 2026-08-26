@@ -54,6 +54,8 @@ public class Normal implements ContinuousDistribution {
 
     /** 1.0 / (stdDev * sqrt(2 * PI)) */
     private final double factor;
+    /** The logarithm of {@link #factor}, formed without ever building it. */
+    private final double logFactor;
 
     public Normal() {
         this(0.0, 1.0);
@@ -67,6 +69,11 @@ public class Normal implements ContinuousDistribution {
         this.stdDev = stdDev;
         this.variance = stdDev * stdDev;
         this.factor = (1.0 / (this.stdDev * SQRT_TWO_PI));
+        // not Math.log(factor): the product inside it overflows to infinity
+        // for a standard deviation below about 7e-309 and underflows to zero
+        // above 7e307, and the logarithm of either is no longer a number.
+        // Split into two terms it is an ordinary subtraction throughout
+        this.logFactor = -Math.log(this.stdDev) - Math.log(SQRT_TWO_PI);
     }
 
     /**
@@ -85,6 +92,19 @@ public class Normal implements ContinuousDistribution {
     public double pdf(double x) {
         double z = (x - mean) / stdDev;
         return factor * Math.exp(-0.5 * (z * z));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The exponent is formed the way {@link #pdf(double)} forms it, and this
+     * is the method that goes on answering where that one cannot: a standard
+     * normal density is exactly zero from {@code x = 38.5755} outwards.
+     */
+    @Override
+    public double logPdf(double x) {
+        double z = (x - mean) / stdDev;
+        return logFactor - 0.5 * (z * z);
     }
 
     @Override

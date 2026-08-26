@@ -17,6 +17,7 @@ import org.junit.Test;
 import math.distribution.Beta;
 import math.distribution.ContinuousDistribution;
 import math.distribution.FisherF;
+import math.distribution.InverseGamma;
 import math.distribution.Uniform;
 import math.stats.Alternative;
 import math.stats.HypothesisTests;
@@ -256,6 +257,21 @@ public final class SingleDrawTest {
             int d2 = dfs[s][1];
             fitsUniformly("F(" + d1 + ", " + d2 + ")", new FisherF(d1, d2), 0x9E3779B97F4A7C15L,
                     p -> p.nextFisherF(d1, d2));
+        }
+    }
+
+    @Test
+    public void testInverseGammaFollowsTheInverseGammaDistribution() {
+        // the stream and the distribution class were written years apart and
+        // in different packages: the sampler inverts a gamma variate, the
+        // class integrates an incomplete gamma. Nothing but the parameter
+        // convention is shared, and that is exactly what this pins
+        double[][] shapes = { { 0.5, 1.0 }, { 1.0, 1.0 }, { 2.5, 3.0 }, { 7.0, 0.25 }, { 30.0, 30.0 } };
+        for (int s = 0; s < shapes.length; s++) {
+            double alpha = shapes[s][0];
+            double beta = shapes[s][1];
+            fitsUniformly("InverseGamma(" + alpha + ", " + beta + ")", new InverseGamma(alpha, beta),
+                    0x14057B7EF767814FL, p -> p.nextInverseGamma(alpha, beta));
         }
     }
 

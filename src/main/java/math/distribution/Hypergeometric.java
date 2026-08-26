@@ -75,10 +75,23 @@ public class Hypergeometric implements DiscreteDistribution {
 
     @Override
     public double pmf(int k) {
-        if (k < lo || k > hi) {
-            return 0.0;
-        }
+        // the mass was already formed as the exponential of the logarithm, so
+        // this returns the bits it always did
         return Math.exp(logPmf(k));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The form {@link #pmf(int)} is the exponential of, which this class was
+     * computing privately before the interface asked for it.
+     */
+    @Override
+    public double logPmf(int k) {
+        if (k < lo || k > hi) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        return logMass(k);
     }
 
     @Override
@@ -148,7 +161,7 @@ public class Hypergeometric implements DiscreteDistribution {
     }
 
     /** log of C(K,k) * C(N-K,n-k) / C(N,n), for k within the support. */
-    private double logPmf(int k) {
+    private double logMass(int k) {
         return logBinomial(successes, k) + logBinomial(population - successes, draws - k)
                 - logBinomial(population, draws);
     }
@@ -165,7 +178,7 @@ public class Hypergeometric implements DiscreteDistribution {
         long N = population;
         long K = successes;
         long n = draws;
-        double t = Math.exp(logPmf(k));
+        double t = Math.exp(logMass(k));
         double s = t;
         for (int j = k; j > lo; j--) {
             t *= (j / (double) (K - j + 1L)) * ((N - K - n + j) / (double) (n - j + 1L));
@@ -188,7 +201,7 @@ public class Hypergeometric implements DiscreteDistribution {
         long N = population;
         long K = successes;
         long n = draws;
-        double t = Math.exp(logPmf(k));
+        double t = Math.exp(logMass(k));
         double s = t;
         for (int j = k; j < hi; j++) {
             t *= ((K - j) / (double) (j + 1L)) * ((n - j) / (double) (N - K - n + j + 1L));

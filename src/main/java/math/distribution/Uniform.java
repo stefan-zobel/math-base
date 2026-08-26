@@ -52,6 +52,22 @@ public class Uniform implements ContinuousDistribution {
         return 1.0 / (b - a);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double logPdf(double x) {
+        if (Double.isNaN(x)) {
+            // as in pdf: neither comparison below holds for NaN, and the log
+            // density of a point that is not one is not -log(b - a)
+            return Double.NaN;
+        }
+        if (x < a || x > b) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        return -Math.log(b - a);
+    }
+
     @Override
     public double cdf(double x) {
         if (x <= a) {

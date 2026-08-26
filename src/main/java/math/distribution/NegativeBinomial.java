@@ -61,15 +61,26 @@ public class NegativeBinomial implements DiscreteDistribution {
 
     @Override
     public double pmf(int k) {
+        // the mass was already formed as the exponential of the logarithm, so
+        // this returns the bits it always did
+        return Math.exp(logPmf(k));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The form {@link #pmf(int)} is the exponential of.
+     */
+    @Override
+    public double logPmf(int k) {
         if (k < 0 || k > Integer.MAX_VALUE - r) {
-            return 0.0;
+            return Double.NEGATIVE_INFINITY;
         }
         if (p == 1.0) {
-            return k == 0 ? 1.0 : 0.0;
+            return k == 0 ? 0.0 : Double.NEGATIVE_INFINITY;
         }
-        double logPmf = Arithmetic.logFactorial(k + r - 1) - Arithmetic.logFactorial(k)
+        return Arithmetic.logFactorial(k + r - 1) - Arithmetic.logFactorial(k)
                 - Arithmetic.logFactorial(r - 1) + r * Math.log(p) + k * Math.log1p(-p);
-        return Math.exp(logPmf);
     }
 
     @Override
