@@ -6,8 +6,9 @@
  * variance ratio, chi-squared goodness of fit and independence, Fisher's exact
  * test, one- and two-sample Kolmogorov-Smirnov, Cramer-von Mises and
  * Anderson-Darling each in a fully specified and a fitted form, Lilliefors,
- * Durbin-Watson, and the rank tests -- Mann-Whitney U, Wilcoxon signed rank
- * and Kruskal-Wallis -- for the samples the t family cannot be asked about.
+ * Durbin-Watson, the rank tests -- Mann-Whitney U, Wilcoxon signed rank and
+ * Kruskal-Wallis -- for the samples the t family cannot be asked about, and
+ * the three tests of zero correlation, Pearson beside Spearman and Kendall.
  * <p>
  * {@link math.stats.MultipleTesting} answers the question none of those can
  * answer on its own: twenty tests at five percent are wrong once on average,
@@ -38,8 +39,9 @@
  * The three neighbouring packages divide the work: {@code math.stats.gof}
  * holds the null distributions of the goodness of fit statistics,
  * {@code math.stats.rank} those of the rank statistics together with the
- * ranking they are computed from, and {@code math.stats.mle} the maximum
- * likelihood fitting that the fitted tests estimate with.
+ * ranking and the two rank correlations they are computed from, and
+ * {@code math.stats.mle} the maximum likelihood fitting that the fitted
+ * tests estimate with.
  * {@link math.stats.Validity} is the small interface those fits report through.
  */
 package math.stats;

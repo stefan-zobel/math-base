@@ -1,6 +1,6 @@
 /**
- * The rank statistics: the ranking itself, and the null distributions of the
- * statistics built from it.
+ * The rank statistics: the ranking itself, the coefficients that take more
+ * than a rank sum to compute, and the null distributions of all of them.
  * <p>
  * A rank test throws the values away and keeps only their order, which is what
  * makes it available where the t-test's normality is not: its null
@@ -20,8 +20,16 @@
  * none: its statistic is chi-squared on {@code k - 1} degrees of freedom, and
  * {@code math.distribution.ChiSquare} is that distribution.
  * <p>
+ * {@link math.stats.rank.SpearmanRho} and {@link math.stats.rank.KendallTau}
+ * are the two rank correlations, and they carry their coefficients as well as
+ * their nulls -- unlike the rank sums, which are three lines once the ranking
+ * is in hand, {@code tau} takes a merge sort that counts its own exchanges.
+ * Their exact nulls are also the two extremes of what that costs: Kendall
+ * counts orderings by a recursion and reaches {@code n = 200}, while Spearman
+ * has no recursion to be had and enumerates, which stops at {@code n = 9}.
+ * <p>
  * The tests themselves are in {@link math.stats.HypothesisTests}, the way the
- * goodness of fit tests are. This package holds the distributions and the
- * ranking they are computed from.
+ * goodness of fit tests are. This package holds the distributions and what
+ * they are computed from.
  */
 package math.stats.rank;

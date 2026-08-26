@@ -10,6 +10,7 @@ import math.distribution.Hypergeometric;
 import math.distribution.StudentT;
 import math.linalg.DMatrix;
 import math.linalg.LSSummary;
+import math.probe.CovarianceAccumulator;
 import math.list.DoubleList;
 import math.stats.gof.AndersonDarling;
 import math.stats.gof.CramerVonMises;
@@ -19,7 +20,9 @@ import math.stats.gof.KolmogorovSmirnovPlus;
 import math.stats.gof.KolmogorovSmirnovTwoSample;
 import math.stats.gof.Lilliefors;
 import math.stats.rank.MannWhitneyU;
+import math.stats.rank.KendallTau;
 import math.stats.rank.Ranks;
+import math.stats.rank.SpearmanRho;
 import math.stats.rank.WilcoxonSignedRank;
 
 /**
@@ -1591,6 +1594,230 @@ public final class HypothesisTests {
         double pValue = (alternative == Alternative.TWO_SIDED) ? 2.0 * tail : tail;
         String name = exact ? "Wilcoxon signed rank, exact" : "Wilcoxon signed rank, asymptotic";
         return new TestResult(name, w, Math.min(1.0, Math.max(0.0, pValue)), alternative, Double.NaN);
+    }
+
+    // ----------------------------------------------- the correlation tests --
+
+    /**
+     * Tests whether two paired samples are associated, using only the order
+     * of the observations within each of them.
+     * <p>
+     * The statistic is Spearman's {@code rho}, which is Pearson's correlation
+     * of the two midrankings. The null hypothesis is that the two rankings are
+     * paired at random, and it holds whatever the two distributions are: this
+     * is the test {@link #pearsonCorrelation} is not.
+     * <p>
+     * <b>It answers a different question, not merely a weaker one.</b>
+     * {@code rho} measures whether the two move together <i>monotonically</i>,
+     * so a perfect curve that never turns gives {@code 1} where Pearson gives
+     * something short of it. A rejection says the association is there, and
+     * says nothing about its shape.
+     * <p>
+     * The null is exact, an enumeration of the {@code n!} pairings, when
+     * neither sample has a tie and {@code n} is at most
+     * {@link SpearmanRho#EXACT_LIMIT}; otherwise it is the approximation
+     * through a {@link StudentT} on {@code n - 2} degrees of freedom.
+     * {@link TestResult#test} says which of the two answered, and the degrees
+     * of freedom are reported only when they were used.
+     *
+     * @param x
+     *            the first sample, at least three finite observations, not all
+     *            equal
+     * @param y
+     *            the second sample, as many observations as {@code x}, under
+     *            the same conditions
+     * @param alternative
+     *            which departure from independence to look for, read as a
+     *            statement about the sign of the association
+     * @return the coefficient {@code rho} and its p-value
+     * @throws IllegalArgumentException
+     *             if either sample is {@code null}, holds fewer than three
+     *             observations or a value that is not finite, if the two are
+     *             of different lengths, if {@code alternative} is {@code null},
+     *             or if either sample takes only one value
+     */
+    public static TestResult spearmanCorrelation(double[] x, double[] y, Alternative alternative) {
+        int n = requirePairedSamples(x, y, alternative);
+        Ranks.Result rx = Ranks.of(x);
+        Ranks.Result ry = Ranks.of(y);
+        double rho = SpearmanRho.coefficient(rx, ry);
+        boolean exact = !rx.hasTies && !ry.hasTies && n <= SpearmanRho.EXACT_LIMIT;
+
+        // the null is symmetric about zero, so the lower tail is the upper one
+        // at -rho and the smaller of the two is the one at |rho|: whichever
+        // alternative was asked for, a single evaluation answers it
+        double at;
+        switch (alternative) {
+        case LESS:
+            at = -rho;
+            break;
+        case GREATER:
+            at = rho;
+            break;
+        default:
+            at = Math.abs(rho);
+            break;
+        }
+        double tail = exact ? SpearmanRho.barFExact(n, at) : SpearmanRho.barFAsymptotic(n, at);
+        double pValue = (alternative == Alternative.TWO_SIDED) ? 2.0 * tail : tail;
+        String name = exact ? "Spearman rank correlation, exact" : "Spearman rank correlation, asymptotic";
+        return new TestResult(name, rho, Math.min(1.0, Math.max(0.0, pValue)), alternative,
+                exact ? Double.NaN : n - 2.0);
+    }
+
+    /**
+     * Tests whether two paired samples are linearly associated, on the values
+     * themselves.
+     * <p>
+     * The statistic is Pearson's {@code r}, and the p-value comes from
+     * {@code t = r sqrt((n - 2) / (1 - r^2))} against a {@link StudentT} on
+     * {@code n - 2} degrees of freedom. That is the same {@code t} the slope of
+     * a simple regression of {@code y} on {@code x} is tested with, and the
+     * same number: {@link math.linalg.LSSummary#getRSquared()} of that fit is
+     * {@code r^2}.
+     * <p>
+     * <b>This one assumes something its two rank neighbours do not.</b> The
+     * null distribution of that {@code t} needs the pairs to be drawn from a
+     * bivariate normal, and {@code r} measures a <i>straight-line</i>
+     * association only -- a perfect curve that never turns gives an {@code r}
+     * well short of one, and a single outlier can carry the coefficient on its
+     * own. Where either is in doubt,
+     * {@link #spearmanCorrelation} and {@link #kendallTau} answer without
+     * assuming a distribution at all.
+     *
+     * @param x
+     *            the first sample, at least three finite observations, not all
+     *            equal
+     * @param y
+     *            the second sample, as many observations as {@code x}, under
+     *            the same conditions
+     * @param alternative
+     *            which departure from zero correlation to look for
+     * @return the coefficient {@code r}, its p-value and the degrees of freedom
+     * @throws IllegalArgumentException
+     *             if either sample is {@code null}, holds fewer than three
+     *             observations or a value that is not finite, if the two are
+     *             of different lengths, if {@code alternative} is {@code null},
+     *             or if either sample takes only one value
+     */
+    public static TestResult pearsonCorrelation(double[] x, double[] y, Alternative alternative) {
+        int n = requirePairedSamples(x, y, alternative);
+        // the accumulator rather than a second Welford of its own; it is one
+        // pair at a time and it does not retain the array it is handed
+        CovarianceAccumulator moments = new CovarianceAccumulator(2);
+        double[] pair = new double[2];
+        for (int i = 0; i < n; i++) {
+            pair[0] = x[i];
+            pair[1] = y[i];
+            moments.add(pair);
+        }
+        double r = Math.max(-1.0, Math.min(1.0, moments.correlation()[1]));
+        double t;
+        if (r * r < 1.0) {
+            t = r * Math.sqrt((n - 2.0) / (1.0 - r * r));
+        } else {
+            // a perfect straight line, where no finite t would do: the tail
+            // beyond it is empty and the one before it is everything
+            t = (r > 0.0) ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+        }
+        double pValue = tailProbability(new StudentT(n - 2.0), t, alternative);
+        return new TestResult("Pearson correlation", r, Math.min(1.0, Math.max(0.0, pValue)), alternative,
+                n - 2.0);
+    }
+
+    /**
+     * Tests whether two paired samples are associated, by counting the pairs
+     * of observations that agree on the ordering against those that disagree.
+     * <p>
+     * The statistic is {@code tau-b}: of all pairs {@code (i, j)}, those where
+     * {@code x} and {@code y} rank the two observations the same way count
+     * once each, those where they rank them opposite ways count against, and
+     * the excess is scaled by what the ties leave attainable. It reaches
+     * {@code 1} only for two orderings that agree with no tie anywhere.
+     * <p>
+     * <b>It answers the same question as {@link #spearmanCorrelation} and puts
+     * a different number on it.</b> Both are one when the two orderings agree
+     * and both are blind to a bend in the relation, so they rarely disagree
+     * about whether an association is there. {@code tau} is usually the
+     * smaller of the two on the same data but not always -- what does always
+     * hold is {@code |3 tau - 2 rho| <= 1}, and that bound is reached -- and it
+     * is the one with a plain reading: it is the difference between the chance
+     * that two observations agree on the order and the chance that they do
+     * not.
+     * <p>
+     * The null is exact, the distribution of the pairs one ordering has out of
+     * step with the other, when neither sample has a tie and {@code n} is at
+     * most {@link KendallTau#EXACT_LIMIT}; otherwise it is the normal
+     * approximation with the tie-corrected variance.
+     * {@link TestResult#test} says which of the two answered.
+     *
+     * @param x
+     *            the first sample, at least three finite observations, not all
+     *            equal
+     * @param y
+     *            the second sample, as many observations as {@code x}, under
+     *            the same conditions
+     * @param alternative
+     *            which departure from independence to look for, read as a
+     *            statement about the sign of the association
+     * @return the coefficient {@code tau-b} and its p-value
+     * @throws IllegalArgumentException
+     *             if either sample is {@code null}, holds fewer than three
+     *             observations or a value that is not finite, if the two are
+     *             of different lengths, if {@code alternative} is {@code null},
+     *             or if either sample takes only one value
+     */
+    public static TestResult kendallTau(double[] x, double[] y, Alternative alternative) {
+        int n = requirePairedSamples(x, y, alternative);
+        KendallTau.Result kendall = KendallTau.of(x, y);
+        boolean exact = !kendall.hasTies && n <= KendallTau.EXACT_LIMIT;
+
+        // the null is symmetric about zero, so the lower tail is the upper one
+        // at -s and the smaller of the two is the one at |s| -- which is also
+        // the direction the exact table is accurate in
+        double at;
+        switch (alternative) {
+        case LESS:
+            at = -kendall.s;
+            break;
+        case GREATER:
+            at = kendall.s;
+            break;
+        default:
+            at = Math.abs(kendall.s);
+            break;
+        }
+        double tail = exact ? KendallTau.barFExact(n, at) : KendallTau.barFAsymptotic(kendall, at);
+        double pValue = (alternative == Alternative.TWO_SIDED) ? 2.0 * tail : tail;
+        String name = exact ? "Kendall tau-b, exact" : "Kendall tau-b, asymptotic";
+        return new TestResult(name, kendall.tau, Math.min(1.0, Math.max(0.0, pValue)), alternative, Double.NaN);
+    }
+
+    /**
+     * The guard rail the three correlation tests share: two finite samples of
+     * the same length, at least three pairs so that {@code n - 2} degrees of
+     * freedom are left, and some spread in each, without which a correlation
+     * is zero over zero.
+     */
+    private static int requirePairedSamples(double[] x, double[] y, Alternative alternative) {
+        int n = requireFiniteSample(x, "x");
+        requireFiniteSample(y, "y");
+        if (y.length != n) {
+            throw new IllegalArgumentException(
+                    "x and y must be paired, but their lengths are " + n + " and " + y.length);
+        }
+        requireAlternative(alternative);
+        if (n < 3) {
+            throw new IllegalArgumentException(
+                    "a correlation test needs at least three pairs for n - 2 degrees of freedom, got " + n);
+        }
+        if (!hasSpread(x)) {
+            throw new IllegalArgumentException("x takes one value only, so it correlates with nothing");
+        }
+        if (!hasSpread(y)) {
+            throw new IllegalArgumentException("y takes one value only, so it correlates with nothing");
+        }
+        return n;
     }
 
     // ------------------------------------------------------- the assembly --
