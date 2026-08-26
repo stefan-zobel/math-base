@@ -18,6 +18,9 @@ import math.stats.gof.KolmogorovSmirnov;
 import math.stats.gof.KolmogorovSmirnovPlus;
 import math.stats.gof.KolmogorovSmirnovTwoSample;
 import math.stats.gof.Lilliefors;
+import math.stats.rank.MannWhitneyU;
+import math.stats.rank.Ranks;
+import math.stats.rank.WilcoxonSignedRank;
 
 /**
  * Classical hypothesis tests, fronting the distributions in
@@ -1282,6 +1285,314 @@ public final class HypothesisTests {
         return durbinWatson(e, designMatrix, alternative);
     }
 
+    // ------------------------------------------------------ the rank tests --
+
+    /**
+     * Tests whether two independent samples come from the same distribution,
+     * using nothing but the order of the observations.
+     * <p>
+     * This is what {@link #tTwoSample} is not. The null hypothesis is that
+     * {@code x} and {@code y} have the <b>same distribution</b>, and the null
+     * distribution of the statistic holds whatever that distribution is, so
+     * nothing here assumes normality or even a finite mean. The statistic is
+     * {@code U = R_x - m (m + 1) / 2}, where {@code R_x} is the sum of the
+     * ranks of {@code x} in the pooled sample; equivalently it counts the
+     * pairs {@code (x_i, y_j)} with {@code x_i > y_j}, a tie counting half.
+     * <p>
+     * <b>The alternative is about the ordering, not about a shift.</b>
+     * {@link Alternative#GREATER} says that {@code x} tends to be the larger
+     * of the two, which is {@code P[x > y] > 1/2}. Reading the answer as a
+     * difference of medians -- or of means -- needs the further assumption
+     * that the two distributions have the same shape, and this test does not
+     * make it.
+     * <p>
+     * The null is exact, a count of the equally likely orderings, when the
+     * pooled sample has no ties and {@code m * n} is at most
+     * {@link MannWhitneyU#EXACT_LIMIT}; otherwise it is the normal
+     * approximation with the tie-corrected variance. {@link TestResult#test}
+     * says which of the two answered.
+     *
+     * @param x
+     *            the first sample, at least one finite observation
+     * @param y
+     *            the second sample, at least one finite observation
+     * @param alternative
+     *            which departure from the common distribution to look for,
+     *            read as a statement about {@code x}
+     * @return the statistic {@code U} of {@code x} and its p-value
+     * @throws IllegalArgumentException
+     *             if either sample is {@code null}, is empty or holds a value
+     *             that is not finite; if {@code alternative} is {@code null};
+     *             or if the two samples together take only one value
+     */
+    public static TestResult mannWhitneyU(double[] x, double[] y, Alternative alternative) {
+        int m = requireFiniteSample(x, "x");
+        int n = requireFiniteSample(y, "y");
+        requireAlternative(alternative);
+
+        double[] pooled = new double[m + n];
+        System.arraycopy(x, 0, pooled, 0, m);
+        System.arraycopy(y, 0, pooled, m, n);
+        if (!hasSpread(pooled)) {
+            throw new IllegalArgumentException(
+                    "x and y together take one value only, so their ranking says nothing");
+        }
+        Ranks.Result ranked = Ranks.of(pooled);
+        double rankSum = 0.0;
+        for (int i = 0; i < m; i++) {
+            rankSum += ranked.ranks[i];
+        }
+        double u = rankSum - m * (m + 1.0) / 2.0;
+        double mn = (double) m * n;
+        boolean exact = !ranked.hasTies && (long) m * n <= MannWhitneyU.EXACT_LIMIT;
+
+        // the null is symmetric about mn/2 and its upper tail is decreasing,
+        // so P[U <= u] is that same tail at mn - u and the smaller of the two
+        // tails is the one at the larger argument: whichever alternative was
+        // asked for, a single evaluation answers it
+        double at;
+        switch (alternative) {
+        case LESS:
+            at = mn - u;
+            break;
+        case GREATER:
+            at = u;
+            break;
+        default:
+            at = Math.max(u, mn - u);
+            break;
+        }
+        double tail = exact ? MannWhitneyU.barFExact(m, n, at)
+                : MannWhitneyU.barFAsymptotic(m, n, at, ranked.tieSum);
+        double pValue = (alternative == Alternative.TWO_SIDED) ? 2.0 * tail : tail;
+        String name = exact ? "Mann-Whitney U, exact" : "Mann-Whitney U, asymptotic";
+        return new TestResult(name, u, Math.min(1.0, Math.max(0.0, pValue)), alternative, Double.NaN);
+    }
+
+    /**
+     * Tests whether a sample is centered on {@code mu}, using the order of
+     * the differences from it and their signs.
+     * <p>
+     * This is what {@link #tOneSample} is not, and it asks for something the
+     * t-test does not either: the null hypothesis is that the differences
+     * {@code x_i - mu} are <b>symmetrically distributed about zero</b>. That
+     * makes the test one about the median, and about the mean only where the
+     * two coincide. Symmetry is the assumption that is easy to forget here;
+     * without it a rejection says the differences are lopsided and not that
+     * their center is elsewhere.
+     * <p>
+     * The statistic is {@code W+}, the sum of the ranks of the positive
+     * differences when all of them are ranked by magnitude.
+     * <p>
+     * <b>Differences of exactly zero are dropped</b>, which is Wilcoxon's own
+     * rule, and every {@code n} below is the number that is left. They carry
+     * no sign to contribute and no information about which way the sample
+     * leans, but dropping them does shorten the sample, so a test of a coarse
+     * measurement against a value it often takes exactly is answered on fewer
+     * observations than it was given.
+     * <p>
+     * The null is exact, a count of the {@code 2^n} equally likely sign
+     * patterns, when the magnitudes have no ties and {@code n} is at most
+     * {@link WilcoxonSignedRank#EXACT_LIMIT}; otherwise it is the normal
+     * approximation with the tie-corrected variance. {@link TestResult#test}
+     * says which of the two answered.
+     *
+     * @param x
+     *            the sample, at least one finite observation
+     * @param mu
+     *            the center under the null hypothesis, a finite number
+     * @param alternative
+     *            which departure from {@code mu} to look for
+     * @return the statistic {@code W+} and its p-value
+     * @throws IllegalArgumentException
+     *             if {@code x} is {@code null}, is empty or holds a value that
+     *             is not finite; if {@code mu} is not finite; if
+     *             {@code alternative} is {@code null}; or if every observation
+     *             equals {@code mu}, which leaves nothing to rank
+     */
+    public static TestResult wilcoxonSignedRank(double[] x, double mu, Alternative alternative) {
+        int n = requireFiniteSample(x, "x");
+        requireAlternative(alternative);
+        if (!isFinite(mu)) {
+            throw new IllegalArgumentException("mu is not a finite number : " + mu);
+        }
+        double[] differences = new double[n];
+        for (int i = 0; i < n; i++) {
+            differences[i] = x[i] - mu;
+        }
+        return signedRank(differences, alternative, "every observation equals mu");
+    }
+
+    /**
+     * Tests whether the differences within pairs are centered on zero, using
+     * their order and their signs.
+     * <p>
+     * The rank counterpart of {@link #tPaired}, and
+     * {@link #wilcoxonSignedRank(double[], double, Alternative)} applied to
+     * {@code x[i] - y[i]}: the null hypothesis is that those differences are
+     * symmetrically distributed about zero. Pairs that are exactly equal are
+     * dropped, and the rest is as described there.
+     *
+     * @param x
+     *            the first of each pair, at least one finite observation
+     * @param y
+     *            the second of each pair, as many as there are in {@code x}
+     * @param alternative
+     *            which departure from zero to look for, read as a statement
+     *            about {@code x - y}
+     * @return the statistic {@code W+} and its p-value
+     * @throws IllegalArgumentException
+     *             if either sample is {@code null}, is empty or holds a value
+     *             that is not finite; if the two are of different lengths; if
+     *             {@code alternative} is {@code null}; or if every pair is
+     *             exactly equal, which leaves nothing to rank
+     */
+    public static TestResult wilcoxonSignedRankPaired(double[] x, double[] y, Alternative alternative) {
+        int n = requireFiniteSample(x, "x");
+        requireFiniteSample(y, "y");
+        if (y.length != n) {
+            throw new IllegalArgumentException(
+                    "x and y must be paired, but their lengths are " + n + " and " + y.length);
+        }
+        requireAlternative(alternative);
+        double[] differences = new double[n];
+        for (int i = 0; i < n; i++) {
+            differences[i] = x[i] - y[i];
+        }
+        return signedRank(differences, alternative, "every pair is exactly equal");
+    }
+
+    /**
+     * Tests whether several independent samples come from the same
+     * distribution, using only the order of the observations.
+     * <p>
+     * The k-sample counterpart of {@link #mannWhitneyU}, and what to reach
+     * for instead of running that test on every pair -- twenty pairs at five
+     * percent are wrong once on average whatever each of them says. The
+     * statistic compares the mean rank of each group against the mean rank
+     * {@code (N + 1) / 2} of the pooled sample,
+     * {@code H = 12 / (N (N + 1)) * sum n_i (Rbar_i - (N + 1) / 2)^2}, divided
+     * by {@code 1 - tieSum / (N^3 - N)} to undo what ties take out of its
+     * spread.
+     * <p>
+     * A poor fit makes {@code H} large whichever group is the one out of
+     * place, so the p-value is the upper tail of a
+     * {@link math.distribution.ChiSquare} on {@code k - 1} degrees of freedom
+     * and the result reports {@link Alternative#GREATER}. That is a statement
+     * about the statistic and not about a parameter: a rejection says the
+     * groups differ, not which of them does.
+     * <p>
+     * <b>The null distribution is the large-sample one</b>, unlike the two
+     * tests beside it, which count their orderings exactly while they can.
+     * With two groups the statistic is exactly the square of the standardized
+     * Mann-Whitney statistic, so {@link #mannWhitneyU} answers that case both
+     * more accurately and more sharply.
+     * <p>
+     * The pairwise follow-up a rejection invites is what
+     * {@link MultipleTesting} is for.
+     *
+     * @param groups
+     *            the samples, at least two of them, each holding at least one
+     *            finite observation
+     * @return the statistic {@code H}, its p-value and the degrees of freedom
+     * @throws IllegalArgumentException
+     *             if {@code groups} is {@code null}, holds fewer than two
+     *             groups, holds a group that is {@code null}, empty or carries
+     *             a value that is not finite; or if all the observations
+     *             together take only one value
+     */
+    public static TestResult kruskalWallis(double[][] groups) {
+        if (groups == null) {
+            throw new IllegalArgumentException("groups must not be null");
+        }
+        if (groups.length < 2) {
+            throw new IllegalArgumentException("there must be at least two groups, got " + groups.length);
+        }
+        int total = 0;
+        for (int g = 0; g < groups.length; g++) {
+            total += requireFiniteSample(groups[g], "groups[" + g + "]");
+        }
+        double[] pooled = new double[total];
+        int at = 0;
+        for (int g = 0; g < groups.length; g++) {
+            System.arraycopy(groups[g], 0, pooled, at, groups[g].length);
+            at += groups[g].length;
+        }
+        if (!hasSpread(pooled)) {
+            throw new IllegalArgumentException(
+                    "the groups together take one value only, so their ranking says nothing");
+        }
+        Ranks.Result ranked = Ranks.of(pooled);
+
+        double n = total;
+        double spread = 0.0;
+        at = 0;
+        for (int g = 0; g < groups.length; g++) {
+            double rankSum = 0.0;
+            for (int i = 0; i < groups[g].length; i++) {
+                rankSum += ranked.ranks[at++];
+            }
+            double gap = rankSum / groups[g].length - (n + 1.0) / 2.0;
+            spread += groups[g].length * gap * gap;
+        }
+        // the pooled sample has some spread, so it is not one single run of
+        // equal values and the correction cannot be zero
+        double correction = 1.0 - ranked.tieSum / (n * n * n - n);
+        double h = 12.0 / (n * (n + 1.0)) * spread / correction;
+        return chiSquaredResult("Kruskal-Wallis", h, groups.length - 1.0);
+    }
+
+    /**
+     * The signed rank test of differences that have already been formed:
+     * drop the zeros, rank what is left by magnitude, and add up the ranks
+     * that carry a positive sign.
+     */
+    private static TestResult signedRank(double[] differences, Alternative alternative, String nothingLeft) {
+        int n = 0;
+        for (int i = 0; i < differences.length; i++) {
+            if (differences[i] != 0.0) {
+                differences[n++] = differences[i];
+            }
+        }
+        if (n == 0) {
+            throw new IllegalArgumentException(nothingLeft + ", so there is nothing to rank");
+        }
+        double[] magnitudes = new double[n];
+        for (int i = 0; i < n; i++) {
+            magnitudes[i] = Math.abs(differences[i]);
+        }
+        Ranks.Result ranked = Ranks.of(magnitudes);
+        double w = 0.0;
+        for (int i = 0; i < n; i++) {
+            if (differences[i] > 0.0) {
+                w += ranked.ranks[i];
+            }
+        }
+        double most = n * (n + 1.0) / 2.0;
+        boolean exact = !ranked.hasTies && n <= WilcoxonSignedRank.EXACT_LIMIT;
+
+        // the null is symmetric about half of the largest attainable sum, so
+        // the lower tail is the upper one at most - w and the smaller of the
+        // two is the one at the larger argument
+        double at;
+        switch (alternative) {
+        case LESS:
+            at = most - w;
+            break;
+        case GREATER:
+            at = w;
+            break;
+        default:
+            at = Math.max(w, most - w);
+            break;
+        }
+        double tail = exact ? WilcoxonSignedRank.barFExact(n, at)
+                : WilcoxonSignedRank.barFAsymptotic(n, at, ranked.tieSum);
+        double pValue = (alternative == Alternative.TWO_SIDED) ? 2.0 * tail : tail;
+        String name = exact ? "Wilcoxon signed rank, exact" : "Wilcoxon signed rank, asymptotic";
+        return new TestResult(name, w, Math.min(1.0, Math.max(0.0, pValue)), alternative, Double.NaN);
+    }
+
     // ------------------------------------------------------- the assembly --
 
     /**
@@ -1491,6 +1802,16 @@ public final class HypothesisTests {
             }
         }
         return x.length;
+    }
+
+    /** Whether a sample takes more than the one value, which a ranking needs. */
+    private static boolean hasSpread(double[] sample) {
+        for (int i = 1; i < sample.length; i++) {
+            if (sample[i] != sample[0]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void requireAtLeastTwo(int n, String name) {

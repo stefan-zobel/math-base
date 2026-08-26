@@ -5,8 +5,9 @@
  * {@code math.solve.Quadrature} fronts the integrators: the t family, the F
  * variance ratio, chi-squared goodness of fit and independence, Fisher's exact
  * test, one- and two-sample Kolmogorov-Smirnov, Cramer-von Mises and
- * Anderson-Darling each in a fully specified and a fitted form, Lilliefors, and
- * Durbin-Watson.
+ * Anderson-Darling each in a fully specified and a fitted form, Lilliefors,
+ * Durbin-Watson, and the rank tests -- Mann-Whitney U, Wilcoxon signed rank
+ * and Kruskal-Wallis -- for the samples the t family cannot be asked about.
  * <p>
  * {@link math.stats.MultipleTesting} answers the question none of those can
  * answer on its own: twenty tests at five percent are wrong once on average,
@@ -34,9 +35,11 @@
  * it after seeing the p-value is not a test, and no signature here makes that
  * convenient.
  * <p>
- * The two neighbouring packages divide the work: {@code math.stats.gof} holds
- * the null distributions and nothing else, and {@code math.stats.mle} the
- * maximum likelihood fitting that the fitted tests estimate with.
+ * The three neighbouring packages divide the work: {@code math.stats.gof}
+ * holds the null distributions of the goodness of fit statistics,
+ * {@code math.stats.rank} those of the rank statistics together with the
+ * ranking they are computed from, and {@code math.stats.mle} the maximum
+ * likelihood fitting that the fitted tests estimate with.
  * {@link math.stats.Validity} is the small interface those fits report through.
  */
 package math.stats;
