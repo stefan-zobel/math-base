@@ -101,7 +101,7 @@ public abstract class AbstractRng64 implements PseudoRandom {
 
     @Override
     public double nextGaussian(double mean, double stdDeviation) {
-        if (stdDeviation <= 0.0) {
+        if (!(stdDeviation > 0.0)) {
             throw new IllegalArgumentException("Standard deviation must be positive (" + stdDeviation + ")");
         }
         return mean + stdDeviation * nextGaussian();

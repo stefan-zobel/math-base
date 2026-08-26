@@ -25,11 +25,16 @@ final class LogNormalSpliterator extends PseudoRandomSpliterator implements Spli
     final double sigma;
     final PseudoRandom prng;
 
-    LogNormalSpliterator(PseudoRandom prng, long index, long fence, double mu, double sigma) {
-        super(index, fence);
-        if (sigma <= 0.0) {
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkSigma(double sigma) {
+        if (!(sigma > 0.0)) {
             throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
         }
+    }
+
+    LogNormalSpliterator(PseudoRandom prng, long index, long fence, double mu, double sigma) {
+        super(index, fence);
+        checkSigma(sigma);
         this.mu = mu;
         this.sigma = sigma;
         this.prng = prng;
@@ -81,7 +86,7 @@ final class LogNormalSpliterator extends PseudoRandomSpliterator implements Spli
         }
     }
 
-    private static double sample(PseudoRandom prng, double mu, double sigma) {
+    static double sample(PseudoRandom prng, double mu, double sigma) {
         double stdNormal = prng.nextGaussian();
         return Math.exp(mu + sigma * stdNormal);
     }

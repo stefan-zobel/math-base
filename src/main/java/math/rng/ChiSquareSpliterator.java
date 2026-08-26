@@ -24,11 +24,17 @@ final class ChiSquareSpliterator extends PseudoRandomSpliterator implements Spli
     final double degreesOfFreedom;
     final PseudoRandom prng;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkDegreesOfFreedom(double degreesOfFreedom) {
+        if (!(degreesOfFreedom > 0.0)) {
+            throw new IllegalArgumentException(
+                    "degreesOfFreedom must be greater than zero (" + degreesOfFreedom + ")");
+        }
+    }
+
     ChiSquareSpliterator(PseudoRandom prng, long index, long fence, double degreesOfFreedom) {
         super(index, fence);
-        if (degreesOfFreedom <= 0.0) {
-            throw new IllegalArgumentException("degreesOfFreedom <= 0.0 (" + degreesOfFreedom + ")");
-        }
+        checkDegreesOfFreedom(degreesOfFreedom);
         this.degreesOfFreedom = degreesOfFreedom;
         this.prng = prng;
     }

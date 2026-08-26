@@ -25,14 +25,19 @@ final class GammaSpliterator extends PseudoRandomSpliterator implements Splitera
     final double scale_theta;
     final PseudoRandom prng;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkParameters(double k, double theta) {
+        if (!(k > 0.0)) {
+            throw new IllegalArgumentException("k must be greater than zero (" + k + ")");
+        }
+        if (!(theta > 0.0)) {
+            throw new IllegalArgumentException("theta must be greater than zero (" + theta + ")");
+        }
+    }
+
     GammaSpliterator(PseudoRandom prng, long index, long fence, double k, double theta) {
         super(index, fence);
-        if (k <= 0.0) {
-            throw new IllegalArgumentException("k <= 0.0 (" + k + ")");
-        }
-        if (theta <= 0.0) {
-            throw new IllegalArgumentException("theta <= 0.0 (" + theta + ")");
-        }
+        checkParameters(k, theta);
         this.shape_k = k;
         this.scale_theta = theta;
         this.prng = prng;

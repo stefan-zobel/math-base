@@ -150,13 +150,13 @@ public final class WishartSampler {
         int p = choleskyL.numRows();
         DMatrix a = new DMatrix(p, p);
         for (int i = 0; i < p; i++) {
-            // the chi-squared draws come from the stream rather than from
+            // the chi-squared draws come from the generator rather than from
             // inverting ChiSquare. Measured, inversion costs 2.4 to 32
-            // microseconds a draw against the stream's 87 to 285 nanoseconds,
-            // and at one degree of freedom -- which is the last diagonal entry
+            // microseconds a draw against 41 to 106 nanoseconds here, and at
+            // one degree of freedom -- which is the last diagonal entry
             // whenever nu equals p -- its far lower tail is wrong by four
             // orders of magnitude
-            a.setUnsafe(i, i, Math.sqrt(chiSquared(prng, diagonalDf[i])));
+            a.setUnsafe(i, i, Math.sqrt(prng.nextChiSquare(diagonalDf[i])));
             for (int j = 0; j < i; j++) {
                 a.setUnsafe(i, j, prng.nextGaussian());
             }
@@ -166,10 +166,6 @@ public final class WishartSampler {
         // tested and a triangular product written here would not be
         DMatrix m = choleskyL.mul(a);
         return m.mulBTrans(m);
-    }
-
-    private static double chiSquared(PseudoRandom prng, double df) {
-        return prng.chiSquare(1L, df).toArray()[0];
     }
 
     /**

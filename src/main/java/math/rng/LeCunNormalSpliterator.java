@@ -31,19 +31,35 @@ final class LeCunNormalSpliterator extends PseudoRandomSpliterator implements Sp
     // ProbabilityFuncs.errorFunction(-2.0 / MathConsts.SQRT_TWO)
     private static final double A = -0.9544997361036416;
     private static final double B = -A;
+    // stddev of a standard normal truncated to (-2.0, 2.0)
+    private static final double TRUNCATED_SD = 0.87962566103423978;
 
     final double sigma;
     final double stdDev;
     final PseudoRandom prng;
 
-    LeCunNormalSpliterator(PseudoRandom prng, long index, long fence, double sigma) {
-        super(index, fence);
-        if (sigma <= 0.0) {
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkSigma(double sigma) {
+        if (!(sigma > 0.0)) {
             throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
         }
+    }
+
+    /**
+     * One draw for the standard deviation as the caller states it. The core
+     * below wants it already divided by the truncated standard deviation, which
+     * the stream does once in its constructor.
+     */
+    static double sampleFor(PseudoRandom prng, double sigma) {
+        checkSigma(sigma);
+        return sample(prng, sigma / TRUNCATED_SD);
+    }
+
+    LeCunNormalSpliterator(PseudoRandom prng, long index, long fence, double sigma) {
+        super(index, fence);
+        checkSigma(sigma);
         this.sigma = sigma;
-        // constant is stddev of standard normal truncated to (-2.0, 2.0)
-        this.stdDev = sigma / 0.87962566103423978;
+        this.stdDev = sigma / TRUNCATED_SD;
         this.prng = prng;
     }
 
@@ -91,6 +107,10 @@ final class LeCunNormalSpliterator extends PseudoRandomSpliterator implements Sp
     }
 
     private double leCun() {
+        return sample(prng, stdDev);
+    }
+
+    static double sample(PseudoRandom prng, double stdDev) {
         double u = prng.nextDouble(A, B);
         double out = MathConsts.SQRT_TWO * ProbabilityFuncs.errorFunctionInverse(u);
         // Clamp the value to the open interval (-2.0, 2.0) to make sure that

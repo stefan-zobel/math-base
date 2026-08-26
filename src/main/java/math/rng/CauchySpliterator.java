@@ -25,11 +25,16 @@ final class CauchySpliterator extends PseudoRandomSpliterator implements Spliter
     final double scale;
     final PseudoRandom prng;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkScale(double scale) {
+        if (!(scale > 0.0)) {
+            throw new IllegalArgumentException("scale must be greater than zero (" + scale + ")");
+        }
+    }
+
     CauchySpliterator(PseudoRandom prng, long index, long fence, double location, double scale) {
         super(index, fence);
-        if (scale <= 0.0) {
-            throw new IllegalArgumentException("scale <= 0.0 (" + scale + ")");
-        }
+        checkScale(scale);
         this.location = location;
         this.scale = scale;
         this.prng = prng;
@@ -81,7 +86,7 @@ final class CauchySpliterator extends PseudoRandomSpliterator implements Spliter
         }
     }
 
-    private static double sample(PseudoRandom prng, double loc, double scale) {
+    static double sample(PseudoRandom prng, double loc, double scale) {
         return loc + (scale * Math.tan(Math.PI * (prng.nextDouble() - 0.5)));
     }
 }

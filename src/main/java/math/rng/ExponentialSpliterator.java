@@ -24,11 +24,16 @@ final class ExponentialSpliterator extends PseudoRandomSpliterator implements Sp
     final double lambda;
     final PseudoRandom prng;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkRate(double lambda) {
+        if (!(lambda > 0.0)) {
+            throw new IllegalArgumentException("lambda must be greater than zero (" + lambda + ")");
+        }
+    }
+
     ExponentialSpliterator(PseudoRandom prng, long index, long fence, double lambda) {
         super(index, fence);
-        if (lambda <= 0.0) {
-            throw new IllegalArgumentException("lambda <= 0.0 (" + lambda + ")");
-        }
+        checkRate(lambda);
         this.lambda = lambda;
         this.prng = prng;
     }
@@ -78,7 +83,7 @@ final class ExponentialSpliterator extends PseudoRandomSpliterator implements Sp
         }
     }
 
-    private static double sample(PseudoRandom prng, double lambda) {
+    static double sample(PseudoRandom prng, double lambda) {
         double u;
         do {
             u = prng.nextDouble();
