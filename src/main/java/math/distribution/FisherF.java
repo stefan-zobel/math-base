@@ -18,21 +18,42 @@ package math.distribution;
 /**
  * Snedecor's F distribution.
  * <p>
+ * The degrees of freedom are not required to be whole numbers, as they are
+ * not for {@link StudentT} and {@link ChiSquare} either: Welch's
+ * approximation to a k-sample test of equal means puts a fractional value in
+ * the denominator, and a distribution that refused it could not answer that
+ * test.
+ * <p>
  * <b>See</b> <a href="https://en.wikipedia.org/wiki/F-distribution">Wikipedia
  * F-distribution</a>.
  */
 public class FisherF implements ContinuousDistribution {
 
-    private final int d1; // numerator DF
-    private final int d2; // denominator DF
+    private final double d1; // numerator DF
+    private final double d2; // denominator DF
     private final Beta beta;
 
-    public FisherF(int numeratorDF, int denominatorDF) {
-        if (numeratorDF < 1) {
-            throw new IllegalArgumentException("numeratorDF < 1 : " + numeratorDF);
+    /**
+     * An F distribution with the given degrees of freedom, neither of which has
+     * to be a whole number.
+     *
+     * @param numeratorDF
+     *            degrees of freedom of the numerator, strictly positive and
+     *            finite
+     * @param denominatorDF
+     *            degrees of freedom of the denominator, strictly positive and
+     *            finite
+     * @throws IllegalArgumentException
+     *             if either argument is not strictly positive and finite
+     */
+    public FisherF(double numeratorDF, double denominatorDF) {
+        // written this way round so that NaN is refused with the rest
+        if (!(numeratorDF > 0.0 && numeratorDF < Double.POSITIVE_INFINITY)) {
+            throw new IllegalArgumentException("numeratorDF must be positive and finite : " + numeratorDF);
         }
-        if (denominatorDF < 1) {
-            throw new IllegalArgumentException("denominatorDF < 1 : " + denominatorDF);
+        if (!(denominatorDF > 0.0 && denominatorDF < Double.POSITIVE_INFINITY)) {
+            throw new IllegalArgumentException(
+                    "denominatorDF must be positive and finite : " + denominatorDF);
         }
         this.d1 = numeratorDF;
         this.d2 = denominatorDF;
@@ -45,10 +66,10 @@ public class FisherF implements ContinuousDistribution {
             return 0.0;
         }
         if (x == 0.0) {
-            if (d1 == 1) {
+            if (d1 < 2.0) {
                 return Double.POSITIVE_INFINITY;
             }
-            if (d1 == 2) {
+            if (d1 == 2.0) {
                 return 1.0;
             }
             return 0.0;
@@ -71,7 +92,7 @@ public class FisherF implements ContinuousDistribution {
         // the correct transformation:
         final double scaled = (w * d1) * w;
         if (scaled == 0.0) {
-            // The prefactor has underflowed. For d2 == 1 the Beta density has
+            // The prefactor has underflowed. For d2 < 2 the Beta density has
             // a pole at one, so the product would read 0 * infinity; the
             // exponent of w wins it and the density is zero this far out.
             return 0.0;
@@ -133,15 +154,15 @@ public class FisherF implements ContinuousDistribution {
 
     @Override
     public double mean() {
-        if (d2 <= 2) {
+        if (d2 <= 2.0) {
             return Double.NaN;
         }
-        return d2 / ((double) d2 - 2.0);
+        return d2 / (d2 - 2.0);
     }
 
     @Override
     public double variance() {
-        if (d2 <= 4) {
+        if (d2 <= 4.0) {
             return Double.NaN;
         }
         final double z = d2 - 2.0;
@@ -153,11 +174,21 @@ public class FisherF implements ContinuousDistribution {
         return 0.0;
     }
 
-    public int getNumeratorDegreesOfFreedom() {
+    /**
+     * Degrees of freedom of the numerator.
+     *
+     * @return degrees of freedom of the numerator
+     */
+    public double getNumeratorDegreesOfFreedom() {
         return d1;
     }
 
-    public int getDenominatorDegreesOfFreedom() {
+    /**
+     * Degrees of freedom of the denominator.
+     *
+     * @return degrees of freedom of the denominator
+     */
+    public double getDenominatorDegreesOfFreedom() {
         return d2;
     }
 }
