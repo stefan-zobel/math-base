@@ -22,8 +22,7 @@ import math.rng.PseudoRandom;
  * distribution whose whole content is a covariance. A scale matrix that is not
  * positive definite is refused instead.
  * <p>
- * Instances are immutable and can be shared between threads -- unlike
- * {@link MultivariateNormalSampler}, which owns its generator. The generator
+ * Instances are immutable and can be shared between threads. The generator
  * passed to {@link #sample(PseudoRandom, DMatrix)} is the one that cannot be
  * shared, which is a restriction belonging to the generator rather than to this
  * sampler.

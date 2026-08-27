@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Stefan Zobel
+ * Copyright 2024, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,22 @@ import math.rng.SplitMix64Seed;
  * <p>
  * Each sampler owns its generator, so a sampler must not be shared between
  * threads. Give each thread its own.
+ * <p>
+ * <b>This sampler perturbs the covariance it is given.</b> It adds
+ * {@code 1e-7} times the identity before factorizing, to keep a matrix that is
+ * only just positive definite factorizable. For a covariance whose entries are
+ * of order one that is invisible; for one of order {@code 1e-5} it is a one
+ * percent shift of every variance, and the draws are then from a distribution
+ * that was not asked for. Measured over 400 000 draws at a covariance of
+ * {@code 1e-5}: the drawn variance comes out at {@code 1.0100} times the one
+ * requested.
+ * <p>
+ * The behaviour is kept as it is, because this class is released and callers
+ * may depend on it. {@link MultivariateNormal#sample(math.rng.PseudoRandom,
+ * double[])} draws from the covariance as given, refuses one it cannot factor
+ * instead of nudging it, takes its generator per call so it can be shared
+ * between threads, and can evaluate the density as well -- prefer it in new
+ * code.
  */
 public class MultivariateNormalSampler {
 
