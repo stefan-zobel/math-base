@@ -529,4 +529,36 @@ public interface PseudoRandom extends PseudoRandomStream {
     default void nextDirichlet(double[] alpha, double[] proportions) {
         DirichletSampler.of(alpha).sample(this, proportions);
     }
+
+    /**
+     * Draws one vector of counts from the multinomial distribution that places
+     * {@code n} draws according to the given weights into {@code counts}.
+     * <p>
+     * As with {@link #nextDirichlet(double[], double[])}, this builds a
+     * {@link MultinomialSampler} per call, and for the same reason: validating
+     * the weights and turning them into conditional probabilities is what that
+     * class is for, and there is nowhere here to keep the result. For more
+     * than a handful of draws hold a sampler, or a {@code Multinomial} from the
+     * {@code math.distribution} package, and call it directly.
+     *
+     * @param n
+     *            the number of draws to place, not negative
+     * @param probabilities
+     *            the weight of each category, at least one of them, each finite
+     *            and not negative, and not all zero. They need not sum to one.
+     *            Not modified
+     * @param counts
+     *            where the result is written, one entry per category. Its
+     *            previous contents are overwritten
+     * @throws IllegalArgumentException
+     *             if {@code probabilities} or {@code counts} is {@code null},
+     *             if {@code n} is negative, if {@code probabilities} is empty
+     *             or holds a value that is negative or not finite or sums to
+     *             zero, or if {@code counts} is not as long as
+     *             {@code probabilities}
+     * @since 1.5.3
+     */
+    default void nextMultinomial(int n, double[] probabilities, int[] counts) {
+        MultinomialSampler.of(probabilities).sample(this, n, counts);
+    }
 }

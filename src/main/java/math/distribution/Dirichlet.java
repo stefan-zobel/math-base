@@ -1,6 +1,5 @@
 package math.distribution;
 
-import math.cern.Arithmetic;
 import math.cern.FastGamma;
 import math.linalg.DMatrix;
 import math.rng.DirichletSampler;
@@ -344,6 +343,11 @@ public final class Dirichlet {
      * difference of two logarithms, which is the subtraction that method exists
      * to avoid: at a total concentration beyond {@code 1e15} the difference is
      * smaller than one ulp of either term and comes back as zero.
+     * <p>
+     * The counting factor is the multinomial coefficient, and it is taken from
+     * {@link Multinomial} rather than written out again here -- the evidence is
+     * the multinomial likelihood with the proportions integrated out, so the
+     * two share that half by construction.
      *
      * @param counts
      *            how often each component was observed, one entry per
@@ -365,9 +369,9 @@ public final class Dirichlet {
             throw new IllegalArgumentException("the counts sum to " + total + ", which is more than an int holds");
         }
         int n = (int) total;
-        double result = Arithmetic.logFactorial(n) - FastGamma.logGammaRatio(alpha0, n);
+        double result = Multinomial.logMultinomialCoefficient(counts, n) - FastGamma.logGammaRatio(alpha0, n);
         for (int i = 0; i < m; i++) {
-            result += FastGamma.logGammaRatio(alpha[i], counts[i]) - Arithmetic.logFactorial(counts[i]);
+            result += FastGamma.logGammaRatio(alpha[i], counts[i]);
         }
         return result;
     }

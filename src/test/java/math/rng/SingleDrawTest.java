@@ -521,6 +521,44 @@ public final class SingleDrawTest {
     }
 
     @Test
+    public void testTheVectorDrawsAreInheritedToo() {
+        // the two draws that write into an array rather than returning a
+        // number. They build their sampler per call, so unlike the scalar
+        // draws above they never touch a stream -- but they are default
+        // methods on the same interface and have to work on the same
+        // generator from outside the hierarchy
+        PseudoRandom foreign = new Delegate(DefaultRng.newPseudoRandom(7L));
+
+        double[] alpha = { 0.5, 2.0, 7.0 };
+        double[] proportions = new double[alpha.length];
+        for (int i = 0; i < 50; i++) {
+            foreign.nextDirichlet(alpha, proportions);
+            double sum = 0.0;
+            for (int j = 0; j < proportions.length; j++) {
+                assertTrue("a proportion left [0, 1]: " + proportions[j],
+                        proportions[j] >= 0.0 && proportions[j] <= 1.0);
+                sum += proportions[j];
+            }
+            assertEquals("the proportions do not sum to one", 1.0, sum, 1.0e-12);
+        }
+
+        double[] weights = { 2.0, 5.0, 1.0, 0.0 };
+        int[] counts = new int[weights.length];
+        for (int n : new int[] { 0, 1, 37 }) {
+            for (int i = 0; i < 50; i++) {
+                foreign.nextMultinomial(n, weights, counts);
+                int total = 0;
+                for (int j = 0; j < counts.length; j++) {
+                    assertTrue("a negative count: " + Arrays.toString(counts), counts[j] >= 0);
+                    total += counts[j];
+                }
+                assertEquals("the counts do not sum to n", n, total);
+                assertEquals("a category of weight zero was counted", 0, counts[counts.length - 1]);
+            }
+        }
+    }
+
+    @Test
     public void testBetaAndFisherFWorkWhereTheirStreamCannot() {
         // the stream needs a second generator and says so; the single draw does
         // not, which is the whole reason it takes both variates from one

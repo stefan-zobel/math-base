@@ -24,12 +24,20 @@
  * {@code default} methods taking the logarithm of the density, and every
  * implementation here overrides that with a closed form.
  * <p>
- * {@link math.distribution.Dirichlet} stands outside both interfaces, and
- * deliberately. Over a simplex there is no distribution function in closed
- * form and no quantile at all, a mean is a vector and a variance a matrix,
- * so of what those interfaces declare only the density survives the move to
- * several dimensions. It is a plain class: a density, a marginal that is a
- * {@link math.distribution.Beta} and brings the whole one dimensional
- * apparatus back with it, and the conjugate update of a multinomial.
+ * {@link math.distribution.Dirichlet} and {@link math.distribution.Multinomial}
+ * stand outside both interfaces, and deliberately. An outcome of either is a
+ * vector, so there is no distribution function in closed form and no quantile
+ * at all, and a mean is a vector and a variance a matrix; of what those
+ * interfaces declare only the density or the mass survives the move to several
+ * dimensions. Both are plain classes with a marginal that brings the whole one
+ * dimensional apparatus back one component at a time -- a
+ * {@link math.distribution.Beta} for the Dirichlet, a
+ * {@link math.distribution.Binomial} for the multinomial.
+ * <p>
+ * The two are the halves of one conjugate pair. {@code Multinomial.logPmf} is
+ * the likelihood of a count vector for known proportions;
+ * {@code Dirichlet.posterior} is what observing those counts does to a belief
+ * about the proportions, and {@code Dirichlet.logMarginalLikelihood} is the
+ * same likelihood with the proportions integrated out.
  */
 package math.distribution;
