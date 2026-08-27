@@ -16,6 +16,7 @@ import org.junit.Test;
 
 import math.distribution.Beta;
 import math.distribution.ContinuousDistribution;
+import math.distribution.Dirichlet;
 import math.distribution.FisherF;
 import math.distribution.InverseGamma;
 import math.distribution.Uniform;
@@ -272,6 +273,29 @@ public final class SingleDrawTest {
             double beta = shapes[s][1];
             fitsUniformly("InverseGamma(" + alpha + ", " + beta + ")", new InverseGamma(alpha, beta),
                     0x14057B7EF767814FL, p -> p.nextInverseGamma(alpha, beta));
+        }
+    }
+
+    @Test
+    public void testDirichletComponentsFollowTheirBetaMarginals() {
+        // a vector draw cannot be fitted against a distribution function,
+        // but each of its components can: the marginal of a Dirichlet is a
+        // Beta, and Dirichlet.marginal says which one. The sampler behind
+        // nextDirichlet normalizes a vector of gamma variates and knows
+        // nothing of that identity
+        double[][] settings = { { 0.5, 2.0, 7.0 }, { 1.0, 1.0, 1.0 } };
+        for (int s = 0; s < settings.length; s++) {
+            final double[] alpha = settings[s];
+            Dirichlet law = new Dirichlet(alpha);
+            for (int i = 0; i < alpha.length; i++) {
+                final int component = i;
+                fitsUniformly("Dirichlet(" + Arrays.toString(alpha) + ")[" + i + "]", law.marginal(i),
+                        0x2B992DDFA23249D6L, p -> {
+                            double[] x = new double[alpha.length];
+                            p.nextDirichlet(alpha, x);
+                            return x[component];
+                        });
+            }
         }
     }
 

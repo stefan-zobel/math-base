@@ -23,5 +23,13 @@
  * likelihood over more than a few hundred observations lives. Both are
  * {@code default} methods taking the logarithm of the density, and every
  * implementation here overrides that with a closed form.
+ * <p>
+ * {@link math.distribution.Dirichlet} stands outside both interfaces, and
+ * deliberately. Over a simplex there is no distribution function in closed
+ * form and no quantile at all, a mean is a vector and a variance a matrix,
+ * so of what those interfaces declare only the density survives the move to
+ * several dimensions. It is a plain class: a density, a marginal that is a
+ * {@link math.distribution.Beta} and brings the whole one dimensional
+ * apparatus back with it, and the conjugate update of a multinomial.
  */
 package math.distribution;

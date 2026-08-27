@@ -503,4 +503,30 @@ public interface PseudoRandom extends PseudoRandomStream {
         HypergeometricSpliterator.checkParameters(population, successes, draws);
         return HypergeometricSpliterator.sample(this, population, successes, draws);
     }
+
+    /**
+     * Draws one vector of proportions from the Dirichlet distribution with
+     * the given concentrations into {@code proportions}.
+     * <p>
+     * Unlike the scalar draws above, this one builds a
+     * {@link DirichletSampler} per call: validating the concentrations and
+     * copying them is what that class is for, and there is nowhere here to
+     * keep the result. For more than a handful of draws hold a sampler, or a
+     * {@code Dirichlet} from the {@code math.distribution} package, and call
+     * it directly.
+     *
+     * @param alpha the concentration of each component, at least one of them,
+     *            each finite and strictly positive. Not modified
+     * @param proportions where the result is written, one entry per
+     *            component. Its previous contents are overwritten
+     * @throws IllegalArgumentException if {@code alpha} or
+     *             {@code proportions} is {@code null}, if {@code alpha} is
+     *             empty or holds a value that is not finite and strictly
+     *             positive, or if {@code proportions} is not as long as
+     *             {@code alpha}
+     * @since 1.5.3
+     */
+    default void nextDirichlet(double[] alpha, double[] proportions) {
+        DirichletSampler.of(alpha).sample(this, proportions);
+    }
 }
