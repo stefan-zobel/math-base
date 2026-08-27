@@ -36,7 +36,23 @@ import math.solve.RootFinder;
  * <li><b>Precision is not accuracy.</b> The classical interval, the bootstrap
  * percentile interval and the BCa interval agree with each other to three
  * decimals and all three miss the truth, by nearly three times their own half
- * width. Nothing computed from these numbers could have told anyone that.</li>
+ * width. Nothing computed from these numbers could have told anyone that.
+ * <p>
+ * <b>Three ways, one shared assumption.</b> All three treat the 100 runs as
+ * independent, and section 5 of this same demo contradicts that: it finds a
+ * drift of {@code -4.4} km/s per day at {@code p = 0.00023}, and a series that
+ * drifts is not a series of independent draws. The size of it is measurable
+ * from the 24 measurement sets the runs are grouped into, which section 5 does
+ * not use -- the runs within a set correlate at {@code 0.59}, giving a design
+ * effect of {@code 2.9}, so the 100 runs carry the information of about 35 and
+ * <b>every half width printed in section 3 is roughly 1.7 times too
+ * small</b>. {@code MichelsonDemoTest} measures that rather than leaving it
+ * here as a claim.
+ * <p>
+ * The conclusion survives, and is strengthened rather than weakened: an
+ * interval that ought to be wider still misses the truth. But "three
+ * different ways" is a weaker phrase than it looks when the three share the
+ * assumption that turns out to be the questionable one.</li>
  * <li><b>A difference that survives the eye need not survive a model.</b> The
  * afternoon runs read 52 km/s above the morning ones, which looks like a
  * finding until day and temperature are in the same regression, where it
@@ -230,6 +246,14 @@ public final class MichelsonDemo {
         double half = criticalT * d.standardError;
         double[] classical = { d.mean - half, d.mean + half };
 
+        // Resampling the runs one at a time assumes they are exchangeable, and
+        // section 5 of this demo shows they are not: there is a drift over the
+        // month, and the runs inside a measurement set correlate at 0.59. The
+        // honest form is a block bootstrap over the 24 sets, which widens every
+        // interval here by about 1.7. Left as it is on purpose, so that the
+        // three intervals stay comparable with each other and with the
+        // classical one beside them; the class comment carries the correction
+        // and MichelsonDemoTest measures it.
         Bootstrap bootstrap = new Bootstrap(speed, MEAN, BOOT_ITERATIONS, BOOT_SEED);
         return new Intervals(d.mean, criticalT, classical, bootstrap.getConfidenceInterval(CONFIDENCE),
                 bootstrap.getConfidenceIntervalBCa(CONFIDENCE), bootstrap.getMean(), d.standardError);

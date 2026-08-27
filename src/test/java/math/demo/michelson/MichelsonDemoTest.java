@@ -12,6 +12,7 @@ import java.io.UnsupportedEncodingException;
 import org.junit.Test;
 
 import math.distribution.StudentT;
+import math.probe.ACF;
 
 /**
  * The bounds here were measured before they were asserted. The ones that are
@@ -203,6 +204,99 @@ public class MichelsonDemoTest {
         assertFalse("a locale slipped into the output", first.contains("299,8"));
         assertTrue("the demo must say what it established", first.contains("what this run established"));
         assertTrue("and it must name the value it is judged against", first.contains("299.792458"));
+    }
+
+    @Test
+    public void testTheHundredRunsAreNotExchangeable() {
+        // The class comment says the three intervals of section 3 share one
+        // assumption and that section 5 of the same demo contradicts it. This
+        // measures the size of it, so that the claim cannot go stale: a one way
+        // decomposition of the 100 runs into the 24 measurement sets the data
+        // file records and nothing else in the demo uses.
+        double[] speed = Datasets.speed();
+        int[] set = Datasets.set();
+        int n = speed.length;
+        int k = Datasets.SETS;
+
+        double grand = 0.0;
+        for (int i = 0; i < n; ++i) {
+            grand += speed[i];
+        }
+        grand /= n;
+
+        double[] sums = new double[k];
+        int[] counts = new int[k];
+        for (int i = 0; i < n; ++i) {
+            sums[set[i] - 1] += speed[i];
+            ++counts[set[i] - 1];
+        }
+        double[] means = new double[k];
+        for (int s = 0; s < k; ++s) {
+            assertTrue("set " + (s + 1) + " is empty", counts[s] > 0);
+            means[s] = sums[s] / counts[s];
+        }
+
+        double between = 0.0;
+        double within = 0.0;
+        for (int s = 0; s < k; ++s) {
+            between += counts[s] * (means[s] - grand) * (means[s] - grand);
+        }
+        for (int i = 0; i < n; ++i) {
+            double d = speed[i] - means[set[i] - 1];
+            within += d * d;
+        }
+        double msBetween = between / (k - 1);
+        double msWithin = within / (n - k);
+        // measured 7.075 on 23 and 76 degrees of freedom
+        assertEquals("the variance ratio", 7.075, msBetween / msWithin, 0.01);
+
+        double squares = 0.0;
+        for (int s = 0; s < k; ++s) {
+            squares += counts[s] * (double) counts[s];
+        }
+        double nBar = (n - squares / n) / (k - 1);
+        double setVariance = (msBetween - msWithin) / nBar;
+        double intraclass = setVariance / (setVariance + msWithin);
+        // measured 0.594: a run tells you rather less about the next run than
+        // an independent draw would
+        assertEquals("the intraclass correlation", 0.594, intraclass, 0.005);
+
+        double designEffect = 1.0 + (n / (double) k - 1.0) * intraclass;
+        // measured 2.88, so the 100 runs are worth about 35 independent ones
+        assertEquals("the design effect", 2.88, designEffect, 0.02);
+        assertTrue("which is what makes every half width in section 3 too small",
+                designEffect > 2.0);
+        assertTrue("100 correlated runs are worth fewer than 50 independent ones",
+                n / designEffect < 50.0);
+    }
+
+    @Test
+    public void testTheSetMeansAreExchangeableEvenThoughTheRunsAreNot() {
+        // where the correlation lives: between the sets, not along the month.
+        // The 24 set means show no autocorrelation, so the structure section 3
+        // trips over is a block effect and not the drift section 5 reports
+        double[] speed = Datasets.speed();
+        int[] set = Datasets.set();
+        int k = Datasets.SETS;
+        double[] sums = new double[k];
+        int[] counts = new int[k];
+        for (int i = 0; i < speed.length; ++i) {
+            sums[set[i] - 1] += speed[i];
+            ++counts[set[i] - 1];
+        }
+        double[] means = new double[k];
+        for (int s = 0; s < k; ++s) {
+            means[s] = sums[s] / counts[s];
+        }
+
+        double[] runs = ACF.acf(speed, 4);
+        double[] sets = ACF.acf(means, 4);
+        // measured +0.535 against a band of 0.196
+        assertTrue("the runs correlate at lag one, was " + runs[1],
+                runs[1] > 1.96 / Math.sqrt(speed.length));
+        // measured -0.150 against a band of 0.400
+        assertTrue("the set means do not, was " + sets[1],
+                Math.abs(sets[1]) < 1.96 / Math.sqrt(k));
     }
 
     private static String run() {
