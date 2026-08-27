@@ -53,10 +53,15 @@ import math.solve.RootFinder;
  * interval that ought to be wider still misses the truth. But "three
  * different ways" is a weaker phrase than it looks when the three share the
  * assumption that turns out to be the questionable one.</li>
- * <li><b>A difference that survives the eye need not survive a model.</b> The
- * afternoon runs read 52 km/s above the morning ones, which looks like a
+ * <li><b>A difference that survives the eye need not survive a model, and a
+ * difference that survives a model need not survive its unit of analysis.</b>
+ * The afternoon runs read 52 km/s above the morning ones, which looks like a
  * finding until day and temperature are in the same regression, where it
- * collapses to nothing. What does survive is a drift over the month.</li>
+ * collapses to nothing. The drift over the month that appears to survive that
+ * -- {@code -4.4} km/s per day at {@code p = 0.00023} -- collapses in turn when
+ * the row is the measurement set rather than the run: {@code p = 0.055}, and
+ * the interval covers zero. Nothing about the measurements changed between the
+ * two fits. Only what was counted as one observation.</li>
  * <li><b>The library checking itself.</b> The quantile the interval is built
  * from, the distribution function behind it and the density behind that are
  * three separate pieces of code, and section 4 makes each one confirm the
@@ -384,12 +389,27 @@ public final class MichelsonDemo {
     }
 
     static Model model() {
-        double[] speed = Datasets.speed();
-        double[] afternoon = Datasets.afternoon();
-        double[] day = Datasets.day();
-        double[] temperature = Datasets.temperature();
-        int n = speed.length;
+        return fitModel(Datasets.speed(), Datasets.afternoon(), Datasets.day(), Datasets.temperature(),
+                describe().sd);
+    }
 
+    /**
+     * The same four terms fitted to the 24 measurement set means rather than to
+     * the 100 runs.
+     * <p>
+     * Which of the two is right is not a matter of taste. A regression assumes
+     * its rows are independent, and {@link #clustering()} measures how far from
+     * independent the runs are; the set is the unit the data were gathered in,
+     * and it is the unit that assumption holds for.
+     */
+    static Model setModel() {
+        Sets s = sets();
+        return fitModel(s.speed, s.afternoon, s.day, s.temperature, standardDeviation(s.speed));
+    }
+
+    private static Model fitModel(double[] response, double[] afternoon, double[] day, double[] temperature,
+            double rawSd) {
+        int n = response.length;
         DMatrix X = new DMatrix(n, 4);
         DMatrix y = new DMatrix(n, 1);
         for (int i = 0; i < n; ++i) {
@@ -397,7 +417,7 @@ public final class MichelsonDemo {
             X.set(i, 1, afternoon[i]);
             X.set(i, 2, day[i]);
             X.set(i, 3, temperature[i]);
-            y.set(i, 0, speed[i]);
+            y.set(i, 0, response[i]);
         }
         LSSummary fit = OLS.estimate(1.0 - CONFIDENCE, X, y);
         List<DoubleList> bounds = fit.getConfidenceIntervals();
@@ -407,7 +427,145 @@ public final class MichelsonDemo {
         }
         return new Model(new String[] { "intercept", "afternoon", "day", "temperature" }, fit.getBeta().toArray(),
                 fit.getTValues().toArray(), fit.getPValues().toArray(), ci, fit.getRSquared(),
-                Math.sqrt(fit.getSigmaHatSquared()), describe().sd, fit.getDegreesOfFreedom());
+                Math.sqrt(fit.getSigmaHatSquared()), rawSd, fit.getDegreesOfFreedom());
+    }
+
+    private static double standardDeviation(double[] v) {
+        double mean = 0.0;
+        for (int i = 0; i < v.length; ++i) {
+            mean += v[i];
+        }
+        mean /= v.length;
+        double sum = 0.0;
+        for (int i = 0; i < v.length; ++i) {
+            sum += (v[i] - mean) * (v[i] - mean);
+        }
+        return Math.sqrt(sum / (v.length - 1));
+    }
+
+    /** The 100 runs collapsed to the 24 measurement sets they were made in. */
+    static final class Sets {
+        final double[] speed;
+        final double[] afternoon;
+        final double[] day;
+        final double[] temperature;
+        final int[] size;
+
+        Sets(double[] speed, double[] afternoon, double[] day, double[] temperature, int[] size) {
+            this.speed = speed;
+            this.afternoon = afternoon;
+            this.day = day;
+            this.temperature = temperature;
+            this.size = size;
+        }
+    }
+
+    /** Every column of the table, averaged within each measurement set. */
+    static Sets sets() {
+        double[] speed = Datasets.speed();
+        double[] afternoon = Datasets.afternoon();
+        double[] day = Datasets.day();
+        double[] temperature = Datasets.temperature();
+        int[] set = Datasets.set();
+        int k = Datasets.SETS;
+
+        double[] s = new double[k];
+        double[] a = new double[k];
+        double[] d = new double[k];
+        double[] t = new double[k];
+        int[] size = new int[k];
+        for (int i = 0; i < speed.length; ++i) {
+            int at = set[i] - 1;
+            s[at] += speed[i];
+            a[at] += afternoon[i];
+            d[at] += day[i];
+            t[at] += temperature[i];
+            ++size[at];
+        }
+        for (int j = 0; j < k; ++j) {
+            s[j] /= size[j];
+            a[j] /= size[j];
+            d[j] /= size[j];
+            t[j] /= size[j];
+        }
+        return new Sets(s, a, d, t, size);
+    }
+
+    /** What the measurement sets cost in effective sample size. */
+    static final class Clustering {
+        /** Between-set mean square over within-set mean square. */
+        final double fRatio;
+        /** Degrees of freedom of the numerator and the denominator. */
+        final int betweenDf;
+        /** See {@link #betweenDf}. */
+        final int withinDf;
+        /** Standard deviation of the set effect, in km/s. */
+        final double setSd;
+        /** Standard deviation of a run within its set, in km/s. */
+        final double runSd;
+        /** How much of the total variance sits between the sets. */
+        final double intraclass;
+        /** By how much a naive variance understates the truth. */
+        final double designEffect;
+        /** How many independent runs the 100 are worth. */
+        final double effectiveSize;
+
+        Clustering(double fRatio, int betweenDf, int withinDf, double setSd, double runSd, double intraclass,
+                double designEffect, double effectiveSize) {
+            this.fRatio = fRatio;
+            this.betweenDf = betweenDf;
+            this.withinDf = withinDf;
+            this.setSd = setSd;
+            this.runSd = runSd;
+            this.intraclass = intraclass;
+            this.designEffect = designEffect;
+            this.effectiveSize = effectiveSize;
+        }
+    }
+
+    /**
+     * The one-way decomposition of the 100 runs into the 24 sets, which is what
+     * says whether the rows of a regression on them are independent.
+     * <p>
+     * The set column has been in {@link Datasets} from the beginning and no
+     * step used it. It decides two of the conclusions below.
+     */
+    static Clustering clustering() {
+        double[] speed = Datasets.speed();
+        int[] set = Datasets.set();
+        int n = speed.length;
+        int k = Datasets.SETS;
+        Sets s = sets();
+
+        double grand = 0.0;
+        for (int i = 0; i < n; ++i) {
+            grand += speed[i];
+        }
+        grand /= n;
+
+        double between = 0.0;
+        for (int j = 0; j < k; ++j) {
+            between += s.size[j] * (s.speed[j] - grand) * (s.speed[j] - grand);
+        }
+        double within = 0.0;
+        for (int i = 0; i < n; ++i) {
+            double d = speed[i] - s.speed[set[i] - 1];
+            within += d * d;
+        }
+        double msBetween = between / (k - 1);
+        double msWithin = within / (n - k);
+
+        double squares = 0.0;
+        for (int j = 0; j < k; ++j) {
+            squares += s.size[j] * (double) s.size[j];
+        }
+        // the unequal set sizes enter here: nBar is not simply n / k
+        double nBar = (n - squares / n) / (k - 1);
+        double setVariance = (msBetween - msWithin) / nBar;
+        double intraclass = setVariance / (setVariance + msWithin);
+        double designEffect = 1.0 + (n / (double) k - 1.0) * intraclass;
+        return new Clustering(msBetween / msWithin, k - 1, n - k, 1000.0 * Math.sqrt(setVariance),
+                1000.0 * Math.sqrt(msWithin), intraclass, designEffect, n / designEffect);
     }
 
     /** The difference the eye sees, before any model is asked about it. */
@@ -575,14 +733,56 @@ public final class MichelsonDemo {
                 "  The afternoon effect does not survive it: p = %.2f, and its interval covers",
                 Double.valueOf(m.pValues[afternoon])));
         System.out.println("  zero comfortably. The runs were simply not spread evenly over the month.");
-        System.out.println(String.format(L, "  What does survive is a drift of %+.1f km/s per day, p = %.5f.",
+        System.out.println(String.format(L, "  What appears to survive is a drift of %+.1f km/s per day, p = %.5f.",
                 Double.valueOf(1000.0 * m.beta[day]), Double.valueOf(m.pValues[day])));
+        System.out.println();
+        System.out.println("  That p value is worth exactly one assumption: that the 100 runs are 100");
+        System.out.println("  independent measurements. They are not. They were made in 24 sets, and");
+        System.out.println("  the set column has been in the table all along without a step using it:");
+        System.out.println();
+        Clustering c5 = clustering();
+        System.out.println(String.format(L, "    F = %.3f on %d and %d degrees of freedom", Double.valueOf(c5.fRatio),
+                Integer.valueOf(c5.betweenDf), Integer.valueOf(c5.withinDf)));
+        System.out.println(String.format(L, "    set to set sd %.1f km/s against run to run sd %.1f km/s",
+                Double.valueOf(c5.setSd), Double.valueOf(c5.runSd)));
+        System.out.println(String.format(L, "    intraclass correlation %.3f, design effect %.2f",
+                Double.valueOf(c5.intraclass), Double.valueOf(c5.designEffect)));
+        System.out.println(String.format(L, "    so the 100 runs carry the information of about %.0f",
+                Double.valueOf(c5.effectiveSize)));
+        System.out.println();
+        System.out.println("  Fit the same four terms to the 24 set means, the unit the data were");
+        System.out.println("  actually gathered in:");
+        System.out.println();
+        Model sm = setModel();
+        System.out.println(String.format(L, "  %-12s %13s %9s %9s %9s   %s", "term", "coefficient", "km/s", "t", "p",
+                "95 percent interval"));
+        for (int j = 0; j < sm.terms.length; ++j) {
+            System.out.println(String.format(L, "  %-12s %13.6f %9.1f %9.3f %9.5f   [%+.6f, %+.6f]", sm.terms[j],
+                    Double.valueOf(sm.beta[j]), Double.valueOf(1000.0 * sm.beta[j]), Double.valueOf(sm.tValues[j]),
+                    Double.valueOf(sm.pValues[j]), Double.valueOf(sm.intervals[j][0]),
+                    Double.valueOf(sm.intervals[j][1])));
+        }
+        System.out.println();
+        int setDay = sm.indexOf("day");
+        System.out.println(String.format(L, "  The drift does not survive that either: %+.1f km/s per day at p = %.3f,",
+                Double.valueOf(1000.0 * sm.beta[setDay]), Double.valueOf(sm.pValues[setDay])));
+        System.out.println(String.format(L, "  and its interval [%+.2f, %+.2f] km/s covers zero. The p value moved by",
+                Double.valueOf(1000.0 * sm.intervals[setDay][0]), Double.valueOf(1000.0 * sm.intervals[setDay][1])));
+        System.out.println(String.format(L, "  a factor of %.0f, and nothing about the measurements changed -- only",
+                Double.valueOf(sm.pValues[setDay] / m.pValues[setDay])));
+        System.out.println("  the row that was treated as one observation.");
+        System.out.println();
+        System.out.println("  Two effects looked like findings in this section and neither was. The");
+        System.out.println("  first needed a column the eye ignored; the second needed a column no");
+        System.out.println("  earlier step had touched.");
+        System.out.println();
         System.out.println(String.format(L,
-                "  The model explains %.0f percent of the variance and leaves an sd of %.6f",
-                Double.valueOf(100.0 * m.rSquared), Double.valueOf(m.residualSd)));
-        System.out.println(String.format(L, "  against the raw %.6f -- and none of it touches the %.0f km/s that",
-                Double.valueOf(m.rawSd), Double.valueOf(d.biasKmPerSecond())));
-        System.out.println("  separate this table from the truth.");
+                "  The model on the runs explains %.0f percent of the variance and leaves an",
+                Double.valueOf(100.0 * m.rSquared)));
+        System.out.println(String.format(L, "  sd of %.6f against the raw %.6f -- and none of it touches",
+                Double.valueOf(m.residualSd), Double.valueOf(m.rawSd)));
+        System.out.println(String.format(L, "  the %.0f km/s that separate this table from the truth.",
+                Double.valueOf(d.biasKmPerSecond())));
 
         rule("6. what this run established");
         System.out.println(String.format(L,
@@ -608,10 +808,18 @@ public final class MichelsonDemo {
         System.out.println(String.format(L,
                 "  5. The eye-catching %+.0f km/s between afternoon and morning is confounding",
                 Double.valueOf(rawAfternoonEffect())));
-        System.out.println(String.format(L, "     (p = %.2f). The real structure is a drift of %+.1f km/s per day",
+        System.out.println(String.format(L, "     (p = %.2f), and the drift of %+.1f km/s per day that looks like the",
                 Double.valueOf(m.pValues[afternoon]), Double.valueOf(1000.0 * m.beta[day])));
-        System.out.println(String.format(L, "     (p = %.5f), and it explains none of the bias.",
-                Double.valueOf(m.pValues[day])));
+        System.out.println(String.format(L,
+                "     real structure at p = %.5f falls to p = %.3f once the 24 measurement",
+                Double.valueOf(m.pValues[day]), Double.valueOf(sm.pValues[setDay])));
+        System.out.println(String.format(L,
+                "     sets are the row rather than the run. Their design effect is %.2f, so",
+                Double.valueOf(c5.designEffect)));
+        System.out.println(String.format(L,
+                "     the 100 runs were never worth more than about %.0f. Neither effect is",
+                Double.valueOf(c5.effectiveSize)));
+        System.out.println("     established, and neither would have touched the bias if it were.");
         System.out.println();
         System.out.println("  Michelson's apparatus was precise and it was wrong, and no amount of");
         System.out.println("  arithmetic on its output could have revealed that. Only a value obtained");
