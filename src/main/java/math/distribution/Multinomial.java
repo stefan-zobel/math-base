@@ -93,8 +93,17 @@ public final class Multinomial {
         this.p = probabilities.clone();
         this.p0 = sum;
         this.logP = new double[m];
+        double logP0 = Math.log(sum);
         for (int i = 0; i < m; i++) {
-            logP[i] = Math.log(this.p[i] / sum);
+            double q = this.p[i] / sum;
+            // the quotient is the accurate form wherever it is a normal number,
+            // but weights spanning hundreds of orders of magnitude underflow it
+            // to zero and lose an answer that is merely small. There the
+            // difference of the logarithms is exact enough: it is only reached
+            // below exp(-708), where neither logarithm exceeds 709 in magnitude
+            // and there is no cancellation to fear. See Categorical, which
+            // carries the same guard for the same reason
+            logP[i] = q > Double.MIN_NORMAL ? Math.log(q) : Math.log(this.p[i]) - logP0;
         }
         this.sampler = MultinomialSampler.of(this.p);
     }

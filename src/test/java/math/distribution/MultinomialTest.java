@@ -240,6 +240,33 @@ public class MultinomialTest {
     }
 
     @Test
+    public void theLogMassSurvivesAWeightWhoseShareDoesNot() {
+        // the share of the first category is 1.0e-620 and is below the smallest
+        // double, so log(p_i / p0) is -Infinity where the answer is finite and
+        // ordinary. Ten decades of weight is what importance weights look like
+        // just before a resampling step, and this is the law they describe
+        double[] weights = { 1.0e-320, 1.0, 1.0e300 };
+        Multinomial law = new Multinomial(3, weights);
+        int[] counts = { 1, 1, 1 };
+        double logMass = law.logPmf(counts);
+        assertTrue("the log mass underflowed with the quotient : " + logMass, !Double.isInfinite(logMass));
+
+        // log(3!) + log(1.0e-320/p0) + log(1.0/p0) + log(1.0e300/p0), with
+        // p0 == 1.0e300 to the last bit
+        double expected = Math.log(6.0) + (Math.log(1.0e-320) - Math.log(1.0e300)) + (-Math.log(1.0e300));
+        assertEquals("the log mass is not the sum of the shares", expected, logMass, 1.0e-9);
+
+        // and the one draw case is exactly what Categorical says it is
+        Categorical single = new Categorical(weights);
+        for (int k = 0; k < weights.length; k++) {
+            int[] indicator = new int[weights.length];
+            indicator[k] = 1;
+            assertEquals("the one draw law differs at " + k, single.logPmf(k),
+                    new Multinomial(1, weights).logPmf(indicator), 0.0);
+        }
+    }
+
+    @Test
     public void aVeryLargeNumberOfTrialsStaysFinite() {
         // logFactorial has no upper bound and switches to a Stirling series
         // above 29, so a count vector no double could hold the mass of still

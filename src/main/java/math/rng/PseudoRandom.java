@@ -561,4 +561,32 @@ public interface PseudoRandom extends PseudoRandomStream {
     default void nextMultinomial(int n, double[] probabilities, int[] counts) {
         MultinomialSampler.of(probabilities).sample(this, n, counts);
     }
+
+    /**
+     * Returns one pseudorandom category from the categorical distribution the
+     * given weights describe: a single draw landing in a single category.
+     * <p>
+     * As with {@link #nextDirichlet(double[], double[])} and
+     * {@link #nextMultinomial(int, double[], int[])}, this builds its
+     * {@link AliasTable} per call, and for the same reason: validating and
+     * pairing up the weights is what that class is for, and there is nowhere
+     * here to keep the result. For more than a handful of draws hold a table
+     * -- or a {@code Categorical} from the {@code math.distribution} package
+     * -- and call it directly, or take the whole stream from
+     * {@link PseudoRandomStream#categorical(long, double[])}.
+     *
+     * @param weights
+     *            the weight of each category, at least one of them, each finite
+     *            and not negative, and not all zero. They need not sum to one.
+     *            Not modified
+     * @return a category in {@code 0 .. weights.length - 1}
+     * @throws IllegalArgumentException
+     *             if {@code weights} is {@code null}, is empty, holds a value
+     *             that is negative or not finite, or does not sum to a finite
+     *             positive number
+     * @since 1.5.3
+     */
+    default int nextCategorical(double[] weights) {
+        return AliasTable.of(weights).sample(this);
+    }
 }

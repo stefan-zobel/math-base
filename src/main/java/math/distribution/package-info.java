@@ -39,5 +39,15 @@
  * {@code Dirichlet.posterior} is what observing those counts does to a belief
  * about the proportions, and {@code Dirichlet.logMarginalLikelihood} is the
  * same likelihood with the proportions integrated out.
+ * <p>
+ * {@link math.distribution.Categorical} is the multinomial of a single draw,
+ * and it does <em>not</em> stand outside: an outcome of one draw is one
+ * category, so it is an ordinary
+ * {@link math.distribution.DiscreteDistribution} with a distribution function,
+ * a quantile and both moments. It is the observation a
+ * {@code Dirichlet.posterior} is updated with when observations arrive one at
+ * a time rather than already counted, and it is the one law in this package
+ * whose masses are given rather than computed from a formula -- its shape is
+ * an argument.
  */
 package math.distribution;

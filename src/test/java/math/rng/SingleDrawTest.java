@@ -26,9 +26,9 @@ import math.stats.HypothesisTests;
 /**
  * The single-draw entry points on {@link PseudoRandom}.
  * <p>
- * Fifteen of the seventeen families are held to a far stronger statement than
+ * Sixteen of the eighteen families are held to a far stronger statement than
  * any distributional test could make: from the same seed the single draw
- * must be the <b>identical</b> {@code double} the stream would produce. That
+ * must be the <b>identical</b> value the stream would produce. That
  * makes the evidence the stream tests already carry transfer whole, and no
  * family needs its distribution established a second time.
  * <p>
@@ -205,6 +205,21 @@ public final class SingleDrawTest {
             identicalCount("hypergeometric(" + population + ", " + successes + ", " + draws + ")",
                     g -> g.nextHypergeometric(population, successes, draws),
                     g -> g.hypergeometric(1L, population, successes, draws));
+        }
+    }
+
+    @Test
+    public void testCategoricalIsBitForBitTheStream() {
+        // the single draw and the stream both go through an AliasTable, so this
+        // says the table is built the same way from either side -- including
+        // the pairing, which is where an off-by-one would show up as a
+        // different column and not as a wrong distribution
+        double[][] settings = { { 1.0, 1.0 }, { 0.5, 2.0, 7.0 }, { 3.0, 0.0, 5.0, 0.0, 1.0 },
+                { 1.0e-6, 1.0, 1.0e6 }, { 9.0 } };
+        for (int s = 0; s < settings.length; s++) {
+            double[] weights = settings[s];
+            identicalCount("categorical(" + Arrays.toString(weights) + ")", g -> g.nextCategorical(weights),
+                    g -> g.categorical(1L, weights));
         }
     }
 
@@ -424,6 +439,17 @@ public final class SingleDrawTest {
                 () -> p.hypergeometric(1L, 10, 11, 5));
         bothReject("hypergeometric draws above the population", () -> p.nextHypergeometric(10, 5, 11),
                 () -> p.hypergeometric(1L, 10, 5, 11));
+
+        // the categorical, whose parameter is a whole vector: both paths build
+        // the same AliasTable, so both have to refuse the same vectors
+        double[][] impossible = { {}, { 1.0, -1.0 }, { 1.0, Double.NaN }, { 1.0, Double.POSITIVE_INFINITY },
+                { 0.0, 0.0 }, { Double.MAX_VALUE, Double.MAX_VALUE } };
+        for (int i = 0; i < impossible.length; i++) {
+            double[] weights = impossible[i];
+            bothReject("categorical " + Arrays.toString(weights), () -> p.nextCategorical(weights),
+                    () -> p.categorical(1L, weights));
+        }
+        bothReject("categorical null", () -> p.nextCategorical(null), () -> p.categorical(1L, (double[]) null));
     }
 
     @Test
@@ -518,6 +544,7 @@ public final class SingleDrawTest {
         assertTrue("nextGeometric", foreign.nextGeometric(0.25) >= 0);
         assertTrue("nextNegativeBinomial", foreign.nextNegativeBinomial(4, 0.4) >= 0);
         assertTrue("nextHypergeometric", foreign.nextHypergeometric(50, 20, 10) >= 0);
+        assertTrue("nextCategorical", foreign.nextCategorical(new double[] { 2.0, 5.0, 1.0 }) >= 0);
     }
 
     @Test
