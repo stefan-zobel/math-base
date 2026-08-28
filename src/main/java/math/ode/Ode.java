@@ -401,11 +401,11 @@ public final class Ode {
      * <caption>evaluations</caption>
      * <tr><th>problem</th><th>this</th><th>better pure</th><th>perfect</th></tr>
      * <tr><td>a dial from 1 to 1e5 and back, tolerance 1e-6</td>
-     * <td>1728</td><td>2928</td><td>1468</td></tr>
+     * <td>1789</td><td>2928</td><td>1468</td></tr>
      * <tr><td>van der Pol at mu = 1000, tolerance 1e-6</td>
-     * <td>4698</td><td>8902</td><td>2747</td></tr>
+     * <td>5017</td><td>8902</td><td>2747</td></tr>
      * <tr><td>Robertson to 1e5, tolerance 1e-8</td>
-     * <td>3210</td><td>3147</td><td>3073</td></tr>
+     * <td>3250</td><td>3147</td><td>3073</td></tr>
      * </table>
      * <p>
      * <b>It is not the answer to the other two cases, and it does not need to

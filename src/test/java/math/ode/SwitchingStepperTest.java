@@ -46,6 +46,43 @@ public class SwitchingStepperTest {
         }
     };
 
+    /**
+     * The dial again, but on a chain of {@code n} cells diffusing into each
+     * other, so that the dimension can be turned up while the spectrum stays
+     * where it is -- the diffusion is scaled with the mesh on purpose, since
+     * what is being varied here is {@code n} and nothing else.
+     */
+    private static DVectorField chain(final int n) {
+        final double h = 1.0 / (n + 1);
+        final double[] profile = new double[n];
+        for (int i = 0; i < n; ++i) {
+            profile[i] = Math.sin(Math.PI * (i + 1) * h);
+        }
+        return new DVectorField() {
+            @Override
+            public void valueAt(double t, double[] y, double[] dydt) {
+                double width = 0.25;
+                double lambda = 1.0 + (1.0e5 - 1.0) * 0.5 * (1.0 + Math.tanh((t - 10.0) / width))
+                        * 0.5 * (1.0 + Math.tanh((20.0 - t) / width));
+                double c = Math.cos(t);
+                for (int i = 0; i < n; ++i) {
+                    double left = (i == 0) ? 0.0 : y[i - 1];
+                    double right = (i == n - 1) ? 0.0 : y[i + 1];
+                    dydt[i] = 2.5 * (left - 2.0 * y[i] + right) - lambda * (y[i] - c * profile[i]);
+                }
+            }
+        };
+    }
+
+    private static double[] chainStart(int n) {
+        double[] y = new double[n];
+        double h = 1.0 / (n + 1);
+        for (int i = 0; i < n; ++i) {
+            y[i] = Math.sin(Math.PI * (i + 1) * h);
+        }
+        return y;
+    }
+
     /** A linear equation whose one eigenvalue is a number this test knows. */
     private static final DVectorField DECAY = new DVectorField() {
         @Override
@@ -180,6 +217,44 @@ public class SwitchingStepperTest {
     }
 
     /**
+     * <b>The dimension must not decide whether the two methods change places.</b>
+     * <p>
+     * A trial judged on the step size the other method would propose
+     * <em>next</em> can only ever hand over while one implicit step costs less
+     * than a couple of explicit ones, since that one-step proposal is all the
+     * ramp it can see. With a differenced Jacobian that is
+     * <code>n + 7 &lt; 6 * 2.7</code>, and above {@code n = 9} such a stepper
+     * never hands over at all: on this chain it took 2072668 evaluations at
+     * {@code n = 10} where the implicit method alone takes 6142. Letting the
+     * trial settle is what removes the bound, and this is the test that says so.
+     */
+    @Test
+    public void itHandsOverAtEveryDimension() {
+        int[] sizes = { 10, 50 };
+        for (int q = 0; q < sizes.length; ++q) {
+            int n = sizes[q];
+            DVectorField f = chain(n);
+            StepController controller = new StepController(1.0e-6, 1.0e-6);
+            SwitchingStepper switcher = new SwitchingStepper(f, n, controller);
+            OdeIntegrator.Result mixed = new OdeIntegrator(switcher, controller).solve(0.0,
+                    chainStart(n), 30.0);
+            OdeIntegrator.Result pure = new OdeIntegrator(
+                    new Rosenbrock(RosenbrockTableau.RODAS4, f, n),
+                    new StepController(1.0e-6, 1.0e-6)).solve(0.0, chainStart(n), 30.0);
+
+            assertTrue("it hands over at n = " + n + ", not " + switcher.switches() + " switches",
+                    switcher.switches() >= 1L);
+            assertTrue("and at n = " + n + " it beats the pure implicit run, " + mixed.evaluations
+                    + " against " + pure.evaluations, mixed.evaluations < 0.7 * pure.evaluations);
+            assertTrue("having explored to find out", switcher.explorationEvaluations() > 0L);
+            for (int i = 0; i < n; ++i) {
+                assertEquals("component " + i + " at n = " + n, pure.finalState()[i],
+                        mixed.finalState()[i], ACROSS_METHODS);
+            }
+        }
+    }
+
+    /**
      * An interior value is asked for on whichever side took the step, so the
      * whole grid is answered even though the method changed halfway through.
      */
@@ -239,8 +314,42 @@ public class SwitchingStepperTest {
             next = swap;
             t += h;
         }
-        assertTrue("both sides stepped, which is what makes this worth asserting",
-                switcher.nonStiffSteps() > 0L && switcher.stiffSteps() > 0L);
+        assertTrue("the explicit side did the stepping here", switcher.nonStiffSteps() > 0L);
+
+        // and the same on the implicit side, reached by driving a run there
+        // first, since the steps taken to find out where the implicit method
+        // settles are the scout's and never the answer
+        StepController controller = new StepController(1.0e-8, 1.0e-8);
+        SwitchingStepper stiffly = new SwitchingStepper(ROBERTSON, 3, controller);
+        OdeIntegrator.Result driven = new OdeIntegrator(stiffly, controller).solve(0.0,
+                new double[] { 1.0, 0.0, 0.0 }, 1.0e3);
+        assertTrue("which ends on the implicit side", stiffly.isStiffActive());
+
+        double[] state = driven.finalState().clone();
+        double[] reached = new double[3];
+        double[] estimate = new double[3];
+        double[] start = new double[3];
+        double[] end = new double[3];
+        double[] inside = new double[3];
+        double time = 1.0e3;
+        for (int i = 0; i < 6; ++i) {
+            double[] before = state.clone();
+            stiffly.step(time, state, 10.0, reached, estimate);
+            stiffly.interpolate(0.0, start);
+            stiffly.interpolate(1.0, end);
+            stiffly.interpolate(0.5, inside);
+            for (int m = 0; m < 3; ++m) {
+                assertEquals("start of implicit step " + i + ", component " + m, before[m], start[m],
+                        0.0);
+                assertEquals("end of implicit step " + i + ", component " + m, reached[m], end[m], 0.0);
+                assertTrue("the middle of implicit step " + i + " is a number",
+                        !Double.isNaN(inside[m]) && !Double.isInfinite(inside[m]));
+            }
+            double[] swap = state;
+            state = reached;
+            reached = swap;
+            time += 10.0;
+        }
     }
 
     /**
@@ -302,10 +411,12 @@ public class SwitchingStepperTest {
         }
         assertTrue("forty attempts asked more than once, not " + switcher.trials(),
                 switcher.trials() >= 2L);
-        // forty calls, plus the trials, each of which is a step of its own that
-        // was computed and thrown away
-        assertEquals("and every attempt is counted", 40L + switcher.trials(),
+        // forty calls, forty steps: a trial on this side is the scout's, and the
+        // scout advances nothing, so it appears in neither count
+        assertEquals("and every attempt is counted", 40L,
                 switcher.nonStiffSteps() + switcher.stiffSteps());
+        assertTrue("what the asking cost is its own figure",
+                switcher.explorationEvaluations() > 0L);
     }
 
     /**
@@ -327,10 +438,13 @@ public class SwitchingStepperTest {
         assertEquals("having handed over once", 1L, switcher.switches());
         assertTrue("and within the first handful of steps, not after twenty",
                 switcher.nonStiffSteps() < 12L);
+        // the concentrations stay concentrations, to within the tolerance the
+        // run was asked for -- the measured worst excursion is a tenth of it,
+        // and the failure this guards against left one of them at -0.12
         for (int i = 0; i < mixed.length; ++i) {
             for (int m = 0; m < 3; ++m) {
                 assertTrue("y[" + i + "][" + m + "] is a concentration, not " + mixed.y[i][m],
-                        mixed.y[i][m] > -1.0e-6 && mixed.y[i][m] < 1.0 + 1.0e-6);
+                        mixed.y[i][m] > -1.0e-4 && mixed.y[i][m] < 1.0 + 1.0e-4);
             }
         }
     }
@@ -369,6 +483,7 @@ public class SwitchingStepperTest {
         new OdeIntegrator(switcher, controller).solve(0.0, new double[] { 1.0, 0.0 }, 50.0);
         assertEquals("trials", 0L, switcher.trials());
         assertEquals("implicit steps", 0L, switcher.stiffSteps());
+        assertEquals("and nothing spent exploring", 0L, switcher.explorationEvaluations());
 
         // where it is stiff the veto lifts and the trials happen
         StepController other = new StepController(1.0e-6, 1.0e-6);
@@ -389,8 +504,9 @@ public class SwitchingStepperTest {
         assertTrue("it went stiff", switcher.isStiffActive());
         long spent = switcher.evaluations();
         assertTrue("which cost something", spent > 0L);
-        assertEquals("the two sides together", switcher.nonStiffStepper().evaluations()
-                + switcher.stiffStepper().evaluations(), spent);
+        assertEquals("the two sides and the exploring together",
+                switcher.nonStiffStepper().evaluations() + switcher.stiffStepper().evaluations()
+                        + switcher.explorationEvaluations(), spent);
 
         switcher.reset();
         assertFalse("back on the explicit side", switcher.isStiffActive());

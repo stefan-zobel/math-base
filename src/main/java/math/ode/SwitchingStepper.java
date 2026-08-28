@@ -19,8 +19,11 @@ import math.fun.DiffDVectorField;
  * <b>The decision is a price, not a diagnosis.</b> Every {@code probeEvery}
  * steps the method that is <em>not</em> stepping is given the step to try, and
  * what that trial costs per unit of time is compared with what the method in
- * charge costs per unit of time. The same question, and the same code, decides
- * both directions.
+ * charge costs per unit of time. The same question decides both directions,
+ * though not by the same reading: coming back to the explicit method one trial
+ * step is enough, and going to the implicit one it is not, because a
+ * stability-limited step size is no baseline to extrapolate from.
+ * {@link #theImplicitSettlesCheaper} is where that is measured out.
  * <p>
  * <b>Neither side can diagnose stiffness on its own, which is why the price is
  * asked instead.</b> Both of the obvious tests were built first and measured,
@@ -64,20 +67,32 @@ import math.fun.DiffDVectorField;
  * <caption>evaluations, at {@code probeEvery} of 20</caption>
  * <tr><th>problem</th><th>this</th><th>better pure</th><th>oracle</th></tr>
  * <tr><td>a dial from 1 to 1e5 and back, rtol 1e-6</td>
- * <td>1728</td><td>2928</td><td>1468</td></tr>
+ * <td>1789</td><td>2928</td><td>1468</td></tr>
  * <tr><td>van der Pol at mu = 1000, rtol 1e-6</td>
- * <td>4698</td><td>8902</td><td>2747</td></tr>
+ * <td>5017</td><td>8902</td><td>2747</td></tr>
  * <tr><td>Robertson to 1e5, rtol 1e-8</td>
- * <td>3210</td><td>3147</td><td>3073</td></tr>
+ * <td>3250</td><td>3147</td><td>3073</td></tr>
+ * <tr><td>a chain of 50 cells under the same dial, rtol 1e-6</td>
+ * <td>8757</td><td>19948</td><td>--</td></tr>
  * </table>
  * <p>
- * The first two are what switching is for, and it closes 82 % and 68 % of the
- * distance to the oracle. The third is an equation that is stiff throughout,
+ * The first two are what switching is for, and it closes 78 % and 63 % of the
+ * distance to the oracle. Robertson is an equation that is stiff throughout,
  * where there is nothing to win and the trials are an insurance premium of a
  * few percent on a claim never made. Over tolerances from {@code 1e-4} to
- * {@code 1e-13} the two winners stay winners -- van der Pol between 40 % and
- * 65 % of the pure implicit run, the dial never above it -- and Robertson's
- * premium stays between 1.5 % and 9 %.
+ * {@code 1e-12} the two winners stay winners -- van der Pol between 41 % and
+ * 85 % of the pure implicit run, the dial never above 99 % of it -- and
+ * Robertson's premium stays between 2 % and 17 %.
+ * <p>
+ * <b>The dimension is not among the things that decide.</b> The last row is
+ * there because it once was: a trial judged on one step could only hand over
+ * while one implicit step cost less than a couple of explicit ones, which for a
+ * differenced Jacobian is {@code n < 9}, and above that the stepper never
+ * handed over at all. See {@link #theImplicitSettlesCheaper} for what that was
+ * and why it is gone. A caller with a large system should still reach for the
+ * {@link DiffDVectorField} constructor where they can: the differencing is
+ * {@code n + 1} evaluations a step, and on that chain of 50 the written
+ * Jacobian costs 1414 evaluations against 8757.
  * <p>
  * <b>Which explicit method to pair.</b> {@link ButcherTableau#DOP853} works
  * here unchanged and is worth reaching for under two conditions at once: the
@@ -144,6 +159,15 @@ public final class SwitchingStepper implements OdeStepper {
      * to try. Measured over {@code 5}, {@code 10}, {@code 20} and {@code 40} on
      * the three problems above, {@code 20} was the best or equal best on all of
      * them.
+     * <p>
+     * <b>A caller who already knows the equation is stiff from beginning to
+     * end can pass {@code 50}</b> to the constructor that takes it and save
+     * about two percent, since every trial such a run takes is one it throws
+     * away. That is the whole of what the cadence is worth: policies that vary
+     * it -- holding the trial overhead to a share of the bill, or backing off
+     * while the answers keep coming back the same -- were measured over four
+     * problems and six tolerances, and the best of them beat this constant by
+     * {@code 0.9} percent on average while adding a setting of its own.
      */
     public static final int DEFAULT_PROBE_EVERY = 20;
 
@@ -153,14 +177,25 @@ public final class SwitchingStepper implements OdeStepper {
      */
     private static final double VETO_FRACTION = 0.5;
 
+    /**
+     * How many steps the implicit method is allowed to take under its own step
+     * control before it is judged. See {@link #theImplicitSettlesCheaper}.
+     */
+    private static final int SETTLE_STEPS = 4;
+
     private final ExplicitRungeKutta nonStiff;
     private final Rosenbrock stiff;
+    private final Rosenbrock scout;
     private final StepController controller;
     private final int n;
     private final int probeEvery;
     private final double threshold;
     private final double explicitCost;
     private final double implicitCost;
+
+    private final double[] scoutY;
+    private final double[] scoutNext;
+    private final double[] scoutError;
 
     private boolean onStiff;
     private boolean lastStiff;
@@ -292,6 +327,11 @@ public final class SwitchingStepper implements OdeStepper {
         this.nonStiff = new ExplicitRungeKutta(explicitTableau, field, dimension);
         this.stiff = (analytic == null) ? new Rosenbrock(implicitTableau, field, dimension)
                 : new Rosenbrock(implicitTableau, analytic, dimension);
+        // a second copy of the implicit method, so that letting it run ahead to
+        // see where its step size settles leaves the one carrying the solution
+        // untouched and still able to interpolate over the step it last took
+        this.scout = (analytic == null) ? new Rosenbrock(implicitTableau, field, dimension)
+                : new Rosenbrock(implicitTableau, analytic, dimension);
         this.controller = controller;
         this.n = dimension;
         this.probeEvery = probeEvery;
@@ -307,6 +347,9 @@ public final class SwitchingStepper implements OdeStepper {
         this.explicitCost = explicitTableau.stages() - (explicitTableau.isFsal() ? 1 : 0);
         this.implicitCost = implicitTableau.stages()
                 + (this.stiff.hasAnalyticJacobian() ? 0 : dimension + 1);
+        this.scoutY = new double[dimension];
+        this.scoutNext = new double[dimension];
+        this.scoutError = new double[dimension];
     }
 
     /**
@@ -378,7 +421,9 @@ public final class SwitchingStepper implements OdeStepper {
      * These are steps <em>attempted</em>, since a stepper is never told which
      * of its steps the driver kept; {@link OdeIntegrator.Result#steps} and
      * {@link OdeIntegrator.Result#rejected} give that split for the run as a
-     * whole.
+     * whole. The steps taken to find out where the implicit method's step size
+     * settles are not among them, since they advance nothing;
+     * {@link #explorationEvaluations()} is what those cost.
      *
      * @return the number of implicit steps attempted
      */
@@ -457,14 +502,23 @@ public final class SwitchingStepper implements OdeStepper {
         // method, and one that never probed until a step was accepted could
         // shrink towards zero without ever asking
         if (errOut != null && dueForTrial()) {
-            // the trial is taken into the arrays the answer goes into, so a
-            // trial that says "switch" is the step and costs nothing at all;
-            // only one that says "stay" is thrown away
             ++trials;
             sinceProbe = 0;
             alarmed = false;
-            take(!onStiff, t, y, h, yOut, errOut);
-            if (theOtherLooksCheaper(y, yOut, errOut, h)) {
+            boolean cheaper;
+            if (onStiff) {
+                // the trial is taken into the arrays the answer goes into, so a
+                // trial that says "switch" is the step and costs nothing at all;
+                // only one that says "stay" is thrown away
+                take(false, t, y, h, yOut, errOut);
+                cheaper = theOtherLooksCheaper(y, yOut, errOut, h);
+            } else {
+                cheaper = theImplicitSettlesCheaper(t, y, h);
+                if (cheaper) {
+                    take(true, t, y, h, yOut, errOut);
+                }
+            }
+            if (cheaper) {
                 onStiff = !onStiff;
                 ++switches;
                 lastStiff = onStiff;
@@ -504,7 +558,23 @@ public final class SwitchingStepper implements OdeStepper {
 
     @Override
     public long evaluations() {
-        return nonStiff.evaluations() + stiff.evaluations();
+        return nonStiff.evaluations() + stiff.evaluations() + scout.evaluations();
+    }
+
+    /**
+     * The part of {@link #evaluations()} spent letting the implicit method find
+     * its own step size rather than advancing the solution.
+     * <p>
+     * It is the price of the trial being able to see past one step, and it is
+     * paid only while the explicit method is stepping and the free estimate has
+     * not vetoed the trial: nothing at all on an equation with no stiffness in
+     * it, and between 3 % and 23 % of the run on one where the two methods
+     * change places, growing with the dimension.
+     *
+     * @return the number of evaluations spent exploring, never decreasing
+     */
+    public long explorationEvaluations() {
+        return scout.evaluations();
     }
 
     /**
@@ -516,6 +586,7 @@ public final class SwitchingStepper implements OdeStepper {
     public void reset() {
         nonStiff.reset();
         stiff.reset();
+        scout.reset();
         onStiff = false;
         lastStiff = false;
         stepped = false;
@@ -618,6 +689,91 @@ public final class SwitchingStepper implements OdeStepper {
             alarmed = true;
         }
         aboveThreshold = above;
+    }
+
+    /**
+     * Whether the implicit method, allowed to find its own step size, would now
+     * be the cheaper of the two.
+     * <p>
+     * <b>Why this side cannot be asked the one-step question.</b>
+     * {@link #theOtherLooksCheaper} reads the step size a single trial would
+     * propose next, <code>h safety err^(-1/p)</code>, which is exact inside the
+     * asymptotic regime and useless across it. The step size an explicit method
+     * is being driven at while it is stability-limited is far below anything the
+     * implicit method would choose, so the trial lands deep inside that regime
+     * and its own natural step does not: measured on a chain of diffusing cells
+     * under a dial of {@code 1e5}, RODAS4 probed at the explicit method's
+     * {@code h = 3.3e-05} reported an error of {@code 0.0131} and therefore
+     * proposed {@code 2.7 h}, where a pure implicit run at that instant was
+     * taking steps <b>1500 times longer</b>. One step cannot show a ramp, and the
+     * ramp is the whole of what an implicit method has to offer.
+     * <p>
+     * <b>What that cost.</b> The switch then happened only while
+     * <code>implicitCost &lt; explicitCost * 2.7</code>, which for a differenced
+     * Jacobian is <code>n + 7 &lt; 16.2</code>, or {@code n < 9}: a bound with
+     * nothing in it about the equation. Above it the stepper never handed over
+     * at all -- at {@code n = 50}, 2677596 evaluations against the pure implicit
+     * method's 19948, a hundredfold loss. So this side lets the implicit method
+     * run {@link #SETTLE_STEPS} steps under its own control and reads where the
+     * step size <em>settles</em>.
+     * <p>
+     * <b>Only this side.</b> Coming back the other way the one-step reading was
+     * never shown wrong, and settling there is what costs the most, since a
+     * trial on the implicit side is nearly always answered "stay": doing it on
+     * both sides took Robertson's premium from 2 % to 34 %, and doing it here
+     * alone costs between 0.1 % and 6.8 % on everything that already worked.
+     */
+    private boolean theImplicitSettlesCheaper(double t, double[] y, double h) {
+        double settled = settledStep(t, y, h);
+        if (!(settled > 0.0)) {
+            return false;
+        }
+        if (Double.isInfinite(settled)) {
+            return true;
+        }
+        return implicitCost / settled < explicitCost / Math.abs(h);
+    }
+
+    /**
+     * The step size the implicit method reaches after {@link #SETTLE_STEPS} of
+     * its own steps, starting from {@code h}, or a negative number if it cannot
+     * take even one.
+     * <p>
+     * This is the loop {@link OdeIntegrator} runs, on a copy of the method so
+     * that the one carrying the solution is not disturbed, and bounded in
+     * attempts so that a point where the implicit method cannot make progress
+     * either costs a fixed amount rather than an unbounded one.
+     */
+    private double settledStep(double t, double[] y, double h) {
+        scout.reset();
+        System.arraycopy(y, 0, scoutY, 0, n);
+        double[] current = scoutY;
+        double[] next = scoutNext;
+        double time = t;
+        double trial = h;
+        double previous = StepController.ERROR_FLOOR;
+        int order = scout.order();
+        int taken = 0;
+        int attempts = 0;
+        while (taken < SETTLE_STEPS && attempts < 8 * SETTLE_STEPS + 8) {
+            ++attempts;
+            scout.step(time, current, trial, next, scoutError);
+            boolean finite = allFinite(next) && allFinite(scoutError);
+            double scaled = finite ? controller.errorNorm(scoutError, current, next) : Double.NaN;
+            if (finite && scaled <= 1.0) {
+                ++taken;
+                double[] swap = current;
+                current = next;
+                next = swap;
+                time += trial;
+                double factor = controller.scale(scaled, previous, order);
+                previous = Math.max(scaled, StepController.ERROR_FLOOR);
+                trial *= factor;
+            } else {
+                trial *= controller.scaleAfterRejection(scaled, order);
+            }
+        }
+        return (taken == 0) ? -1.0 : trial;
     }
 
     /** One step of whichever side is named, counted against that side. */
