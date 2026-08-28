@@ -198,6 +198,30 @@ public interface OdeStepper {
     }
 
     /**
+     * A controller this stepper has to be driven by, rather than any controller
+     * with the same settings, or {@code null} for one that does not care --
+     * which almost every method is.
+     * <p>
+     * <b>Why a stepper would care.</b> The division of labor described above
+     * holds because a step is one thing and judging it is another. A stepper
+     * that chooses <em>between</em> methods breaks that in one narrow place: to
+     * decide whether the cheaper method could carry the next step it has to
+     * know what an acceptable step is, and that is the tolerances, which live
+     * in the controller. Answering here is how such a stepper says that the
+     * controller it was built with and the one the driver holds must be the
+     * same object, so that the decision and the acceptance cannot be made
+     * against different tolerances.
+     * <p>
+     * {@link OdeIntegrator} checks this when it is constructed and refuses the
+     * pair rather than letting the two disagree silently.
+     *
+     * @return the controller this stepper is bound to, or {@code null}
+     */
+    default StepController requiredController() {
+        return null;
+    }
+
+    /**
      * How often the field has been evaluated since this stepper was created.
      * The count runs across {@link #reset()}, so a driver can report the cost
      * of a whole solve.

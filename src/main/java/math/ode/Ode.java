@@ -19,22 +19,25 @@ import math.solve.Quadrature;
  * the classical fixed step method builds those three objects directly; this is
  * the shortcut and not the interface.
  * <p>
- * Three entries are different methods for different questions.
+ * Four entries are different methods for different questions.
  * {@link #solveSymplectic(math.fun.DSecondOrderField, double, double[],
  * double[], double, int)} answers not "where is it now" but "where is it still,
  * after a very long time".
  * {@link #solveStiff(math.fun.DVectorField, double, double[], double, double)}
- * answers a question the explicit family cannot answer at all. And
+ * answers a question the explicit family cannot answer at all.
  * {@link #solveAccurate(math.fun.DVectorField, double, double[], double, double)}
  * answers the same question as {@code solve} but at a tolerance where a fifth
  * order method has become the expensive way to get there -- below about
- * {@code 1e-07}, measured.
+ * {@code 1e-07}, measured. And
+ * {@link #solveAuto(math.fun.DVectorField, double, double[], double, double)}
+ * answers the question when the answer changes during the run.
  * <p>
  * <b>Read {@link OdeIntegrator.Result#seemsStiff}.</b> It is the one field here
  * that says the answer may be worthless: an explicit method whose step is held
  * down by stability rather than accuracy will either take a very long time or
  * run out of its budget, and no tolerance makes that better. When it comes back
- * {@code true}, hand the same problem to {@code solveStiff}.
+ * {@code true}, hand the same problem to {@code solveStiff} -- or, if the
+ * equation is only stiff in places, to {@code solveAuto}.
  * <p>
  * The fixed step form uses {@link ButcherTableau#CLASSIC_RK4} instead, because
  * that is what a fixed step size usually means and because its four stages are
@@ -383,6 +386,96 @@ public final class Ode {
     }
 
     /**
+     * Integrates {@code y' = f(t, y)} with both methods at once, letting each
+     * step decide which of them the equation currently wants, for an equation
+     * that is stiff over part of its run and not over the rest.
+     * <p>
+     * <b>Use this when the answer to "is it stiff" is "sometimes".</b> A
+     * relaxation oscillator, a reaction with a fast transient, a system with a
+     * dial in it: on those neither {@link #solve} nor {@link #solveStiff} is
+     * right everywhere, and picking one of them is picking which half of the
+     * run to be wrong about. Measured against the better of the two run alone,
+     * and against a solver switching at exactly the right instants, which no
+     * real one can beat:
+     * <table border="1">
+     * <caption>evaluations</caption>
+     * <tr><th>problem</th><th>this</th><th>better pure</th><th>perfect</th></tr>
+     * <tr><td>a dial from 1 to 1e5 and back, tolerance 1e-6</td>
+     * <td>1728</td><td>2928</td><td>1468</td></tr>
+     * <tr><td>van der Pol at mu = 1000, tolerance 1e-6</td>
+     * <td>4698</td><td>8902</td><td>2747</td></tr>
+     * <tr><td>Robertson to 1e5, tolerance 1e-8</td>
+     * <td>3210</td><td>3147</td><td>3073</td></tr>
+     * </table>
+     * <p>
+     * <b>It is not the answer to the other two cases, and it does not need to
+     * be.</b> On an equation with no stiffness in it this takes no trial at all
+     * and its run is {@link #solve}'s run <em>bit for bit</em>, so nothing is
+     * lost by reaching for it; on one that is stiff from beginning to end,
+     * Robertson's row above is the whole story -- a few percent for insurance
+     * on a claim never made.
+     * <p>
+     * How it decides is {@link SwitchingStepper}, and a caller who wants to see
+     * what it did builds that object instead and reads
+     * {@link SwitchingStepper#switches()}.
+     *
+     * @param f
+     *            the right hand side
+     * @param t0
+     *            the time the initial state belongs to
+     * @param y0
+     *            the initial state (not modified)
+     * @param t1
+     *            the time to reach, which may lie before {@code t0}
+     * @param tolerance
+     *            the error one step may add, relative and absolute alike
+     * @return the solution at the times the methods chose
+     * @throws IllegalArgumentException
+     *             if an argument is out of shape
+     * @throws ArithmeticException
+     *             if the step size collapses or the step budget runs out
+     */
+    public static OdeIntegrator.Result solveAuto(DVectorField f, double t0, double[] y0, double t1,
+            double tolerance) {
+        if (y0 == null) {
+            throw new IllegalArgumentException("y0 must not be null");
+        }
+        StepController controller = new StepController(tolerance, tolerance);
+        return new OdeIntegrator(new SwitchingStepper(f, y0.length, controller), controller).solve(t0, y0,
+                t1);
+    }
+
+    /**
+     * The same, with the Jacobian the field supplies, which the implicit half
+     * of the pair is the one to benefit from.
+     *
+     * @param f
+     *            the right hand side together with its two first derivatives
+     * @param t0
+     *            the time the initial state belongs to
+     * @param y0
+     *            the initial state (not modified)
+     * @param t1
+     *            the time to reach, which may lie before {@code t0}
+     * @param tolerance
+     *            the error one step may add, relative and absolute alike
+     * @return the solution at the times the methods chose
+     * @throws IllegalArgumentException
+     *             if an argument is out of shape
+     * @throws ArithmeticException
+     *             if the step size collapses or the step budget runs out
+     */
+    public static OdeIntegrator.Result solveAuto(DiffDVectorField f, double t0, double[] y0, double t1,
+            double tolerance) {
+        if (y0 == null) {
+            throw new IllegalArgumentException("y0 must not be null");
+        }
+        StepController controller = new StepController(tolerance, tolerance);
+        return new OdeIntegrator(new SwitchingStepper(f, y0.length, controller), controller).solve(t0, y0,
+                t1);
+    }
+
+    /**
      * The state at {@code t1} and nothing else, for a caller who wants the
      * answer rather than the path to it.
      *
@@ -419,7 +512,7 @@ public final class Ode {
     }
 
     /**
-     * A self check: eight claims about this package, each measured rather than
+     * A self check: nine claims about this package, each measured rather than
      * asserted, and a verdict at the end.
      *
      * @param args
@@ -569,6 +662,21 @@ public final class Ode {
                         eight.evaluations / (double) five.evaluations),
                 Long.valueOf(eight.evaluations), Long.valueOf(five.evaluations));
         ok &= eight.evaluations * 2L < five.evaluations;
+
+        // 9. and the fourth question, which is none of those three: an equation
+        // whose own answer to "is it stiff" changes while it is being solved,
+        // where picking either method is picking which half to be wrong about
+        OdeIntegrator.Result switching = solveAuto(stiff, 0.0, new double[] { 2.0, 0.0 }, 300.0, 1.0e-6);
+        OdeIntegrator.Result always = solveStiff(stiff, 0.0, new double[] { 2.0, 0.0 }, 300.0, 1.0e-6);
+        // and where there is nothing to switch, it is the explicit run itself
+        OdeIntegrator.Result smooth = solveAuto(oscillator, 0.0, new double[] { 1.0, 0.0 }, 20.0, 1.0e-10);
+        boolean freeWhenIdle = smooth.evaluations == turning.evaluations;
+        System.out.printf(Locale.ROOT, "%-52s %12.2f   (%d evaluations against %d, and %s)%n",
+                "switching costs this fraction of staying implicit",
+                Double.valueOf(switching.evaluations / (double) always.evaluations),
+                Long.valueOf(switching.evaluations), Long.valueOf(always.evaluations),
+                freeWhenIdle ? "free on a smooth problem" : "NOT free on a smooth problem");
+        ok &= switching.evaluations * 3L < always.evaluations * 2L && freeWhenIdle;
 
         System.out.println(ok ? ">>> OK" : ">>> FAILED");
     }

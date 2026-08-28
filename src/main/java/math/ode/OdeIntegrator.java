@@ -138,6 +138,15 @@ public final class OdeIntegrator {
                     "a step controller needs a method that estimates the error of its own steps, and "
                             + stepper + " does not");
         }
+        // a stepper that judges a step of its own -- one choosing between two
+        // methods does -- has to judge it by the same tolerances the driver
+        // accepts by, or the two decide against different rules. Where the
+        // driver judges nothing there is nothing to disagree with
+        StepController required = stepper.requiredController();
+        if (controller != null && required != null && required != controller) {
+            throw new IllegalArgumentException(stepper + " has to be driven by the very controller it"
+                    + " was built with, and " + controller + " is a different one");
+        }
         if (events != null) {
             for (int i = 0; i < events.length; ++i) {
                 if (events[i] == null) {
@@ -366,7 +375,6 @@ public final class OdeIntegrator {
         recorder.initial(t0, y);
         watch.initial(t0, y);
 
-        int order = stepper.order();
         int budget = controller.maxSteps();
         double maxStep = controller.maxStepSize();
         double h = controller.initialStep(stepper, t0, y, t1);
@@ -400,6 +408,11 @@ public final class OdeIntegrator {
             double trial = last ? (t1 - t) : h;
 
             stepper.step(t, y, trial, yNext, error);
+            // asked after the step and not once before the loop, because a
+            // stepper that chooses between two methods answers for whichever of
+            // them just took this step, and the exponent the controller scales
+            // with is one over that order
+            int order = stepper.order();
             // a method that estimates its error twice, at two orders, hands the
             // second one over here and the controller combines them, because
             // combining takes the tolerances and those belong to the controller

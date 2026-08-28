@@ -197,9 +197,11 @@ public final class OdeTest {
         assertTrue("the contrast is the point of the two Kepler lines", page.contains("symplectically"));
         assertTrue("and the stiff problem answers the line above it",
                 page.contains("the explicit method gives up"));
-        assertTrue("and the last line is the third regime question",
+        assertTrue("and the tolerance question is there",
                 page.contains("at rtol 1e-12"));
-        assertEquals("eight claims and a verdict", 9, page.split("\\r?\\n").length);
+        assertTrue("and the last line is the one where the regime changes mid-run",
+                page.contains("free on a smooth problem"));
+        assertEquals("nine claims and a verdict", 10, page.split("\\r?\\n").length);
     }
 
     /**
@@ -346,6 +348,78 @@ public final class OdeTest {
                 + eight.evaluations + " against " + five.evaluations,
                 eight.evaluations * 2L < five.evaluations);
         assertFalse("a smooth orbit is not stiff at any tolerance", eight.seemsStiff);
+    }
+
+    /**
+     * The automatic entry is the switching stepper, and the shortcut is the
+     * same thing written shorter -- including that both objects have to be
+     * handed the one controller, which is what the shortcut is chiefly for.
+     */
+    @Test
+    public void testTheAutomaticEntryIsTheSwitchingStepper() {
+        StepController controller = new StepController(1.0e-8, 1.0e-8);
+        OdeIntegrator.Result byHand = new OdeIntegrator(
+                new SwitchingStepper((DVectorField) STIFF, 1, controller), controller)
+                        .solve(0.0, new double[] { 1.0 }, 10.0);
+        OdeIntegrator.Result byFacade = Ode.solveAuto((DVectorField) STIFF, 0.0, new double[] { 1.0 },
+                10.0, 1.0e-8);
+        assertEquals(byHand.length, byFacade.length);
+        assertEquals(byHand.evaluations, byFacade.evaluations);
+        assertEquals(byHand.finalState()[0], byFacade.finalState()[0], 0.0);
+        assertEquals("and the answer is the cosine", Math.cos(10.0), byFacade.finalState()[0], 1.0e-6);
+
+        // the written Jacobian reaches the same answer for less. The two are
+        // not asserted against each other beyond the accuracy either of them
+        // claims: a differenced Jacobian is an approximate one, the two runs
+        // therefore change methods at slightly different points, and that gap
+        // is a property of the answer rather than of the switching
+        OdeIntegrator.Result written = Ode.solveAuto(STIFF, 0.0, new double[] { 1.0 }, 10.0, 1.0e-8);
+        assertEquals("the written form is the cosine too", Math.cos(10.0), written.finalState()[0],
+                1.0e-6);
+        assertTrue("and it is cheaper: " + written.evaluations + " against " + byFacade.evaluations,
+                written.evaluations < byFacade.evaluations);
+    }
+
+    /**
+     * Where there is no stiffness there is nothing to switch, and the automatic
+     * entry costs exactly what the ordinary one costs -- not nearly, exactly,
+     * because it takes no trial and the arithmetic is then the same arithmetic.
+     */
+    @Test
+    public void testTheAutomaticEntryIsFreeOnASmoothProblem() {
+        double[] start = { 1.0, 0.0 };
+        OdeIntegrator.Result plain = Ode.solve(OSCILLATOR, 0.0, start, 50.0, 1.0e-10);
+        OdeIntegrator.Result auto = Ode.solveAuto(OSCILLATOR, 0.0, start, 50.0, 1.0e-10);
+        assertEquals("evaluations", plain.evaluations, auto.evaluations);
+        assertEquals("steps", plain.steps, auto.steps);
+        assertEquals("recorded points", plain.length, auto.length);
+        for (int i = 0; i < plain.length; ++i) {
+            assertEquals("t[" + i + "]", plain.t[i], auto.t[i], 0.0);
+            assertEquals("y[" + i + "][0]", plain.y[i][0], auto.y[i][0], 0.0);
+            assertEquals("y[" + i + "][1]", plain.y[i][1], auto.y[i][1], 0.0);
+        }
+    }
+
+    @Test
+    public void testTheAutomaticEntryChecksItsArguments() {
+        try {
+            Ode.solveAuto((DVectorField) null, 0.0, new double[] { 1.0 }, 1.0, 1.0e-8);
+            fail("expected a refusal naming the field");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().length() > 0);
+        }
+        try {
+            Ode.solveAuto((DVectorField) STIFF, 0.0, null, 1.0, 1.0e-8);
+            fail("expected a refusal naming y0");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("y0"));
+        }
+        try {
+            Ode.solveAuto(STIFF, 0.0, null, 1.0, 1.0e-8);
+            fail("expected a refusal naming y0");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("y0"));
+        }
     }
 
     @Test

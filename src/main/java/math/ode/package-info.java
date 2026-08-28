@@ -25,7 +25,9 @@
  * Blanes-Moan of order six. And for a stiff one, {@link math.ode.Rosenbrock}
  * over {@link math.ode.RosenbrockTableau#RODAS4} and two others -- linearly
  * implicit, so a step costs one Jacobian and one matrix factorization and no
- * iteration converges or fails to.
+ * iteration converges or fails to. {@link math.ode.SwitchingStepper} is the
+ * first and third of those behind one stepper, for an equation that is stiff
+ * over part of its run and not over the rest.
  * <p>
  * <b>Among those five, the order is not the thing to choose on.</b> Yoshida's
  * triple jump, Suzuki's five-fold composition and Blanes-Moan's
@@ -68,7 +70,7 @@
  * equation and the interval, and it is not one.</li>
  * </ul>
  * <p>
- * <b>Three questions, and a measurement for each.</b>
+ * <b>Four questions, and a measurement for each.</b>
  * <p>
  * The first is <b>stiffness</b>. An explicit method is stable only while the
  * step size times the largest eigenvalue of the Jacobian stays inside a region
@@ -94,7 +96,45 @@
  * {@code t = 1e11} in 395 steps, and no tolerance lets an explicit method reach
  * it at all.
  * <p>
- * The second question is <b>the tolerance</b>, and it decides between the two
+ * The second question is <b>whether the answer to the first one holds for the
+ * whole run</b>, and on a great many equations it does not. A relaxation
+ * oscillator is stiff on its slow manifold and not during its transitions; a
+ * reaction is stiff after its first transient and not before it; anything with
+ * a dial in it is stiff while the dial is turned up. Choosing one method for
+ * such a run is choosing which part of it to be wrong about, and
+ * {@link math.ode.SwitchingStepper} -- reached through
+ * {@link math.ode.Ode#solveAuto(math.fun.DVectorField, double, double[], double,
+ * double)} -- declines to choose: every twentieth step the method that is not
+ * stepping is given one to try, and the two are compared on what they cost per
+ * unit of time rather than on any diagnosis of stiffness.
+ * <p>
+ * <b>Neither side can diagnose stiffness, which is why the price is asked
+ * instead.</b> Both free tests were built and measured before this one, and both
+ * have a blind spot. An implicit method damps the fast modes between its own
+ * stages, so no difference quotient it forms sees what limits an explicit
+ * method: on Robertson such an estimate disagreed with the truth on half the
+ * steps. And an explicit method whose step size has settled at the stability
+ * limit sits just <em>below</em>
+ * {@link math.ode.OdeStepper#stiffnessThreshold()} rather than above it -- on a
+ * dial rising smoothly to {@code lambda = 1e5}, the measure read a mean of
+ * {@code 2.97} and a worst of {@code 3.2501} against a threshold of
+ * {@code 3.25} over 29158 steps. Hairer's test catches a run being pushed past
+ * the limit and rejected, not one that has already adapted to it, and
+ * {@link math.ode.OdeIntegrator.Result#seemsStiff} inherits that blind spot: it
+ * is reliable when the stiffness arrives suddenly and silent when it arrives
+ * gradually.
+ * <p>
+ * Measured in evaluations against the better of the two methods run alone, and
+ * against a solver switching at exactly the right instants -- which is an upper
+ * bound no real one reaches -- the dial takes 1728 against 2928 and 1468, van
+ * der Pol at {@code mu = 1000} takes 4698 against 8902 and 2747, and Robertson
+ * takes 3210 against 3147 and 3073. <b>Switching closes 82 % and 68 % of the
+ * distance to perfect on the two runs that change their mind, and costs 3.5 %
+ * on the one that does not.</b> Where there is no stiffness at all it takes no
+ * trial and is the pure explicit run bit for bit, so the premium is paid only
+ * by an equation that really is stiff throughout.
+ * <p>
+ * The third question is <b>the tolerance</b>, and it decides between the two
  * explicit methods rather than between two families. Dormand-Prince needs steps
  * proportional to <code>rtol^(-1/5)</code> and DOP853 to
  * <code>rtol^(-1/9)</code>, and a step of the second costs twice a step of the
@@ -107,7 +147,7 @@
  * {@code 2^8} per halving against {@code 2^5} -- and pays the three stages that
  * costs only inside a step something actually looked into.
  * <p>
- * The third question is <b>what happens to an invariant over a long
+ * The fourth question is <b>what happens to an invariant over a long
  * time</b>, and the answer depends on which family is used. The energy of a
  * two body orbit does
  * not change; Dormand-Prince loses it steadily, by {@code 1.28e-09},
