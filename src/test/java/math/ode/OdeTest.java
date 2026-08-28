@@ -12,6 +12,7 @@ import java.util.Locale;
 
 import org.junit.Test;
 
+import math.fun.DSecondOrderField;
 import math.fun.DVectorField;
 
 /**
@@ -42,6 +43,17 @@ public final class OdeTest {
         @Override
         public void valueAt(double t, double[] y, double[] dydt) {
             dydt[0] = 1.0;
+        }
+    };
+
+    /** Two bodies under gravity, as an acceleration on the position alone. */
+    private static final DSecondOrderField GRAVITY = new DSecondOrderField() {
+        @Override
+        public void valueAt(double t, double[] q, double[] v, double[] acceleration) {
+            double r2 = q[0] * q[0] + q[1] * q[1];
+            double r3 = r2 * Math.sqrt(r2);
+            acceleration[0] = -q[0] / r3;
+            acceleration[1] = -q[1] / r3;
         }
     };
 
@@ -157,7 +169,7 @@ public final class OdeTest {
 
     /**
      * The self check is the class's own statement about the package, and it has
-     * to keep passing. Its five lines are the same claims the test classes make
+     * to keep passing. Its six lines are the same claims the test classes make
      * at length, which is the point: a reader who runs the class gets the
      * measurements without reading the tests.
      */
@@ -168,7 +180,63 @@ public final class OdeTest {
         assertFalse(page, page.contains("FAILED"));
         assertTrue(page, page.contains("against Gauss-Kronrod"));
         assertTrue(page, page.contains("drifts, and is meant to"));
-        assertEquals("five claims and a verdict", 6, page.split("\\r?\\n").length);
+        assertTrue("the contrast is the point of the two Kepler lines", page.contains("symplectically"));
+        assertEquals("six claims and a verdict", 7, page.split("\\r?\\n").length);
+    }
+
+    /**
+     * The two Kepler lines are next to each other on purpose: the same orbit,
+     * the same hundred revolutions, one method whose energy error grows and one
+     * whose energy error does not.
+     */
+    @Test
+    public void testTheSelfCheckPutsTheTwoKeplerRunsSideBySide() throws UnsupportedEncodingException {
+        String[] lines = capture().split("\\r?\\n");
+        int drifting = -1;
+        int bounded = -1;
+        for (int i = 0; i < lines.length; ++i) {
+            if (lines[i].contains("drifts, and is meant to")) {
+                drifting = i;
+            }
+            if (lines[i].contains("symplectically")) {
+                bounded = i;
+            }
+        }
+        assertTrue("both lines are there", drifting >= 0 && bounded >= 0);
+        assertEquals("and one follows the other", drifting + 1, bounded);
+    }
+
+    @Test
+    public void testTheSymplecticEntryTakesThePositionAndTheVelocitySeparately() {
+        double[] q0 = { 0.4, 0.0 };
+        double[] v0 = { 0.0, 2.0 };
+        OdeIntegrator.Result r = Ode.solveSymplectic(GRAVITY, 0.0, q0, v0, 2.0 * Math.PI, 400);
+        assertEquals(401, r.length);
+        assertEquals(400L, r.steps);
+        assertEquals("eleven evaluations a step, and the first one pays for the shared kick", 4401L,
+                r.evaluations);
+        assertEquals("the state is the position and then the velocity", 4, r.finalState().length);
+        // the orbit has semi-major axis one and so a period of 2 pi exactly
+        assertEquals("one whole revolution returns to the start", q0[0], r.finalState()[0], 1.0e-11);
+        assertEquals(q0[1], r.finalState()[1], 1.0e-11);
+        assertEquals("and the inputs are not written into", 0.4, q0[0], 0.0);
+        assertEquals(2.0, v0[1], 0.0);
+    }
+
+    @Test
+    public void testTheSymplecticEntryChecksItsArguments() {
+        try {
+            Ode.solveSymplectic(GRAVITY, 0.0, null, new double[2], 1.0, 10);
+            fail("expected a refusal naming q0");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("q0"));
+        }
+        try {
+            Ode.solveSymplectic(GRAVITY, 0.0, new double[2], new double[3], 1.0, 10);
+            fail("expected a refusal about the lengths");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("must agree"));
+        }
     }
 
     @Test

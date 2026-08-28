@@ -3,6 +3,7 @@ package math.ode;
 import java.util.Locale;
 
 import math.fun.DFunction;
+import math.fun.DSecondOrderField;
 import math.fun.DVectorField;
 import math.solve.Quadrature;
 
@@ -10,13 +11,19 @@ import math.solve.Quadrature;
  * Solves an initial value problem, for a caller who does not want to choose a
  * method.
  * <p>
- * Everything here is {@link ExplicitRungeKutta} over
+ * Everything here but one entry is {@link ExplicitRungeKutta} over
  * {@link ButcherTableau#DORMAND_PRINCE_45} driven by an
  * {@link OdeIntegrator}, which is the right answer for a problem that is not
  * stiff and is the only answer this package has for one that is. A caller who
  * wants a different method, a step controller of their own, several events at
  * once or the classical fixed step method builds those three objects directly;
  * this is the shortcut and not the interface.
+ * <p>
+ * The exception is
+ * {@link #solveSymplectic(math.fun.DSecondOrderField, double, double[],
+ * double[], double, int)}, which is a different kind of method for a different
+ * question -- not "where is it now" but "where is it still, after a very long
+ * time".
  * <p>
  * <b>Read {@link OdeIntegrator.Result#seemsStiff}.</b> It is the one field here
  * that says the answer may be worthless: an explicit method whose step is held
@@ -176,6 +183,67 @@ public final class Ode {
     }
 
     /**
+     * Integrates a mechanical system <code>q'' = f(t, q)</code> in equally long
+     * steps with a symplectic method, for a question about a long time rather
+     * than about accuracy now.
+     * <p>
+     * The method is {@link SplittingCoefficients#BLANES_MOAN_6}, order six at
+     * eleven force evaluations a step. It is the cheapest of the five shipped
+     * at any accuracy tighter than about {@code 1.6e-04}, which is where its
+     * two extra orders stop paying for the extra evaluations, and no run worth
+     * making symplectic is looser than that. The result holds the position and
+     * the velocity stacked, position first.
+     * <p>
+     * <b>This is not the accurate answer, it is the stable one.</b> Over ten
+     * orbits of a two body problem at matched cost, the adaptive fifth order
+     * method above is nearly three orders of magnitude closer to the truth.
+     * What this buys instead is that the energy error stays inside a band
+     * instead of growing, and that the position error grows linearly with time
+     * rather than as its square -- which is worth nothing over ten orbits and
+     * decisive over ten thousand.
+     * <p>
+     * <b>The force must not read the velocity.</b> It is handed one because
+     * {@link math.fun.DSecondOrderField} carries it; a field that uses it still
+     * runs and is no longer symplectic, and nothing detects that.
+     *
+     * @param f
+     *            the acceleration, which must depend on the time and the
+     *            position only
+     * @param t0
+     *            the time the initial state belongs to
+     * @param q0
+     *            the initial position (not modified)
+     * @param v0
+     *            the initial velocity, of the same length (not modified)
+     * @param t1
+     *            the time to reach, which may lie before {@code t0}
+     * @param steps
+     *            how many equal steps to take, at least one; the step size has
+     *            to be constant, which is what the bounded behavior rests on
+     * @return the position and the velocity at {@code steps + 1} equally spaced
+     *         times, stacked into one state each
+     * @throws IllegalArgumentException
+     *             if an argument is out of shape
+     * @throws ArithmeticException
+     *             if the state stops being finite
+     */
+    public static OdeIntegrator.Result solveSymplectic(DSecondOrderField f, double t0, double[] q0,
+            double[] v0, double t1, int steps) {
+        if (q0 == null || v0 == null) {
+            throw new IllegalArgumentException("q0 and v0 must not be null");
+        }
+        if (q0.length != v0.length) {
+            throw new IllegalArgumentException("q0 is of length " + q0.length + " and v0 of length "
+                    + v0.length + ", which must agree");
+        }
+        double[] y0 = new double[2 * q0.length];
+        System.arraycopy(q0, 0, y0, 0, q0.length);
+        System.arraycopy(v0, 0, y0, q0.length, v0.length);
+        return new OdeIntegrator(new SymplecticNystrom(SplittingCoefficients.BLANES_MOAN_6, f, q0.length))
+                .solve(t0, y0, t1, steps);
+    }
+
+    /**
      * The state at {@code t1} and nothing else, for a caller who wants the
      * answer rather than the path to it.
      *
@@ -288,7 +356,27 @@ public final class Ode {
         System.out.printf(Locale.ROOT, "%-52s %12.3e   (drifts, and is meant to)%n",
                 "Kepler energy over a hundred orbits", Double.valueOf(Math.abs(energy1 - energy0)));
 
-        // 5. and the one thing it says about its own limits
+        // 5. and what a symplectic method does with the same orbit: the energy
+        // error is no smaller, it simply stops growing
+        DSecondOrderField gravity = new DSecondOrderField() {
+            @Override
+            public void valueAt(double t, double[] q, double[] v, double[] acceleration) {
+                double r2 = q[0] * q[0] + q[1] * q[1];
+                double r3 = r2 * Math.sqrt(r2);
+                acceleration[0] = -q[0] / r3;
+                acceleration[1] = -q[1] / r3;
+            }
+        };
+        OdeIntegrator.Result orbit = solveSymplectic(gravity, 0.0, new double[] { start[0], start[1] },
+                new double[] { start[2], start[3] }, 100.0 * 2.0 * Math.PI, 100 * 200);
+        double firstBand = band(orbit, 0, 10 * 200);
+        double lastBand = band(orbit, orbit.length - 10 * 200, orbit.length);
+        System.out.printf(Locale.ROOT, "%-52s %12.3f   (band %.2e, first ten orbits against last ten)%n",
+                "the same orbit, symplectically: the band grows by", Double.valueOf(lastBand / firstBand),
+                Double.valueOf(firstBand));
+        ok &= Math.abs(lastBand / firstBand - 1.0) < 0.05;
+
+        // 6. and the one thing it says about its own limits
         DVectorField stiff = new DVectorField() {
             @Override
             public void valueAt(double t, double[] y, double[] dydt) {
@@ -304,6 +392,22 @@ public final class Ode {
         ok &= vanDerPol.seemsStiff;
 
         System.out.println(ok ? ">>> OK" : ">>> FAILED");
+    }
+
+    /**
+     * The width of the energy error over a stretch of a two body run, whose
+     * state is the position and then the velocity either way it was produced.
+     */
+    private static double band(OdeIntegrator.Result r, int from, int to) {
+        double low = Double.MAX_VALUE;
+        double high = -Double.MAX_VALUE;
+        for (int i = from; i < to; ++i) {
+            double[] y = r.y[i];
+            double energy = 0.5 * (y[2] * y[2] + y[3] * y[3]) - 1.0 / Math.hypot(y[0], y[1]);
+            low = Math.min(low, energy);
+            high = Math.max(high, energy);
+        }
+        return high - low;
     }
 
     private static boolean report(String what, double measured, double allowed) {

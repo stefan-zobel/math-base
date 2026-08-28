@@ -35,9 +35,11 @@ package math.fun;
  * <b>A method may require {@code f} not to depend on {@code v}.</b> The
  * separable case <code>q'' = f(t, q)</code> is the mechanical one -- an
  * acceleration that is a force over a mass and no damping -- and it is what a
- * symplectic method assumes. Such a method ignores the {@code v} it is handed;
- * passing it a velocity dependent field does not fail, it silently stops being
- * symplectic, and the class documents which of the two it is.
+ * symplectic method assumes. Such a method still hands over the velocity,
+ * because it has one and because a caller may want it; a field that reads it
+ * does not fail and is not detected, it simply stops being integrated
+ * symplectically. Damping, drag and a magnetic force are all on the wrong side
+ * of that line, and the class documents which side it is on.
  *
  * @since 1.5.3
  */

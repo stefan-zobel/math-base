@@ -15,10 +15,23 @@
  * the answer. Adding a method means adding coefficients, and adding a kind of
  * method means adding a stepper -- neither touches the driver.
  * <p>
- * <b>What is here</b> is the explicit case: Dormand-Prince 5(4) with a
- * continuous extension and an error estimate, and the classical fourth order
- * method for a fixed step size. That covers a problem that is not stiff, which
- * is most of them, and covers a stiff one not at all -- see below.
+ * <b>What is here</b> is the explicit case, in two families. For a general
+ * system {@code y' = f(t, y)}: Dormand-Prince 5(4) with a continuous extension
+ * and an error estimate, and the classical fourth order method for a fixed step
+ * size. For a mechanical one {@code q'' = f(t, q)}, where the position and the
+ * velocity are worth keeping apart: {@link math.ode.SymplecticNystrom} over
+ * five methods, from Verlet up to Blanes-Moan of order six. That covers a
+ * problem that is not stiff, which is most of them, and covers a stiff one not
+ * at all -- see below.
+ * <p>
+ * <b>Among those five, the order is not the thing to choose on.</b> Yoshida's
+ * triple jump, Suzuki's five-fold composition and Blanes-Moan's
+ * {@code SRKN 6b} are all of order four, and their leading error constants are
+ * {@code 1.0e-01}, {@code 4.5e-03} and {@code 1.6e-05} -- four orders of
+ * magnitude at the same order of accuracy, because the first travels
+ * {@code 4.40} units of time to advance one and the last only {@code 1.16}.
+ * Blanes-Moan reaches any given accuracy for about a fifth of the triple jump's
+ * cost.
  *
  * <pre>
  * DVectorField decay = (t, y, dydt) -&gt; dydt[0] = -0.5 * y[0];
@@ -52,7 +65,7 @@
  * equation and the interval, and it is not one.</li>
  * </ul>
  * <p>
- * <b>Two limits, both of them structural.</b>
+ * <b>One limit, and one question with two answers.</b>
  * <p>
  * The first is <b>stiffness</b>. An explicit method is stable only while the
  * step size times the largest eigenvalue of the Jacobian stays inside a region
@@ -64,15 +77,24 @@
  * what the field is telling a caller is to look elsewhere; saying so is better
  * than not saying it.
  * <p>
- * The second is that <b>an invariant is not conserved</b>. The energy of a two
- * body orbit does not change and a method of this kind loses it steadily --
- * measured over ten, a hundred and a thousand orbits, the drift is
- * {@code 1.28e-09}, {@code 1.18e-08} and {@code 1.16e-07}, a factor of ten per
- * factor of ten. That is not a tolerance that was set too loosely; tightening
- * it lowers the line without changing its slope. Breaking that proportionality
- * is what a symplectic method is for, and
- * {@link math.fun.DSecondOrderField} is the shape one will be built on: it
- * needs the position and the velocity kept apart, which is exactly what
- * flattening the problem into {@code y' = f(t, y)} throws away.
+ * The question is <b>what happens to an invariant over a long time</b>, and the
+ * answer depends on which family is used. The energy of a two body orbit does
+ * not change; Dormand-Prince loses it steadily, by {@code 1.28e-09},
+ * {@code 1.18e-08} and {@code 1.16e-07} over ten, a hundred and a thousand
+ * orbits -- a factor of ten per factor of ten, and tightening the tolerance
+ * lowers that line without changing its slope. A symplectic method does not
+ * conserve the energy either, but its error stays inside a band: measured over
+ * two hundred orbits, the band over the last twenty is the band over the first
+ * twenty to three decimal places. The angular momentum it conserves outright,
+ * because neither a drift nor a kick can move it.
+ * <p>
+ * <b>Bounded is not the same as accurate, and the choice turns on the
+ * horizon.</b> At matched cost after ten orbits, Dormand-Prince is nearly three
+ * orders of magnitude closer to the truth than Suzuki's method. What changes is
+ * the rate: the symplectic position error grows exactly linearly with time and
+ * the adaptive one grows as its square, so they cross at some ten thousand
+ * orbits and past that the symplectic method is ahead and stays ahead. For a
+ * short accurate answer, use the first family; for a long qualitative one, the
+ * second.
  */
 package math.ode;
