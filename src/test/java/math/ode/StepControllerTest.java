@@ -37,6 +37,54 @@ public final class StepControllerTest {
         assertEquals(Math.sqrt((1.5 * 1.5 + 2.0 * 2.0) / 2.0), c.errorNorm(error, y, y), 1.0e-15);
     }
 
+    /**
+     * A second estimate of exactly zero has to leave the first one alone, and
+     * it does so identically rather than nearly: the combination is
+     * <code>s1 sqrt(1 / (n (s1 + 0.01 s2)))</code>, which at {@code s2 = 0}
+     * is <code>sqrt(s1 / n)</code>, the plain root mean square.
+     */
+    @Test
+    public void testTheCombinedNormFallsBackOnThePlainOneWhenTheSecondEstimateVanishes() {
+        StepController c = new StepController(1.0e-3, 1.0e-3);
+        double[] error = { 3.0e-3, 4.0e-3 };
+        double[] zero = { 0.0, 0.0 };
+        double[] y = { 1.0, 1.0 };
+        assertEquals(c.errorNorm(error, y, y), c.errorNorm(error, zero, y, y), 1.0e-15);
+    }
+
+    /**
+     * And the worked example in the other direction: the same two components,
+     * scaled to 1.5 and 2, against a second estimate scaled to 15 and 20. Then
+     * {@code s1} is {@code 6.25}, {@code s2} is {@code 625}, and the answer is
+     * {@code 6.25 / sqrt(2 * 12.5)}, which is a good deal below the
+     * {@code 1.7678} the first estimate alone would have given.
+     */
+    @Test
+    public void testTheCombinedNormIsHairersCombination() {
+        StepController c = new StepController(1.0e-3, 1.0e-3);
+        double[] error = { 3.0e-3, 4.0e-3 };
+        double[] secondary = { 3.0e-2, 4.0e-2 };
+        double[] y = { 1.0, 1.0 };
+        double s1 = 1.5 * 1.5 + 2.0 * 2.0;
+        double s2 = 15.0 * 15.0 + 20.0 * 20.0;
+        assertEquals(s1 * Math.sqrt(1.0 / (2.0 * (s1 + 0.01 * s2))), c.errorNorm(error, secondary, y, y),
+                1.0e-15);
+        assertEquals(1.7677669529663689, c.errorNorm(error, y, y), 1.0e-15);
+    }
+
+    /**
+     * Two estimates that are both exactly zero would divide by zero, and the
+     * guard Hairer writes turns that into a step accepted rather than a step
+     * whose error is not a number.
+     */
+    @Test
+    public void testTwoEstimatesOfZeroLeaveAnErrorOfZero() {
+        StepController c = new StepController(1.0e-3, 1.0e-3);
+        double[] zero = { 0.0, 0.0 };
+        double[] y = { 1.0, 1.0 };
+        assertEquals(0.0, c.errorNorm(zero, zero, y, y), 0.0);
+    }
+
     @Test
     public void testTheLargerOfTheTwoStatesSetsTheScale() {
         StepController c = new StepController(1.0e-3, 1.0e-300);

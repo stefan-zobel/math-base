@@ -17,7 +17,8 @@
  * <p>
  * <b>What is here</b> is three families. For a general system
  * {@code y' = f(t, y)} that is not stiff: Dormand-Prince 5(4) with a continuous
- * extension and an error estimate, and the classical fourth order method for a
+ * extension and an error estimate, DOP853 for an answer wanted to many digits,
+ * and the classical fourth order method for a
  * fixed step size. For a mechanical one {@code q'' = f(t, q)}, where the
  * position and the velocity are worth keeping apart:
  * {@link math.ode.SymplecticNystrom} over five methods, from Verlet up to
@@ -67,7 +68,7 @@
  * equation and the interval, and it is not one.</li>
  * </ul>
  * <p>
- * <b>Two questions, and a measurement for each.</b>
+ * <b>Three questions, and a measurement for each.</b>
  * <p>
  * The first is <b>stiffness</b>. An explicit method is stable only while the
  * step size times the largest eigenvalue of the Jacobian stays inside a region
@@ -93,7 +94,20 @@
  * {@code t = 1e11} in 395 steps, and no tolerance lets an explicit method reach
  * it at all.
  * <p>
- * The second question is <b>what happens to an invariant over a long
+ * The second question is <b>the tolerance</b>, and it decides between the two
+ * explicit methods rather than between two families. Dormand-Prince needs steps
+ * proportional to <code>rtol^(-1/5)</code> and DOP853 to
+ * <code>rtol^(-1/9)</code>, and a step of the second costs twice a step of the
+ * first, so there is a crossing. Measured on the two body problem over ten
+ * orbits: at {@code rtol = 1e-06} it is 831 evaluations against 891, at
+ * {@code 1e-07} 1149 against 1095, at {@code 1e-10} 3951 against 2091 and at
+ * {@code 1e-13} 15669 against 4035. <b>The crossing is near {@code 1e-07}</b>,
+ * and past it the advantage keeps growing, because the exponents differ and
+ * the factor of two does not. DOP853 also interpolates far better --
+ * {@code 2^8} per halving against {@code 2^5} -- and pays the three stages that
+ * costs only inside a step something actually looked into.
+ * <p>
+ * The third question is <b>what happens to an invariant over a long
  * time</b>, and the answer depends on which family is used. The energy of a
  * two body orbit does
  * not change; Dormand-Prince loses it steadily, by {@code 1.28e-09},

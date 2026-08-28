@@ -2,6 +2,8 @@ package math.ode;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -193,6 +195,94 @@ public final class ExplicitRungeKuttaTest {
             rk.interpolate(i / 20.0, out);
         }
         assertEquals(afterStep, rk.evaluations());
+    }
+
+    /**
+     * DOP853's does not, and this is the distinction
+     * {@link ButcherTableau#denseStages()} was separated from
+     * {@link ButcherTableau#stages()} for in the first place: three stages
+     * exist for the interpolant alone, they are evaluated when an interior
+     * point is first asked for, and asking for nineteen more inside the same
+     * step is free.
+     */
+    @Test
+    public void testTheDop853ContinuousExtensionCostsThreeEvaluationsAndOnlyOnce() {
+        ExplicitRungeKutta rk = new ExplicitRungeKutta(ButcherTableau.DOP853, OSCILLATOR, 2);
+        double[] y = { 1.0, 0.0 };
+        double[] yOut = new double[2];
+        double[] out = new double[2];
+        rk.step(0.0, y, 0.2, yOut, null);
+        // thirteen stages, none of them carried in, so thirteen evaluations
+        assertEquals(13L, rk.evaluations());
+        rk.interpolate(0.5, out);
+        assertEquals(16L, rk.evaluations());
+        for (int i = 1; i < 20; ++i) {
+            rk.interpolate(i / 20.0, out);
+        }
+        assertEquals("further interior points of the same step are free", 16L, rk.evaluations());
+
+        // and the next step pays for the three again only if it is asked
+        System.arraycopy(yOut, 0, y, 0, 2);
+        rk.step(0.2, y, 0.2, yOut, null);
+        assertEquals("twelve, the last stage of the step before being the first of this one", 28L,
+                rk.evaluations());
+    }
+
+    /**
+     * A run that never looks inside a step must not pay for the machinery that
+     * would let it. Ten steps of DOP853: thirteen evaluations for the first and
+     * twelve for each of the nine that follow, and not one of the three
+     * interpolation stages among them.
+     */
+    @Test
+    public void testADop853RunThatNeverInterpolatesPaysTwelveEvaluationsAStep() {
+        ExplicitRungeKutta rk = new ExplicitRungeKutta(ButcherTableau.DOP853, OSCILLATOR, 2);
+        double[] y = { 1.0, 0.0 };
+        double[] yOut = new double[2];
+        double t = 0.0;
+        for (int i = 0; i < 10; ++i) {
+            rk.step(t, y, 0.1, yOut, null);
+            t += 0.1;
+            System.arraycopy(yOut, 0, y, 0, 2);
+        }
+        assertEquals(13L + 9L * 12L, rk.evaluations());
+    }
+
+    /**
+     * The second estimate is there for a method that has one and absent for a
+     * method that does not, and it is filled by the same call that fills the
+     * first, so a caller never has to ask for it separately.
+     */
+    @Test
+    public void testTheSecondErrorEstimateArrivesWithTheFirst() {
+        ExplicitRungeKutta dp = new ExplicitRungeKutta(ButcherTableau.DORMAND_PRINCE_45, OSCILLATOR, 2);
+        double[] y = { 1.0, 0.0 };
+        double[] yOut = new double[2];
+        double[] err = new double[2];
+        dp.step(0.0, y, 0.1, yOut, err);
+        assertNull("Dormand-Prince estimates its error once", dp.secondaryError());
+
+        ExplicitRungeKutta d8 = new ExplicitRungeKutta(ButcherTableau.DOP853, OSCILLATOR, 2);
+        assertNull("and nothing is valid before a step", d8.secondaryError());
+        d8.step(0.0, y, 0.1, yOut, err);
+        double[] second = d8.secondaryError();
+        assertNotNull(second);
+        assertEquals(2, second.length);
+        // the two estimate the same error and disagree about its size, which is
+        // the whole reason both are worth having
+        assertTrue(norm(second) > norm(err));
+
+        // a step that was not asked for an estimate produces neither
+        d8.step(0.0, y, 0.1, yOut, null);
+        assertNull(d8.secondaryError());
+    }
+
+    private static double norm(double[] x) {
+        double sum = 0.0;
+        for (int i = 0; i < x.length; ++i) {
+            sum += x[i] * x[i];
+        }
+        return Math.sqrt(sum);
     }
 
     @Test

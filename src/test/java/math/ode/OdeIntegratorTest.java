@@ -595,9 +595,14 @@ public final class OdeIntegratorTest {
      * equation is {@code y' = -lambda (y - cos t) - sin t}, whose solution is
      * {@code cos t} for every {@code lambda} and whose Jacobian is
      * {@code -lambda}: the answer does not change and the difficulty of getting
-     * it does. Measured, the estimate comes out at {@code 0.37}, {@code 2.77}
-     * and {@code 4.27} for {@code lambda} of one, a hundred and ten thousand,
-     * against a threshold of {@code 3.25}.
+     * it does. Measured, the estimate comes out at {@code 0.367}, {@code 2.735}
+     * and {@code 4.919} for {@code lambda} of one, a hundred and ten thousand,
+     * against a threshold of {@code 3.25}, over 40, 642 and 30240 steps.
+     * <p>
+     * DOP853 on the same three, against its own threshold of {@code 6.1}:
+     * {@code 1.142}, {@code 5.619} and {@code 7.457}. The two thresholds are
+     * different numbers but they are the same fraction of each method's
+     * stability boundary, and the verdicts agree on all three.
      */
     @Test
     public void testTheStiffnessEstimateFollowsTheEigenvalueAndNotTheAnswer() {

@@ -261,6 +261,64 @@ public final class StepController {
     }
 
     /**
+     * The same, for a method that produced two estimates of different orders.
+     * <p>
+     * <b>Why they are combined rather than one of them used.</b> Take a method
+     * of order {@code q} carrying embedded solutions of orders {@code p1} and
+     * {@code p2}, and write {@code s1} and {@code s2} for the sums of the
+     * squared scaled components of the two estimates. Then
+     * <p>
+     * <code>err = s1 sqrt(1 / (n (s1 + eps s2)))</code>
+     * <p>
+     * with {@code eps} of {@code 0.01}. This is Hairer's expression, which
+     * carries a leading <code>|h|</code> because there the two estimates are
+     * combinations of derivatives; the ones arriving here are already
+     * multiplied by the step size, and that factor comes out of the ratio by
+     * itself. Where the first estimate dominates this
+     * is the plain root mean square of it. Where the second does -- which is
+     * what happens as the step shrinks, since the lower order estimate goes to
+     * zero more slowly -- it becomes {@code |h| s1 / sqrt(eps n s2)}, and with
+     * <code>s1 ~ h^(2 p1 + 2)</code> and <code>s2 ~ h^(2 p2 + 2)</code> that
+     * falls like <code>h^(2 p1 - p2 + 1)</code>. For DOP853, where the orders
+     * are 5 and 3, the exponent is 8: the number falls at the order of the
+     * solution the method actually advances, and controlling the step on it
+     * controls the accuracy that is kept rather than the accuracy that is
+     * thrown away.
+     * <p>
+     * The formula is Hairer's, and so is the guard: a denominator that is not
+     * positive -- both estimates exactly zero -- is replaced by one, which
+     * leaves {@code err} at zero and the step accepted.
+     *
+     * @param error
+     *            the estimate of the higher order, from
+     *            {@link OdeStepper#step(double, double[], double, double[], double[])}
+     * @param secondary
+     *            the estimate of the lower order, from
+     *            {@link OdeStepper#secondaryError()}
+     * @param y
+     *            the state the step started from
+     * @param yNext
+     *            the state it reached
+     * @return the scaled error, a step being acceptable at one or below
+     */
+    public double errorNorm(double[] error, double[] secondary, double[] y, double[] yNext) {
+        double sum = 0.0;
+        double sumSecondary = 0.0;
+        for (int i = 0; i < error.length; ++i) {
+            double scale = atol + rtol * Math.max(Math.abs(y[i]), Math.abs(yNext[i]));
+            double e = error[i] / scale;
+            double e2 = secondary[i] / scale;
+            sum += e * e;
+            sumSecondary += e2 * e2;
+        }
+        double denominator = sum + 0.01 * sumSecondary;
+        if (!(denominator > 0.0)) {
+            denominator = 1.0;
+        }
+        return sum * Math.sqrt(1.0 / (error.length * denominator));
+    }
+
+    /**
      * The factor to multiply the step size by after a step that was kept.
      *
      * @param error

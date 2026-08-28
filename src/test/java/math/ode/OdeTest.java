@@ -47,6 +47,19 @@ public final class OdeTest {
         }
     };
 
+    /** The same two bodies as a first order system, position then velocity. */
+    private static final DVectorField KEPLER = new DVectorField() {
+        @Override
+        public void valueAt(double t, double[] y, double[] dydt) {
+            double r2 = y[0] * y[0] + y[1] * y[1];
+            double r3 = r2 * Math.sqrt(r2);
+            dydt[0] = y[2];
+            dydt[1] = y[3];
+            dydt[2] = -y[0] / r3;
+            dydt[3] = -y[1] / r3;
+        }
+    };
+
     /** Two bodies under gravity, as an acceleration on the position alone. */
     private static final DSecondOrderField GRAVITY = new DSecondOrderField() {
         @Override
@@ -170,7 +183,7 @@ public final class OdeTest {
 
     /**
      * The self check is the class's own statement about the package, and it has
-     * to keep passing. Its seven lines are the same claims the test classes
+     * to keep passing. Its eight lines are the same claims the test classes
      * make at length, which is the point: a reader who runs the class gets the
      * measurements without reading the tests.
      */
@@ -184,7 +197,9 @@ public final class OdeTest {
         assertTrue("the contrast is the point of the two Kepler lines", page.contains("symplectically"));
         assertTrue("and the stiff problem answers the line above it",
                 page.contains("the explicit method gives up"));
-        assertEquals("seven claims and a verdict", 8, page.split("\\r?\\n").length);
+        assertTrue("and the last line is the third regime question",
+                page.contains("at rtol 1e-12"));
+        assertEquals("eight claims and a verdict", 9, page.split("\\r?\\n").length);
     }
 
     /**
@@ -308,6 +323,35 @@ public final class OdeTest {
         }
         try {
             Ode.solveStiff(STIFF, 0.0, null, 1.0, 1.0e-8);
+            fail("expected a refusal naming y0");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("y0"));
+        }
+    }
+
+    /**
+     * The accurate entry is DOP853 and reaches the same answer as the ordinary
+     * one, for a good deal less at a tight tolerance: 3099 evaluations against
+     * 9891 over ten orbits at {@code rtol = 1e-12}.
+     */
+    @Test
+    public void testTheAccurateEntryIsDop853AndIsCheaperWhereItShouldBe() {
+        double[] start = { 0.4, 0.0, 0.0, 2.0 };
+        OdeIntegrator.Result five = Ode.solve(KEPLER, 0.0, start, 20.0, 1.0e-12);
+        OdeIntegrator.Result eight = Ode.solveAccurate(KEPLER, 0.0, start, 20.0, 1.0e-12);
+        for (int i = 0; i < start.length; ++i) {
+            assertEquals("component " + i, five.finalState()[i], eight.finalState()[i], 1.0e-8);
+        }
+        assertTrue("at rtol 1e-12 the eighth order method should cost less than half: "
+                + eight.evaluations + " against " + five.evaluations,
+                eight.evaluations * 2L < five.evaluations);
+        assertFalse("a smooth orbit is not stiff at any tolerance", eight.seemsStiff);
+    }
+
+    @Test
+    public void testTheAccurateEntryChecksItsArguments() {
+        try {
+            Ode.solveAccurate(KEPLER, 0.0, null, 1.0, 1.0e-8);
             fail("expected a refusal naming y0");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage(), expected.getMessage().contains("y0"));

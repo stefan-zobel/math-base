@@ -19,12 +19,16 @@ import math.solve.Quadrature;
  * the classical fixed step method builds those three objects directly; this is
  * the shortcut and not the interface.
  * <p>
- * Two entries are different methods for different questions.
+ * Three entries are different methods for different questions.
  * {@link #solveSymplectic(math.fun.DSecondOrderField, double, double[],
  * double[], double, int)} answers not "where is it now" but "where is it still,
  * after a very long time".
  * {@link #solveStiff(math.fun.DVectorField, double, double[], double, double)}
- * answers a question the explicit family cannot answer at all.
+ * answers a question the explicit family cannot answer at all. And
+ * {@link #solveAccurate(math.fun.DVectorField, double, double[], double, double)}
+ * answers the same question as {@code solve} but at a tolerance where a fifth
+ * order method has become the expensive way to get there -- below about
+ * {@code 1e-07}, measured.
  * <p>
  * <b>Read {@link OdeIntegrator.Result#seemsStiff}.</b> It is the one field here
  * that says the answer may be worthless: an explicit method whose step is held
@@ -246,6 +250,57 @@ public final class Ode {
     }
 
     /**
+     * Integrates {@code y' = f(t, y)} with {@link ButcherTableau#DOP853}, the
+     * eighth order method, for an answer wanted to many digits.
+     * <p>
+     * <b>Use this when the tolerance is tight and not otherwise.</b> An eighth
+     * order step costs twelve evaluations against Dormand-Prince's six, and it
+     * pays for them by needing far fewer steps as the tolerance falls: the step
+     * count grows like <code>rtol^(-1/9)</code> rather than
+     * <code>rtol^(-1/5)</code>. Measured on the two body problem over ten
+     * orbits, the crossing sits near {@code 1e-07} -- at {@code 1e-06}
+     * {@link #solve(math.fun.DVectorField, double, double[], double, double)}
+     * costs 831 evaluations against this one's 891, at {@code 1e-07} it is 1149
+     * against 1095, at {@code 1e-10} it is 3951 against 2091, and at
+     * {@code 1e-13} it is 15669 against 4035.
+     * <p>
+     * It also interpolates far more accurately, at {@code 2^8} per halving
+     * against {@code 2^5}, and that is worth knowing for a run with an output
+     * grid or an event: the three stages its continuous extension needs are
+     * evaluated only inside a step somebody looked into.
+     * <p>
+     * <b>It is still an explicit method.</b> On a stiff equation it fails the
+     * same way Dormand-Prince does, a little later; the answer to
+     * {@link OdeIntegrator.Result#seemsStiff} is
+     * {@link #solveStiff(math.fun.DVectorField, double, double[], double, double)}
+     * and not this.
+     *
+     * @param f
+     *            the right hand side
+     * @param t0
+     *            the time the initial state belongs to
+     * @param y0
+     *            the initial state (not modified)
+     * @param t1
+     *            the time to reach, which may lie before {@code t0}
+     * @param tolerance
+     *            the error one step may add, relative and absolute alike
+     * @return the solution at the times the method chose
+     * @throws IllegalArgumentException
+     *             if an argument is out of shape
+     * @throws ArithmeticException
+     *             if the step size collapses or the step budget runs out
+     */
+    public static OdeIntegrator.Result solveAccurate(DVectorField f, double t0, double[] y0, double t1,
+            double tolerance) {
+        if (y0 == null) {
+            throw new IllegalArgumentException("y0 must not be null");
+        }
+        return new OdeIntegrator(new ExplicitRungeKutta(ButcherTableau.DOP853, f, y0.length),
+                new StepController(tolerance, tolerance)).solve(t0, y0, t1);
+    }
+
+    /**
      * Integrates a stiff {@code y' = f(t, y)} with
      * {@link RosenbrockTableau#RODAS4}, differencing the Jacobian out of the
      * field.
@@ -364,7 +419,7 @@ public final class Ode {
     }
 
     /**
-     * A self check: seven claims about this package, each measured rather than
+     * A self check: eight claims about this package, each measured rather than
      * asserted, and a verdict at the end.
      *
      * @param args
@@ -504,6 +559,16 @@ public final class Ode {
                 Long.valueOf(reaction.evaluations),
                 explicitGaveUp ? "gives up" : "FINISHED, which it should not");
         ok &= wandered < 1.0e-14 && explicitGaveUp;
+
+        // 8. and the third question, which is neither the horizon nor the
+        // stiffness but the tolerance
+        OdeIntegrator.Result five = solve(kepler, 0.0, start, 20.0, 1.0e-12);
+        OdeIntegrator.Result eight = solveAccurate(kepler, 0.0, start, 20.0, 1.0e-12);
+        System.out.printf(Locale.ROOT, "%-52s %12.2f   (%d evaluations against %d, at rtol 1e-12)%n",
+                "ten orbits cost DOP853 this fraction of DP45", Double.valueOf(
+                        eight.evaluations / (double) five.evaluations),
+                Long.valueOf(eight.evaluations), Long.valueOf(five.evaluations));
+        ok &= eight.evaluations * 2L < five.evaluations;
 
         System.out.println(ok ? ">>> OK" : ">>> FAILED");
     }

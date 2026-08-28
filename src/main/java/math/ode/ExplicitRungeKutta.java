@@ -23,19 +23,25 @@ import math.fun.DVectorField;
  * order this class did not anticipate loses the saving and not the answer.
  * <p>
  * <b>Interpolation is always available and the endpoints are exact.</b> With a
- * continuous extension in the tableau it is a polynomial over the stages
- * already computed and costs nothing further. Without one it is the cubic
- * through the two states and the two derivatives, and it needs the derivative
- * at the end of the step: that one is evaluated the first time an interior
- * point is asked for and not at all otherwise, so a caller who never
- * interpolates never pays for it.
+ * continuous extension in the tableau it is a polynomial over the stages, and
+ * for Dormand-Prince those are the stages the step computed anyway, so it costs
+ * nothing further. Without one it is the cubic through the two states and the
+ * two derivatives. A method whose interpolant needs stages of its own --
+ * {@link ButcherTableau#denseStages()} above {@link ButcherTableau#stages()},
+ * which DOP853 is by three -- pays for them, and so does the cubic for the
+ * derivative at the end of the step. <b>Either way that cost is deferred to the
+ * first interior point asked for inside a step and paid once</b>, so a caller
+ * who never interpolates never pays it, and one who asks for a hundred points
+ * in a step pays it once.
  * <p>
  * Either way the interpolant is <b>one order below the step it spans</b>, which
  * is what the continuous extension of Dormand-Prince buys over the cubic: it is
  * one order below a fifth order step rather than one order below a fourth order
  * one. Measured on the harmonic oscillator over five halvings, the worst error
- * inside a step falls by {@code 2^5.0} for Dormand-Prince and by {@code 2^4.0}
- * for the classical method.
+ * inside a step falls by {@code 2^5.0} for Dormand-Prince, by {@code 2^4.0} for
+ * the classical method and by {@code 2^8.0} for DOP853 -- the last being what
+ * its three extra stages are bought with, and the reason they are worth
+ * evaluating when they are wanted.
  * <p>
  * Instances are stateful and cannot be shared between threads.
  * <p>
@@ -55,6 +61,7 @@ public final class ExplicitRungeKutta implements OdeStepper {
     private final double[][] a;
     private final double[] b;
     private final double[] bStar;
+    private final double[] bStarSecondary;
     private final double[][] denseB;
     private final int propagating;
     private final int allStages;
@@ -62,6 +69,7 @@ public final class ExplicitRungeKutta implements OdeStepper {
 
     private final double[][] k;
     private final double[] stage;
+    private final double[] secondError;
     private final double[] endDerivative;
     private final double[] stiffArgument;
     private final int stiffEarly;
@@ -78,6 +86,8 @@ public final class ExplicitRungeKutta implements OdeStepper {
     private boolean endValid;
     private boolean stepped;
     private boolean endDerivativeValid;
+    private boolean denseStagesValid;
+    private boolean secondErrorValid;
     private long evaluations;
 
     /**
@@ -110,12 +120,14 @@ public final class ExplicitRungeKutta implements OdeStepper {
         this.a = tableau.a();
         this.b = tableau.b();
         this.bStar = tableau.bStar();
+        this.bStarSecondary = tableau.bStarSecondary();
         this.denseB = tableau.dense();
         this.propagating = tableau.stages();
         this.allStages = tableau.denseStages();
         this.fsal = tableau.isFsal();
         this.k = new double[allStages][dimension];
         this.stage = new double[dimension];
+        this.secondError = (bStarSecondary == null) ? null : new double[dimension];
         this.endDerivative = new double[dimension];
         this.startY = new double[dimension];
         this.endY = new double[dimension];
@@ -220,8 +232,10 @@ public final class ExplicitRungeKutta implements OdeStepper {
         System.arraycopy(y, 0, startY, 0, n);
         startValid = true;
 
-        int limit = (denseB == null) ? propagating : allStages;
-        for (int i = 1; i < limit; ++i) {
+        // only what advances the solution: any stage beyond that exists for the
+        // interpolant alone and is evaluated when one is actually asked for
+        denseStagesValid = allStages == propagating;
+        for (int i = 1; i < propagating; ++i) {
             System.arraycopy(y, 0, stage, 0, n);
             double[] ai = a[i];
             for (int j = 0; j < i; ++j) {
@@ -253,19 +267,12 @@ public final class ExplicitRungeKutta implements OdeStepper {
             }
         }
 
+        secondErrorValid = false;
         if (errOut != null && bStar != null) {
-            for (int m = 0; m < n; ++m) {
-                errOut[m] = 0.0;
-            }
-            for (int i = 0; i < propagating; ++i) {
-                double di = b[i] - bStar[i];
-                if (di != 0.0) {
-                    double w = h * di;
-                    double[] ki = k[i];
-                    for (int m = 0; m < n; ++m) {
-                        errOut[m] += w * ki[m];
-                    }
-                }
+            weigh(errOut, bStar, h);
+            if (bStarSecondary != null) {
+                weigh(secondError, bStarSecondary, h);
+                secondErrorValid = true;
             }
         }
 
@@ -297,6 +304,7 @@ public final class ExplicitRungeKutta implements OdeStepper {
             return;
         }
         if (denseB != null) {
+            ensureDenseStages();
             System.arraycopy(startY, 0, out, 0, n);
             for (int i = 0; i < allStages; ++i) {
                 double[] p = denseB[i];
@@ -372,6 +380,16 @@ public final class ExplicitRungeKutta implements OdeStepper {
     }
 
     @Override
+    public double[] secondaryError() {
+        return secondErrorValid ? secondError : null;
+    }
+
+    @Override
+    public double stiffnessThreshold() {
+        return tableau.stiffnessThreshold();
+    }
+
+    @Override
     public long evaluations() {
         return evaluations;
     }
@@ -382,6 +400,8 @@ public final class ExplicitRungeKutta implements OdeStepper {
         endValid = false;
         stepped = false;
         endDerivativeValid = false;
+        denseStagesValid = false;
+        secondErrorValid = false;
     }
 
     /**
@@ -390,6 +410,54 @@ public final class ExplicitRungeKutta implements OdeStepper {
     @Override
     public String toString() {
         return "ExplicitRungeKutta[" + tableau + ", dimension " + n + "]";
+    }
+
+    /**
+     * The difference between the advancing solution and an embedded one, over
+     * the stages that propagate, which is that pair's estimate of the error of
+     * the step.
+     */
+    private void weigh(double[] out, double[] embedded, double h) {
+        for (int m = 0; m < n; ++m) {
+            out[m] = 0.0;
+        }
+        for (int i = 0; i < propagating; ++i) {
+            double di = b[i] - embedded[i];
+            if (di != 0.0) {
+                double w = h * di;
+                double[] ki = k[i];
+                for (int m = 0; m < n; ++m) {
+                    out[m] += w * ki[m];
+                }
+            }
+        }
+    }
+
+    /**
+     * Evaluates the stages that only the continuous extension needs, once per
+     * step and only if an interior value is asked for.
+     */
+    private void ensureDenseStages() {
+        if (denseStagesValid) {
+            return;
+        }
+        for (int i = propagating; i < allStages; ++i) {
+            System.arraycopy(startY, 0, stage, 0, n);
+            double[] ai = a[i];
+            for (int j = 0; j < i; ++j) {
+                double aij = ai[j];
+                if (aij != 0.0) {
+                    double w = lastH * aij;
+                    double[] kj = k[j];
+                    for (int m = 0; m < n; ++m) {
+                        stage[m] += w * kj[m];
+                    }
+                }
+            }
+            field.valueAt(startT + c[i] * lastH, stage, k[i]);
+            ++evaluations;
+        }
+        denseStagesValid = true;
     }
 
     private static boolean sameContent(double[] x, double[] y) {

@@ -68,14 +68,6 @@ import math.solve.RootFinder;
  */
 public final class OdeIntegrator {
 
-    /**
-     * Past this, the step of an explicit method is being held down by stability
-     * rather than by accuracy. It is the value Hairer's {@code dopri5} uses,
-     * and it sits just inside the real stability boundary of a fifth order
-     * explicit method, which is a little over three.
-     */
-    private static final double STIFFNESS_THRESHOLD = 3.25;
-
     /** How many steps in a row have to look stiff before the run says so. */
     private static final int STIFF_STREAK = 15;
 
@@ -321,7 +313,7 @@ public final class OdeIntegrator {
         long before = stepper.evaluations();
         Recorder recorder = new Recorder(times, forward, (times == null) ? steps + 1 : times.length);
         Watch watch = new Watch(events, n);
-        Stiffness stiffness = new Stiffness();
+        Stiffness stiffness = new Stiffness(stepper);
         double[] y = y0.clone();
         double[] yNext = new double[n];
         recorder.initial(t0, y);
@@ -367,7 +359,7 @@ public final class OdeIntegrator {
         long before = stepper.evaluations();
         Recorder recorder = new Recorder(times, forward, (times == null) ? 64 : times.length);
         Watch watch = new Watch(events, n);
-        Stiffness stiffness = new Stiffness();
+        Stiffness stiffness = new Stiffness(stepper);
         double[] y = y0.clone();
         double[] yNext = new double[n];
         double[] error = new double[n];
@@ -408,8 +400,16 @@ public final class OdeIntegrator {
             double trial = last ? (t1 - t) : h;
 
             stepper.step(t, y, trial, yNext, error);
-            boolean finite = allFinite(yNext) && allFinite(error);
-            double scaled = finite ? controller.errorNorm(error, y, yNext) : Double.NaN;
+            // a method that estimates its error twice, at two orders, hands the
+            // second one over here and the controller combines them, because
+            // combining takes the tolerances and those belong to the controller
+            double[] second = stepper.secondaryError();
+            boolean finite = allFinite(yNext) && allFinite(error) && (second == null || allFinite(second));
+            double scaled = Double.NaN;
+            if (finite) {
+                scaled = (second == null) ? controller.errorNorm(error, y, yNext)
+                        : controller.errorNorm(error, second, y, yNext);
+            }
 
             if (finite && scaled <= 1.0) {
                 ++accepted;
@@ -499,10 +499,17 @@ public final class OdeIntegrator {
      */
     private static final class Stiffness {
 
+        private final double threshold;
         private double worst = Double.NaN;
         private int stiffStreak;
         private int calmStreak;
         private boolean seems;
+
+        Stiffness(OdeStepper stepper) {
+            // how far the method's own stability region reaches, which is not
+            // the same number for a fifth order pair and for an eighth order one
+            this.threshold = stepper.stiffnessThreshold();
+        }
 
         void afterStep(OdeStepper stepper) {
             double measure = stepper.stiffnessMeasure();
@@ -512,7 +519,7 @@ public final class OdeIntegrator {
             if (Double.isNaN(worst) || measure > worst) {
                 worst = measure;
             }
-            if (measure > STIFFNESS_THRESHOLD) {
+            if (measure > threshold) {
                 calmStreak = 0;
                 ++stiffStreak;
                 if (stiffStreak >= STIFF_STREAK) {
@@ -535,8 +542,7 @@ public final class OdeIntegrator {
             if (Double.isNaN(worst)) {
                 return "";
             }
-            return "; stiffness was measured at " + worst + " against a threshold of "
-                    + STIFFNESS_THRESHOLD;
+            return "; stiffness was measured at " + worst + " against a threshold of " + threshold;
         }
     }
 
@@ -848,14 +854,18 @@ public final class OdeIntegrator {
          * tolerance will make it the right one: the step is short because a
          * longer one would be unstable, not because a longer one would be
          * inaccurate. What it is telling a caller to reach for is an implicit
-         * method, which this library does not yet have.
+         * method, and
+         * {@link Ode#solveStiff(math.fun.DVectorField, double, double[], double, double)}
+         * is one.
          */
         public final boolean seemsStiff;
 
         /**
-         * The largest <code>|h| |lambda|</code> seen over the run, against a
-         * threshold of {@code 3.25}; {@link Double#NaN} if the method cannot
-         * estimate it, as the classical one cannot.
+         * The largest <code>|h| |lambda|</code> seen over the run, against
+         * {@link OdeStepper#stiffnessThreshold()} -- {@code 3.25} for
+         * Dormand-Prince and {@code 6.1} for DOP853, since the two stability
+         * regions do not reach equally far. {@link Double#NaN} if the method
+         * cannot estimate it, as the classical one cannot.
          */
         public final double stiffness;
 

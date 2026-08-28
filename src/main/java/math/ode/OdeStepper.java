@@ -53,6 +53,32 @@ public interface OdeStepper {
     boolean hasErrorEstimate();
 
     /**
+     * A second, independent estimate of the error of the step just taken, of a
+     * lower order than the first, or {@code null} for a method that carries
+     * only one.
+     * <p>
+     * <b>Why a method would want two.</b> An embedded solution of order
+     * {@code p} makes the difference of the pair fall like
+     * <code>h^(p+1)</code>, so a step controlled on it is a step controlled on
+     * the accuracy of the solution that is discarded. For a pair whose two
+     * orders are close that is near enough; for a method of order eight
+     * carrying a fifth order estimate it is not, and the step would be held to
+     * what the fifth order solution can do. Two estimates of different orders
+     * can be combined into a number that falls at the order of the solution the
+     * method actually advances, and
+     * {@link StepController#errorNorm(double[], double[], double[], double[])}
+     * is where that combining happens, because it takes the tolerances to do it.
+     * <p>
+     * The array belongs to the stepper and is valid until the next step. A
+     * caller that keeps it must copy it.
+     *
+     * @return the second estimate, or {@code null}
+     */
+    default double[] secondaryError() {
+        return null;
+    }
+
+    /**
      * Whether the method carries a continuous extension of its own: an
      * interpolant built over stages it has already computed, and one order
      * below the step it spans rather than three.
@@ -153,6 +179,23 @@ public interface OdeStepper {
      *         or no step has been taken
      */
     double stiffnessMeasure();
+
+    /**
+     * How large {@link #stiffnessMeasure()} may grow over a step before the
+     * step counts as one the equation is forcing rather than the tolerance.
+     * <p>
+     * It is not a universal number: it is how far the stability region of the
+     * particular method reaches along the negative real axis, and a method of a
+     * higher order has a longer one. The default is Hairer's value for a fifth
+     * order pair, which is what a stepper whose measure is always
+     * {@link Double#NaN} may as well answer, and a method that reaches further
+     * says so.
+     *
+     * @return the threshold, positive and finite
+     */
+    default double stiffnessThreshold() {
+        return 3.25;
+    }
 
     /**
      * How often the field has been evaluated since this stepper was created.
