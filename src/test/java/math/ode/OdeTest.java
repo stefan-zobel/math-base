@@ -14,6 +14,7 @@ import org.junit.Test;
 
 import math.fun.DSecondOrderField;
 import math.fun.DVectorField;
+import math.fun.DiffDVectorField;
 
 /**
  * The facade, checked against the three objects it builds.
@@ -169,8 +170,8 @@ public final class OdeTest {
 
     /**
      * The self check is the class's own statement about the package, and it has
-     * to keep passing. Its six lines are the same claims the test classes make
-     * at length, which is the point: a reader who runs the class gets the
+     * to keep passing. Its seven lines are the same claims the test classes
+     * make at length, which is the point: a reader who runs the class gets the
      * measurements without reading the tests.
      */
     @Test
@@ -181,7 +182,9 @@ public final class OdeTest {
         assertTrue(page, page.contains("against Gauss-Kronrod"));
         assertTrue(page, page.contains("drifts, and is meant to"));
         assertTrue("the contrast is the point of the two Kepler lines", page.contains("symplectically"));
-        assertEquals("six claims and a verdict", 7, page.split("\\r?\\n").length);
+        assertTrue("and the stiff problem answers the line above it",
+                page.contains("the explicit method gives up"));
+        assertEquals("seven claims and a verdict", 8, page.split("\\r?\\n").length);
     }
 
     /**
@@ -221,6 +224,94 @@ public final class OdeTest {
         assertEquals(q0[1], r.finalState()[1], 1.0e-11);
         assertEquals("and the inputs are not written into", 0.4, q0[0], 0.0);
         assertEquals(2.0, v0[1], 0.0);
+    }
+
+    /**
+     * {@code y' = -L (y - cos t) - sin t}, whose solution is {@code cos t} for
+     * every {@code L} and which an explicit method cannot follow at all once
+     * {@code L} is large.
+     */
+    private static final DiffDVectorField STIFF = new DiffDVectorField() {
+        @Override
+        public void valueAt(double t, double[] y, double[] dydt) {
+            dydt[0] = -1.0e5 * (y[0] - Math.cos(t)) - Math.sin(t);
+        }
+
+        @Override
+        public void jacobianAt(double t, double[] y, double[] dfdy, double[] dfdt) {
+            dfdy[0] = -1.0e5;
+            dfdt[0] = -1.0e5 * Math.sin(t) - Math.cos(t);
+        }
+    };
+
+    @Test
+    public void testTheStiffEntryIsRodas4AndTheObjectsAroundIt() {
+        OdeIntegrator.Result byHand = new OdeIntegrator(
+                new Rosenbrock(RosenbrockTableau.RODAS4, (DVectorField) STIFF, 1),
+                new StepController(1.0e-8, 1.0e-8)).solve(0.0, new double[] { 1.0 }, 10.0);
+        OdeIntegrator.Result byFacade = Ode.solveStiff((DVectorField) STIFF, 0.0, new double[] { 1.0 },
+                10.0, 1.0e-8);
+        assertEquals(byHand.length, byFacade.length);
+        assertEquals(byHand.evaluations, byFacade.evaluations);
+        assertEquals(byHand.finalState()[0], byFacade.finalState()[0], 0.0);
+        assertEquals("and the answer is the cosine", Math.cos(10.0), byFacade.finalState()[0], 1.0e-6);
+    }
+
+    /**
+     * The same run with the Jacobian written down. The two do not take exactly
+     * the same steps -- a differenced Jacobian is an approximate one and the
+     * error estimates part company a little -- but the cost of each is exact:
+     * six stages a step, five on a step retried from a point already
+     * linearized, and two more per point where the derivatives have to be
+     * differenced out of a system of one component.
+     */
+    @Test
+    public void testTheStiffEntryTakesAJacobianWhenOneIsOffered() {
+        OdeIntegrator.Result differenced = Ode.solveStiff((DVectorField) STIFF, 0.0,
+                new double[] { 1.0 }, 10.0, 1.0e-8);
+        OdeIntegrator.Result written = Ode.solveStiff(STIFF, 0.0, new double[] { 1.0 }, 10.0, 1.0e-8);
+        assertEquals("the two agree on the answer", differenced.finalState()[0],
+                written.finalState()[0], 1.0e-9);
+        assertTrue("and very nearly on the number of steps: " + written.steps + " against "
+                + differenced.steps, Math.abs(written.steps - differenced.steps) < 0.05 * written.steps);
+        assertEquals("six a step, five on a retry, and two for the first step",
+                2L + 6L * written.steps + 5L * written.rejected, written.evaluations);
+        assertEquals("and two more per point where the Jacobian is differenced",
+                2L + 8L * differenced.steps + 5L * differenced.rejected, differenced.evaluations);
+        assertTrue("so the written form is the cheaper one: " + written.evaluations + " against "
+                + differenced.evaluations, written.evaluations < differenced.evaluations);
+    }
+
+    /**
+     * What the explicit entry says about the same problem, and what happens
+     * when its advice is taken. This is the pair the package comment is about.
+     */
+    @Test
+    public void testTheStiffnessReportIsTheAdviceToUseTheStiffEntry() {
+        OdeIntegrator.Result explicit = Ode.solve(STIFF, 0.0, new double[] { 1.0 }, 1.0, 1.0e-8);
+        assertTrue("the explicit method should notice", explicit.seemsStiff);
+        OdeIntegrator.Result implicit = Ode.solveStiff(STIFF, 0.0, new double[] { 1.0 }, 1.0, 1.0e-8);
+        assertFalse("and the implicit one has no such limit to report", implicit.seemsStiff);
+        assertTrue("and it should be very much cheaper: " + implicit.evaluations + " against "
+                + explicit.evaluations, 10L * implicit.evaluations < explicit.evaluations);
+        assertEquals(Math.cos(1.0), implicit.finalState()[0], 1.0e-7);
+        assertEquals(Math.cos(1.0), explicit.finalState()[0], 1.0e-7);
+    }
+
+    @Test
+    public void testTheStiffEntryChecksItsArguments() {
+        try {
+            Ode.solveStiff((DVectorField) STIFF, 0.0, null, 1.0, 1.0e-8);
+            fail("expected a refusal naming y0");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("y0"));
+        }
+        try {
+            Ode.solveStiff(STIFF, 0.0, null, 1.0, 1.0e-8);
+            fail("expected a refusal naming y0");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("y0"));
+        }
     }
 
     @Test

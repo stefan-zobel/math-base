@@ -15,14 +15,16 @@
  * the answer. Adding a method means adding coefficients, and adding a kind of
  * method means adding a stepper -- neither touches the driver.
  * <p>
- * <b>What is here</b> is the explicit case, in two families. For a general
- * system {@code y' = f(t, y)}: Dormand-Prince 5(4) with a continuous extension
- * and an error estimate, and the classical fourth order method for a fixed step
- * size. For a mechanical one {@code q'' = f(t, q)}, where the position and the
- * velocity are worth keeping apart: {@link math.ode.SymplecticNystrom} over
- * five methods, from Verlet up to Blanes-Moan of order six. That covers a
- * problem that is not stiff, which is most of them, and covers a stiff one not
- * at all -- see below.
+ * <b>What is here</b> is three families. For a general system
+ * {@code y' = f(t, y)} that is not stiff: Dormand-Prince 5(4) with a continuous
+ * extension and an error estimate, and the classical fourth order method for a
+ * fixed step size. For a mechanical one {@code q'' = f(t, q)}, where the
+ * position and the velocity are worth keeping apart:
+ * {@link math.ode.SymplecticNystrom} over five methods, from Verlet up to
+ * Blanes-Moan of order six. And for a stiff one, {@link math.ode.Rosenbrock}
+ * over {@link math.ode.RosenbrockTableau#RODAS4} and two others -- linearly
+ * implicit, so a step costs one Jacobian and one matrix factorization and no
+ * iteration converges or fails to.
  * <p>
  * <b>Among those five, the order is not the thing to choose on.</b> Yoshida's
  * triple jump, Suzuki's five-fold composition and Blanes-Moan's
@@ -65,7 +67,7 @@
  * equation and the interval, and it is not one.</li>
  * </ul>
  * <p>
- * <b>One limit, and one question with two answers.</b>
+ * <b>Two questions, and a measurement for each.</b>
  * <p>
  * The first is <b>stiffness</b>. An explicit method is stable only while the
  * step size times the largest eigenvalue of the Jacobian stays inside a region
@@ -73,12 +75,27 @@
  * and not by accuracy, and no tolerance changes that. The failure does not look
  * like inaccuracy, it looks like a program that has stopped -- which is why
  * {@link math.ode.OdeIntegrator.Result#seemsStiff} exists and why the
- * exceptions say what they suspect. There is no implicit method here yet, so
- * what the field is telling a caller is to look elsewhere; saying so is better
- * than not saying it.
+ * exceptions say what they suspect. The answer to a {@code true} there is
+ * {@link math.ode.Ode#solveStiff(math.fun.DVectorField, double, double[],
+ * double, double)}.
  * <p>
- * The question is <b>what happens to an invariant over a long time</b>, and the
- * answer depends on which family is used. The energy of a two body orbit does
+ * <b>But a stiff method is not a better method.</b> It pays for a Jacobian, a
+ * factorization and a back substitution per stage, and where there is no
+ * stiffness to pay for it loses. Measured on van der Pol's oscillator, where
+ * the stiffness is a dial: at {@code mu = 10} Dormand-Prince costs 789 field
+ * evaluations against {@code RODAS4}'s 1763; at {@code mu = 100}, 3087 against
+ * 5204; at {@code mu = 1000} they have crossed; at {@code mu = 1e4} it is 74205
+ * against 10034; and at {@code mu = 1e5} the explicit method does not finish at
+ * all. The explicit cost is proportional to {@code mu} and the implicit one
+ * grows like its logarithm, by about two thousand evaluations a decade, so
+ * there is a crossing and it is worth knowing which side of it a problem is
+ * on. Robertson's reaction is the other side outright: {@code RODAS4} reaches
+ * {@code t = 1e11} in 395 steps, and no tolerance lets an explicit method reach
+ * it at all.
+ * <p>
+ * The second question is <b>what happens to an invariant over a long
+ * time</b>, and the answer depends on which family is used. The energy of a
+ * two body orbit does
  * not change; Dormand-Prince loses it steadily, by {@code 1.28e-09},
  * {@code 1.18e-08} and {@code 1.16e-07} over ten, a hundred and a thousand
  * orbits -- a factor of ten per factor of ten, and tightening the tolerance

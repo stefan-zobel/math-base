@@ -392,9 +392,13 @@ public final class OdeIntegrator {
                 throw new ArithmeticException("the step budget of " + budget + " ran out at t = " + t
                         + ", with " + rejected + " steps rejected" + stiffness.verdict());
             }
-            // the ulp of t1 as well, because the ulp of t alone is nothing at
-            // t = 0 and the guard would never fire on an interval starting there
-            if (Math.abs(h) <= 16.0 * Math.max(Math.ulp(t), Math.ulp(t1))) {
+            // the resolution of the time the step starts from, and not of the
+            // interval: a stiff run to t1 = 1e11 begins at t = 0 with a step of
+            // 1e-04, which is far below the ulp of t1 and perfectly able to
+            // make progress. At t = 0 itself the guard cannot fire and does not
+            // need to, since the next step starts somewhere else; the step
+            // budget above is what catches a run that crawls
+            if (Math.abs(h) <= 16.0 * Math.ulp(t)) {
                 throw new ArithmeticException("the step size collapsed to " + h + " at t = " + t
                         + ", which is the resolution of the time itself; the solution may end there,"
                         + " or the tolerance may be below what double precision can carry"
