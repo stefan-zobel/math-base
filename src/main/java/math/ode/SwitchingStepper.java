@@ -84,8 +84,9 @@ import math.fun.DiffDVectorField;
  * 85 % of the pure implicit run, the dial never above 99 % of it -- and
  * Robertson's premium stays between 2 % and 17 %.
  * <p>
- * <b>The dimension is not among the things that decide.</b> The last row is
- * there because it twice was. A switch needs the implicit method's step to be
+ * <b>The dimension no longer decides whether it hands over, but it decides what
+ * asking costs.</b> The last row is there because the handover twice stopped
+ * altogether. A switch needs the implicit method's step to be
  * worth its price, <code>implicitCost / explicitCost</code>, which for a
  * differenced Jacobian is <code>(n + 7) / 6</code> and so <em>rises with the
  * dimension</em>; a trial that can only reveal a fixed multiple of the step it
@@ -95,12 +96,38 @@ import math.fun.DiffDVectorField;
  * See {@link #theImplicitSettlesCheaper} for both measurements and what
  * replaced them.
  * <p>
- * A caller with a large system should still reach for the
- * {@link DiffDVectorField} constructor where they can: it drops
- * <code>implicitCost</code> to the stage count, so the ratio a switch must clear
- * stops depending on {@code n} altogether, and it spares the {@code n + 1}
- * evaluations a differenced Jacobian costs per step. On that chain of 50 the
- * written Jacobian costs 1466 evaluations against 8365.
+ * <b>A large system without a written Jacobian is the one regime where this
+ * class loses, and by how much is measured.</b> Both factors of a trial's bill
+ * grow with the dimension at once: the settled step has to climb past
+ * <code>(n + 7) / 6</code>, and every climbing step costs
+ * <code>stages + n + 1</code> evaluations, while the
+ * {@link #DEFAULT_PROBE_EVERY} explicit steps between one trial and the next
+ * cost a fixed six each. On a semi-discretized diffusion-reaction PDE at
+ * {@code rtol = 1e-6}, with the Jacobian differenced:
+ * <table border="1">
+ * <caption>what one trial costs, and what share of the whole run goes into
+ * trials, against the dimension</caption>
+ * <tr><th>n</th><th>implicit steps per trial</th><th>evaluations per
+ * trial</th><th>share of the run spent probing</th></tr>
+ * <tr><td>10</td><td>2.9</td><td>49</td><td>16 %</td></tr>
+ * <tr><td>20</td><td>4.1</td><td>111</td><td>30 %</td></tr>
+ * <tr><td>40</td><td>6.3</td><td>296</td><td>57 %</td></tr>
+ * <tr><td>100</td><td>7.1</td><td>761</td><td>79 %</td></tr>
+ * </table>
+ * <p>
+ * The worst cell measured on that problem is {@code n = 100} at
+ * {@code rtol = 1e-4}, where the pair costs <b>2.20 times</b> the better pure
+ * method; the same cell with a written Jacobian costs 1.11. Note also that the
+ * evaluation count flatters the pair here, because the trial's LU
+ * factorizations are not evaluations and so appear in none of these numbers.
+ * <p>
+ * <b>So: with a large system and no analytic Jacobian, prefer
+ * {@link Ode#solveStiff} outright.</b> Where a Jacobian can be written, the
+ * {@link DiffDVectorField} constructor removes the problem rather than easing
+ * it: it drops <code>implicitCost</code> to the stage count, so the ratio a
+ * switch must clear stops depending on {@code n} altogether, and it spares the
+ * {@code n + 1} evaluations a differenced Jacobian costs per step. On that
+ * chain of 50 the written Jacobian costs 1466 evaluations against 8365.
  * <p>
  * <b>Which explicit method to pair.</b> {@link ButcherTableau#DOP853} works
  * here unchanged and is worth reaching for under two conditions at once: the

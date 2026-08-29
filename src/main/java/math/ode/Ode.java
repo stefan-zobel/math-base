@@ -415,6 +415,18 @@ public final class Ode {
      * Robertson's row above is the whole story -- a few percent for insurance
      * on a claim never made.
      * <p>
+     * <b>Where it does not pay: a large system whose Jacobian has to be
+     * differenced.</b> This overload has no Jacobian to work from, so every
+     * trial costs {@code n + 7} evaluations and has to prove a step
+     * {@code (n + 7) / 6} times longer -- both growing with the dimension while
+     * the work between trials does not. Measured on a semi-discretized PDE, the
+     * share of the run spent probing runs 16 %, 30 %, 57 %, 79 % at
+     * {@code n} of 10, 20, 40, 100, and at {@code n = 100} the worst cell costs
+     * 2.20 times {@link #solveStiff}. Past a few dozen equations without a
+     * written Jacobian, call {@link #solveStiff} directly; with one, use the
+     * {@link DiffDVectorField} overload below, where the same cell costs 1.11.
+     * {@link SwitchingStepper} carries the table.
+     * <p>
      * How it decides is {@link SwitchingStepper}, and a caller who wants to see
      * what it did builds that object instead and reads
      * {@link SwitchingStepper#switches()}.
