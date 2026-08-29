@@ -67,16 +67,16 @@ import math.fun.DiffDVectorField;
  * <caption>evaluations, at {@code probeEvery} of 20</caption>
  * <tr><th>problem</th><th>this</th><th>better pure</th><th>oracle</th></tr>
  * <tr><td>a dial from 1 to 1e5 and back, rtol 1e-6</td>
- * <td>1789</td><td>2928</td><td>1468</td></tr>
+ * <td>1749</td><td>2928</td><td>1468</td></tr>
  * <tr><td>van der Pol at mu = 1000, rtol 1e-6</td>
- * <td>5017</td><td>8902</td><td>2747</td></tr>
+ * <td>4774</td><td>8902</td><td>2747</td></tr>
  * <tr><td>Robertson to 1e5, rtol 1e-8</td>
- * <td>3250</td><td>3147</td><td>3073</td></tr>
+ * <td>3220</td><td>3147</td><td>3073</td></tr>
  * <tr><td>a chain of 50 cells under the same dial, rtol 1e-6</td>
- * <td>8757</td><td>19948</td><td>--</td></tr>
+ * <td>8365</td><td>19948</td><td>--</td></tr>
  * </table>
  * <p>
- * The first two are what switching is for, and it closes 78 % and 63 % of the
+ * The first two are what switching is for, and it closes 81 % and 67 % of the
  * distance to the oracle. Robertson is an equation that is stiff throughout,
  * where there is nothing to win and the trials are an insurance premium of a
  * few percent on a claim never made. Over tolerances from {@code 1e-4} to
@@ -85,14 +85,22 @@ import math.fun.DiffDVectorField;
  * Robertson's premium stays between 2 % and 17 %.
  * <p>
  * <b>The dimension is not among the things that decide.</b> The last row is
- * there because it once was: a trial judged on one step could only hand over
- * while one implicit step cost less than a couple of explicit ones, which for a
- * differenced Jacobian is {@code n < 9}, and above that the stepper never
- * handed over at all. See {@link #theImplicitSettlesCheaper} for what that was
- * and why it is gone. A caller with a large system should still reach for the
- * {@link DiffDVectorField} constructor where they can: the differencing is
- * {@code n + 1} evaluations a step, and on that chain of 50 the written
- * Jacobian costs 1414 evaluations against 8757.
+ * there because it twice was. A switch needs the implicit method's step to be
+ * worth its price, <code>implicitCost / explicitCost</code>, which for a
+ * differenced Jacobian is <code>(n + 7) / 6</code> and so <em>rises with the
+ * dimension</em>; a trial that can only reveal a fixed multiple of the step it
+ * starts from therefore stops handing over above some {@code n}. Judged on one
+ * step that bound was {@code n < 9}; judged on four it was about {@code n < 21}.
+ * Judged, as now, by settling until the answer is in, there is no such bound.
+ * See {@link #theImplicitSettlesCheaper} for both measurements and what
+ * replaced them.
+ * <p>
+ * A caller with a large system should still reach for the
+ * {@link DiffDVectorField} constructor where they can: it drops
+ * <code>implicitCost</code> to the stage count, so the ratio a switch must clear
+ * stops depending on {@code n} altogether, and it spares the {@code n + 1}
+ * evaluations a differenced Jacobian costs per step. On that chain of 50 the
+ * written Jacobian costs 1466 evaluations against 8365.
  * <p>
  * <b>Which explicit method to pair.</b> {@link ButcherTableau#DOP853} works
  * here unchanged and is worth reaching for under two conditions at once: the
@@ -178,10 +186,20 @@ public final class SwitchingStepper implements OdeStepper {
     private static final double VETO_FRACTION = 0.5;
 
     /**
-     * How many steps the implicit method is allowed to take under its own step
-     * control before it is judged. See {@link #theImplicitSettlesCheaper}.
+     * The most steps the implicit method may take under its own step control
+     * before it is judged. It is a ceiling and not a target: the trial stops as
+     * soon as the answer is settled either way, and reaches this only where the
+     * step size is still climbing and has not yet climbed far enough. See
+     * {@link #theImplicitSettlesCheaper}.
      */
-    private static final int SETTLE_STEPS = 4;
+    private static final int MAX_SETTLE_STEPS = 16;
+
+    /**
+     * The growth per accepted trial step under which the implicit method's step
+     * size counts as having stopped climbing. See
+     * {@link #theImplicitSettlesCheaper}.
+     */
+    private static final double STALL_FACTOR = 1.05;
 
     private final ExplicitRungeKutta nonStiff;
     private final Rosenbrock stiff;
@@ -714,14 +732,39 @@ public final class SwitchingStepper implements OdeStepper {
      * nothing in it about the equation. Above it the stepper never handed over
      * at all -- at {@code n = 50}, 2677596 evaluations against the pure implicit
      * method's 19948, a hundredfold loss. So this side lets the implicit method
-     * run {@link #SETTLE_STEPS} steps under its own control and reads where the
-     * step size <em>settles</em>.
+     * run under its own control and reads where the step size <em>settles</em>.
+     * <p>
+     * <b>How long it is allowed to settle is not a fixed number, and a fixed
+     * number is what failed next.</b> A run of four steps moved the bound from
+     * {@code n < 9} to about {@code n < 21} and left it there, because the ratio
+     * a switch has to clear, <code>implicitCost / explicitCost</code>, grows with
+     * {@code n} while what four steps can reveal does not. Measured over 1100
+     * drawn problems, four steps reveal {@code 4.6 h} where {@code 9.5 h} was
+     * wanted at {@code n = 50}. Raising the number closes that and costs more
+     * everywhere else, since a trial answered "stay" pays for every step it took:
+     * eight steps took the share of problems costing more than twice the better
+     * pure method from 3.1 % to 4.8 %.
+     * <p>
+     * <b>So the trial stops as soon as the answer is in.</b> It is given the
+     * ratio it must clear and returns the moment it clears it, and it gives up
+     * the moment the step size stops climbing -- under {@link #STALL_FACTOR} per
+     * accepted step -- because a climb that has died away short of the mark will
+     * not resume. {@link #MAX_SETTLE_STEPS} is only the ceiling. The same exit
+     * that finds a long ramp early also abandons a hopeless probe early, which
+     * is why this is the one rule that improves both ends at once: the share of
+     * a run spent exploring, on runs that probe and never switch, falls from
+     * 30 % to 4.1 %.
      * <p>
      * <b>Only this side.</b> Coming back the other way the one-step reading was
      * never shown wrong, and settling there is what costs the most, since a
      * trial on the implicit side is nearly always answered "stay": doing it on
-     * both sides took Robertson's premium from 2 % to 34 %, and doing it here
-     * alone costs between 0.1 % and 6.8 % on everything that already worked.
+     * both sides took Robertson's premium from 2 % to 34 %.
+     * <p>
+     * <b>What is still not seen.</b> Where the stiff modes <em>rotate</em> as
+     * well as decay, an implicit method has to resolve the rotation and cannot
+     * ramp away from the explicit method's step at all, so no amount of settling
+     * finds a ramp that is not there. On such a problem the trial is right to
+     * answer "stay" and the cost of asking is what remains.
      */
     private boolean theImplicitSettlesCheaper(double t, double[] y, double h) {
         double settled = settledStep(t, y, h);
@@ -735,9 +778,11 @@ public final class SwitchingStepper implements OdeStepper {
     }
 
     /**
-     * The step size the implicit method reaches after {@link #SETTLE_STEPS} of
-     * its own steps, starting from {@code h}, or a negative number if it cannot
-     * take even one.
+     * The step size the implicit method reaches under its own step control,
+     * starting from {@code h}, or a negative number if it cannot take even one
+     * step. It stops early once the reading can no longer change the verdict --
+     * once it is past what a switch needs, or once it has stopped climbing --
+     * and at {@link #MAX_SETTLE_STEPS} steps in any case.
      * <p>
      * This is the loop {@link OdeIntegrator} runs, on a copy of the method so
      * that the one carrying the solution is not disturbed, and bounded in
@@ -755,7 +800,8 @@ public final class SwitchingStepper implements OdeStepper {
         int order = scout.order();
         int taken = 0;
         int attempts = 0;
-        while (taken < SETTLE_STEPS && attempts < 8 * SETTLE_STEPS + 8) {
+        double enough = Math.abs(h) * implicitCost / explicitCost;
+        while (taken < MAX_SETTLE_STEPS && attempts < 8 * MAX_SETTLE_STEPS + 8) {
             ++attempts;
             scout.step(time, current, trial, next, scoutError);
             boolean finite = allFinite(next) && allFinite(scoutError);
@@ -769,6 +815,15 @@ public final class SwitchingStepper implements OdeStepper {
                 double factor = controller.scale(scaled, previous, order);
                 previous = Math.max(scaled, StepController.ERROR_FLOOR);
                 trial *= factor;
+                if (Math.abs(trial) > enough) {
+                    // the answer is yes and no further step can unmake it
+                    return trial;
+                }
+                if (factor < STALL_FACTOR) {
+                    // the climb has died away short of what was needed, and
+                    // waiting longer only spends more to hear the same no
+                    return trial;
+                }
             } else {
                 trial *= controller.scaleAfterRejection(scaled, order);
             }

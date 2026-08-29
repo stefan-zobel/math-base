@@ -126,9 +126,9 @@
  * <p>
  * Measured in evaluations against the better of the two methods run alone, and
  * against a solver switching at exactly the right instants -- which is an upper
- * bound no real one reaches -- the dial takes 1789 against 2928 and 1468, van
- * der Pol at {@code mu = 1000} takes 5017 against 8902 and 2747, and Robertson
- * takes 3250 against 3147 and 3073. <b>Switching closes 78 % and 63 % of the
+ * bound no real one reaches -- the dial takes 1749 against 2928 and 1468, van
+ * der Pol at {@code mu = 1000} takes 4774 against 8902 and 2747, and Robertson
+ * takes 3220 against 3147 and 3073. <b>Switching closes 81 % and 67 % of the
  * distance to perfect on the two runs that change their mind, and costs 3.3 %
  * on the one that does not.</b> Where there is no stiffness at all it takes no
  * trial and is the pure explicit run bit for bit, so the premium is paid only

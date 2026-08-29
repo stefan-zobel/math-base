@@ -83,6 +83,77 @@ public class SwitchingStepperTest {
         return y;
     }
 
+    /**
+     * Stiff modes that <em>rotate</em> as well as decay: {@code n / 2} pairs
+     * whose decay rates are log-spaced from 1 to 1e5 under a dial, each turning
+     * between 30 and 3 times as fast as it decays. An implicit method has to
+     * resolve a rotation and cannot ramp away from it in a step or two, so the
+     * step size it reaches climbs slowly and over many steps -- which is what a
+     * trial of a fixed length cannot see. The exact solution is
+     * {@code y_i = cos(t)}, so cost and accuracy can both be asserted.
+     */
+    private static DVectorField rotating(final int n) {
+        final int pairs = n / 2;
+        final double[] base = new double[n];
+        final double[] turn = new double[pairs];
+        for (int i = 0; i < n; ++i) {
+            base[i] = Math.pow(1.0e5, i / (double) (n - 1));
+        }
+        for (int p = 0; p < pairs; ++p) {
+            turn[p] = 30.0 * Math.pow(0.1, p / (double) (pairs - 1));
+        }
+        return new DVectorField() {
+            @Override
+            public void valueAt(double t, double[] y, double[] dydt) {
+                double w = 0.5 * (1.0 + Math.tanh((t - 8.0) / 0.25)) * 0.5
+                        * (1.0 + Math.tanh((24.0 - t) / 0.25));
+                double c = Math.cos(t);
+                double s = Math.sin(t);
+                for (int i = 0; i < n; i += 2) {
+                    double m = 1.0 + (base[i] - 1.0) * w;
+                    double r = m * turn[i / 2];
+                    double d0 = y[i] - c;
+                    double d1 = y[i + 1] - c;
+                    dydt[i] = -m * d0 + r * d1 - s;
+                    dydt[i + 1] = -r * d0 - m * d1 - s;
+                }
+            }
+        };
+    }
+
+    /**
+     * Decays whose rates are log-spaced from 1 to 100 under the same dial: stiff
+     * enough that the explicit method's step is held down and trials are taken,
+     * never stiff enough that handing over would pay. The exact solution is
+     * {@code y_i = cos(t)}.
+     */
+    private static DVectorField spread(final int n) {
+        final double[] base = new double[n];
+        for (int i = 0; i < n; ++i) {
+            base[i] = Math.pow(100.0, i / (double) (n - 1));
+        }
+        return new DVectorField() {
+            @Override
+            public void valueAt(double t, double[] y, double[] dydt) {
+                double w = 0.5 * (1.0 + Math.tanh((t - 10.0) / 0.25)) * 0.5
+                        * (1.0 + Math.tanh((20.0 - t) / 0.25));
+                double c = Math.cos(t);
+                double s = Math.sin(t);
+                for (int i = 0; i < n; ++i) {
+                    dydt[i] = -(1.0 + (base[i] - 1.0) * w) * (y[i] - c) - s;
+                }
+            }
+        };
+    }
+
+    private static double[] ones(int n) {
+        double[] y = new double[n];
+        for (int i = 0; i < n; ++i) {
+            y[i] = 1.0;
+        }
+        return y;
+    }
+
     /** A linear equation whose one eigenvalue is a number this test knows. */
     private static final DVectorField DECAY = new DVectorField() {
         @Override
@@ -252,6 +323,69 @@ public class SwitchingStepperTest {
                         mixed.finalState()[i], ACROSS_METHODS);
             }
         }
+    }
+
+    /**
+     * The dimension bound came back once already, and this is the shape that
+     * brought it. A trial of a <em>fixed</em> length reveals a fixed multiple of
+     * the step it starts from, while the ratio a switch has to clear,
+     * <code>(n + 7) / 6</code>, grows with the dimension; so any fixed length
+     * has an {@code n} above which the stepper stops handing over. Four steps
+     * put that at about {@code n = 21}: on these rotating pairs at {@code n = 50}
+     * a four-step trial reveals {@code 4.6 h} where {@code 9.5 h} is wanted, the
+     * stepper never switches, and the run dies at the step budget having spent
+     * 2612749 evaluations where the implicit method alone needs 71993. Settling
+     * until the answer is in has no such bound, and this is the test that says
+     * so.
+     */
+    @Test
+    public void itHandsOverWhenTheStiffModesRotate() {
+        int n = 50;
+        DVectorField f = rotating(n);
+        StepController controller = new StepController(1.0e-6, 1.0e-6);
+        SwitchingStepper switcher = new SwitchingStepper(f, n, controller);
+        OdeIntegrator.Result mixed = new OdeIntegrator(switcher, controller).solve(0.0, ones(n),
+                30.0);
+        OdeIntegrator.Result pure = new OdeIntegrator(
+                new Rosenbrock(RosenbrockTableau.RODAS4, f, n),
+                new StepController(1.0e-6, 1.0e-6)).solve(0.0, ones(n), 30.0);
+
+        assertTrue("it hands over, not " + switcher.switches() + " switches",
+                switcher.switches() >= 1L);
+        assertTrue("and beats the pure implicit run, " + mixed.evaluations + " against "
+                + pure.evaluations, mixed.evaluations < pure.evaluations);
+        // y_i = cos(t) solves this exactly, so being cheap is not enough
+        for (int i = 0; i < n; ++i) {
+            assertEquals("component " + i, Math.cos(30.0), mixed.finalState()[i], 1.0e-3);
+        }
+    }
+
+    /**
+     * What a trial costs when it learns nothing. A trial that ends in a switch
+     * is free, because the switch is the step; only one answered "stay" is paid
+     * for, and it is paid for once per {@code probeEvery} steps. On a problem
+     * whose answer is always "stay" the climb dies away at once, so the trial
+     * should learn that in about <em>one</em> implicit step and stop. A trial of
+     * four fixed steps spent 108 evaluations here where this spends 27, and at
+     * {@code n = 50} it was 228 against 95.
+     */
+    @Test
+    public void aTrialThatLearnsNothingStopsEarly() {
+        int n = 20;
+        DVectorField f = spread(n);
+        StepController controller = new StepController(1.0e-6, 1.0e-6);
+        SwitchingStepper switcher = new SwitchingStepper(f, n, controller);
+        new OdeIntegrator(switcher, controller).solve(0.0, ones(n), 30.0);
+
+        assertEquals("this problem never wants the implicit method", 0L, switcher.switches());
+        assertTrue("but it does ask", switcher.trials() > 0L);
+        // an implicit step here costs the six stages plus the n + 1 the
+        // difference quotient takes
+        double oneStep = 6 + n + 1;
+        double perTrial = switcher.explorationEvaluations() / (double) switcher.trials();
+        assertTrue("a trial that learns nothing costs " + perTrial + " evaluations, more than the "
+                + (2.0 * oneStep) + " that two implicit steps would",
+                perTrial < 2.0 * oneStep);
     }
 
     /**
