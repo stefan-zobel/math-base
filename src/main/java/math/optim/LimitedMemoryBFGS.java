@@ -466,8 +466,10 @@ public final class LimitedMemoryBFGS implements Optimizer {
             // Test for terminations
             if (2.0 * Math.abs(newValue - value) <= tolerance
                     * (Math.abs(newValue) + Math.abs(value) + eps)) {
-                logger.info("Exiting L-BFGS on termination #1:\nvalue difference below tolerance (oldValue: "
-                        + value + " newValue: " + newValue);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Exiting L-BFGS on termination #1:\nvalue difference below tolerance (oldValue: "
+                            + value + " newValue: " + newValue);
+                }
                 termination = Termination.VALUE_TOLERANCE;
                 return true;
             }

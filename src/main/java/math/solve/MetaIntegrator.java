@@ -1,5 +1,8 @@
 package math.solve;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import math.fun.DFunction;
 import math.fun.DBiFunction;
 import math.fun.DTriFunction;
@@ -31,6 +34,8 @@ import math.fun.DTriFunction;
  */
 public class MetaIntegrator {
 
+    private static final Logger LOG = Logger.getLogger(MetaIntegrator.class.getName());
+
     // ==========================================
     // SMART INTEGRATOR 1D
     // ==========================================
@@ -52,7 +57,9 @@ public class MetaIntegrator {
 
         // case 2: Genuine Oscillation (Low oscillation index OR heavy aliasing noise)
         if ((oscillationIndex < 0.05 || isAliasedOscillation) && firstStep.approximatedErrorEstimate > epsTol) { // case 2: Oscillation
-            System.out.println("[Meta1D] Oscillation detected (Index: " + oscillationIndex + ", Noise: " + isAliasedOscillation + ") -> Switch to Clenshaw-Curtis.");
+            if (LOG.isLoggable(Level.FINE)) {
+                LOG.fine("[Meta1D] Oscillation detected (Index: " + oscillationIndex + ", Noise: " + isAliasedOscillation + ") -> Switch to Clenshaw-Curtis.");
+            }
             ClenshawCurtis.IntegralResult cc = ClenshawCurtis.integrate1D(f, a, b, epsTol);
             if (cc.converged) {
                 return cc.value;
@@ -79,7 +86,9 @@ public class MetaIntegrator {
         boolean isAliasedOscillation = (firstStep.approximatedErrorEstimate > Math.abs(firstStep.value)) && (oscillationIndex < 0.1);
 
         if (((oscillationIndex < 0.05) || isAliasedOscillation) && firstStep.approximatedErrorEstimate > epsTol) {
-            System.out.println("[Meta2D] Oscillation detected -> Route to efficient Clenshaw-Curtis.");
+            if (LOG.isLoggable(Level.FINE)) {
+                LOG.fine("[Meta2D] Oscillation detected -> Route to efficient Clenshaw-Curtis.");
+            }
             ClenshawCurtis.IntegralResult cc = ClenshawCurtis.integrate2D(f, ax, bx, ay, by, epsTol);
             if (cc.converged) {
                 return cc.value;
@@ -109,7 +118,9 @@ public class MetaIntegrator {
                 && (oscillationIndex < 0.1);
 
         if (((oscillationIndex < 0.05) || isAliasedOscillation) && firstStep.approximatedErrorEstimate > epsTol) {
-            System.out.println("[Meta3D] Oscillation detected -> Route to efficient Clenshaw-Curtis.");
+            if (LOG.isLoggable(Level.FINE)) {
+                LOG.fine("[Meta3D] Oscillation detected -> Route to efficient Clenshaw-Curtis.");
+            }
             ClenshawCurtis.IntegralResult cc = ClenshawCurtis.integrate3D(f, ax, bx, ay, by, az, bz, epsTol);
             if (cc.converged) {
                 return cc.value;
