@@ -20,8 +20,12 @@
  * extension and an error estimate, DOP853 for an answer wanted to many digits,
  * and the classical fourth order method for a fixed step size. For a mechanical
  * one {@code q'' = f(t, q)}, where the position and the velocity are worth
- * keeping apart: {@link math.ode.SymplecticNystrom} over five methods, from
- * Verlet up to Blanes-Moan of order six. And for a stiff one,
+ * keeping apart, two methods that answer opposite questions:
+ * {@link math.ode.SymplecticNystrom} over five splitting methods, from Verlet
+ * up to Blanes-Moan of order six, which keeps an invariant inside a band over a
+ * long run at a constant step size; and {@link math.ode.NystromRungeKutta},
+ * which adapts its step size instead and is two to five times cheaper than the
+ * same equation flattened onto the first order form. And for a stiff one,
  * {@link math.ode.Rosenbrock} over
  * {@link math.ode.RosenbrockTableau#RODAS4} and two others -- linearly
  * implicit, so a step costs one Jacobian and one matrix factorization and no

@@ -440,6 +440,93 @@ public final class OdeTest {
         assertEquals("y[1] against sin(20)", Math.sin(20.0), y[1], 1.0e-6);
     }
 
+    /**
+     * The second order entry is the three objects a caller would assemble, and
+     * it is the adaptive counterpart of {@link Ode#solveSymplectic} rather than
+     * a replacement for it.
+     */
+    @Test
+    public void testTheSecondOrderEntryIsTheNystromStepper() {
+        DSecondOrderField kepler = new DSecondOrderField() {
+            @Override
+            public void valueAt(double t, double[] q, double[] v, double[] acc) {
+                double r = Math.sqrt(q[0] * q[0] + q[1] * q[1]);
+                double r3 = r * r * r;
+                acc[0] = -q[0] / r3;
+                acc[1] = -q[1] / r3;
+            }
+        };
+        double[] q0 = { 1.0, 0.0 };
+        double[] v0 = { 0.0, 1.0 };
+        OdeIntegrator.Result facade = Ode.solveSecondOrder(kepler, 0.0, q0, v0, 12.0, 1.0e-10);
+
+        StepController c = new StepController(1.0e-10, 1.0e-10);
+        double[] y0 = { 1.0, 0.0, 0.0, 1.0 };
+        OdeIntegrator.Result byHand = new OdeIntegrator(
+                new NystromRungeKutta(NystromTableau.RKN6_4, kepler, 2), c).solve(0.0, y0, 12.0);
+
+        assertEquals("evaluations", byHand.evaluations, facade.evaluations);
+        assertEquals("steps", byHand.steps, facade.steps);
+        assertEquals("recorded points", byHand.length, facade.length);
+        for (int i = 0; i < byHand.length; ++i) {
+            for (int k = 0; k < 4; ++k) {
+                assertEquals("y[" + i + "][" + k + "]", byHand.y[i][k], facade.y[i][k], 0.0);
+            }
+        }
+        double[] end = facade.finalState();
+        assertEquals("x against cos", Math.cos(12.0), end[0], 1.0e-8);
+        assertEquals("y against sin", Math.sin(12.0), end[1], 1.0e-8);
+        assertTrue("and it did not use a fixed step", facade.steps > 2L);
+    }
+
+    /**
+     * The two second order entries take opposite sides of the same trade, and
+     * the one that adapts is the one that refuses a velocity-dependent force.
+     */
+    @Test
+    public void testTheSecondOrderEntryRefusesWhatTheSymplecticOneAccepts() {
+        DSecondOrderField damped = new DSecondOrderField() {
+            @Override
+            public void valueAt(double t, double[] q, double[] v, double[] acc) {
+                acc[0] = -q[0] - 0.2 * v[0];
+            }
+        };
+        double[] q0 = { 1.0 };
+        double[] v0 = { 0.0 };
+        try {
+            Ode.solveSecondOrder(damped, 0.0, q0, v0, 1.0, 1.0e-8);
+            fail("a velocity-dependent force was accepted");
+        } catch (IllegalArgumentException e) {
+            assertTrue("says which form it needs, not " + e.getMessage(),
+                    e.getMessage().contains("q'' = f(t, q)"));
+        }
+        // the symplectic entry integrates it, losing only its symplecticity
+        OdeIntegrator.Result r = Ode.solveSymplectic(damped, 0.0, q0, v0, 1.0, 200);
+        assertTrue("and finished", r.length > 1);
+    }
+
+    @Test
+    public void testTheSecondOrderEntryChecksItsArguments() {
+        DSecondOrderField f = new DSecondOrderField() {
+            @Override
+            public void valueAt(double t, double[] q, double[] v, double[] acc) {
+                acc[0] = -q[0];
+            }
+        };
+        try {
+            Ode.solveSecondOrder(f, 0.0, null, new double[1], 1.0, 1.0e-8);
+            fail("a null position was accepted");
+        } catch (IllegalArgumentException expected) {
+            // named
+        }
+        try {
+            Ode.solveSecondOrder(f, 0.0, new double[2], new double[1], 1.0, 1.0e-8);
+            fail("mismatched lengths were accepted");
+        } catch (IllegalArgumentException expected) {
+            // named
+        }
+    }
+
     @Test
     public void testTheAutomaticEntryChecksItsArguments() {
         try {

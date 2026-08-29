@@ -250,6 +250,71 @@ public final class Ode {
     }
 
     /**
+     * Integrates a second order system <code>q'' = f(t, q)</code> with an
+     * adaptive step size, for an accurate answer rather than a stable one.
+     * <p>
+     * <b>This and {@link #solveSymplectic(math.fun.DSecondOrderField, double,
+     * double[], double[], double, int)} answer opposite questions.</b> That one
+     * keeps an invariant inside a band over a very long run and needs a constant
+     * step size to do it; this one is driven by an error estimate, is far more
+     * accurate over a short horizon, and promises nothing about what a long run
+     * conserves. The crossing is at some ten thousand periods.
+     * <p>
+     * The method is {@link NystromTableau#RKN6_4}, order six with an embedded
+     * four. Measured at matched accuracy it costs <b>a quarter to a half</b> of
+     * what {@link #solve(math.fun.DVectorField, double, double[], double,
+     * double)} costs on the flattened system, because the second order form
+     * drops order conditions and so reaches its order in fewer stages. Against
+     * {@link #solveAccurate} it wins at a loose tolerance and loses below about
+     * {@code 1e-8}, the same crossing the first order pair has; for many digits,
+     * flatten and call that instead.
+     * <p>
+     * <b>The acceleration must not read the velocity it is handed</b>, and
+     * unlike the symplectic entry this one checks: a field that does is refused
+     * with an {@link IllegalArgumentException} rather than integrated at a lower
+     * order than it claims. For <code>q'' = f(t, q, v)</code> -- damping, drag,
+     * a magnetic force -- flatten the system and use {@link #solve}.
+     *
+     * @param f
+     *            the acceleration, which must depend on the time and the
+     *            position only
+     * @param t0
+     *            the time the initial state belongs to
+     * @param q0
+     *            the initial position (not modified)
+     * @param v0
+     *            the initial velocity, of the same length (not modified)
+     * @param t1
+     *            the time to reach, which may lie before {@code t0}
+     * @param tolerance
+     *            the error one step may add, relative and absolute alike
+     * @return the position and the velocity at the times the method chose,
+     *         stacked into one state each, position first
+     * @throws IllegalArgumentException
+     *             if an argument is out of shape, or the field reads the
+     *             velocity
+     * @throws ArithmeticException
+     *             if the step size collapses or the step budget runs out
+     */
+    public static OdeIntegrator.Result solveSecondOrder(DSecondOrderField f, double t0, double[] q0,
+            double[] v0, double t1, double tolerance) {
+        if (q0 == null || v0 == null) {
+            throw new IllegalArgumentException("q0 and v0 must not be null");
+        }
+        if (q0.length != v0.length) {
+            throw new IllegalArgumentException("q0 is of length " + q0.length + " and v0 of length "
+                    + v0.length + ", which must agree");
+        }
+        double[] y0 = new double[2 * q0.length];
+        System.arraycopy(q0, 0, y0, 0, q0.length);
+        System.arraycopy(v0, 0, y0, q0.length, v0.length);
+        StepController controller = new StepController(tolerance, tolerance);
+        return new OdeIntegrator(
+                new NystromRungeKutta(NystromTableau.RKN6_4, f, q0.length), controller)
+                        .solve(t0, y0, t1);
+    }
+
+    /**
      * Integrates {@code y' = f(t, y)} with {@link ButcherTableau#DOP853}, the
      * eighth order method, for an answer wanted to many digits.
      * <p>
