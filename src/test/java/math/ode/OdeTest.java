@@ -332,6 +332,153 @@ public final class OdeTest {
     }
 
     /**
+     * The Oregonator, Field and Noyes' three variable reduction of the
+     * Belousov-Zhabotinsky reaction, in the scaling the stiff test sets use:
+     *
+     * <pre>
+     * y1' = s (y2 + y1 (1 - q y1 - y2))
+     * y2' = (y3 - (1 + y1) y2) / s
+     * y3' = w (y1 - y3)
+     * </pre>
+     *
+     * with {@code s = 77.27}, {@code q = 8.375e-06} and {@code w = 0.161},
+     * started from {@code (1, 2, 3)}. It is a relaxation oscillator: the first
+     * component climbs five decades and drops back, so the equation is stiff in
+     * bursts rather than throughout, which is what makes it the standard
+     * awkward case rather than merely a stiff one.
+     * <p>
+     * <b>See</b> <a href="https://en.wikipedia.org/wiki/Oregonator">Wikipedia
+     * Oregonator</a>.
+     */
+    private static final DiffDVectorField OREGONATOR = new DiffDVectorField() {
+        @Override
+        public void valueAt(double t, double[] y, double[] dydt) {
+            dydt[0] = 77.27 * (y[1] + y[0] * (1.0 - 8.375e-06 * y[0] - y[1]));
+            dydt[1] = (y[2] - (1.0 + y[0]) * y[1]) / 77.27;
+            dydt[2] = 0.161 * (y[0] - y[2]);
+        }
+
+        @Override
+        public void jacobianAt(double t, double[] y, double[] dfdy, double[] dfdt) {
+            dfdy[0] = 77.27 * (1.0 - 2.0 * 8.375e-06 * y[0] - y[1]);
+            dfdy[1] = -y[1] / 77.27;
+            dfdy[2] = 0.161;
+            dfdy[3] = 77.27 * (1.0 - y[0]);
+            dfdy[4] = -(1.0 + y[0]) / 77.27;
+            dfdy[5] = 0.0;
+            dfdy[6] = 0.0;
+            dfdy[7] = 1.0 / 77.27;
+            dfdy[8] = -0.161;
+            dfdt[0] = 0.0;
+            dfdt[1] = 0.0;
+            dfdt[2] = 0.0;
+        }
+    };
+
+    /**
+     * The reference solution at {@code t = 360} published with the problem in
+     * the Bari test set, where it is called OREGO.
+     */
+    private static final double[] OREGONATOR_AT_360 = { 0.1000814870318523e+01,
+            0.1228178521549917e+04, 0.1320554942846706e+03 };
+
+    /**
+     * The Oregonator over the one period the problem is posed on, checked
+     * against numbers this library had no part in producing.
+     * <p>
+     * The published reference is only worth asserting against if the run is
+     * converging <b>to</b> it rather than merely near it, so the tolerance is
+     * tightened by a thousand and the agreement has to improve by about as
+     * much. It does: {@code 2.3e-06} at {@code 1e-06} against {@code 2.0e-09}
+     * at {@code 1e-09}. Everything else asserted here is a property of the
+     * chemistry -- three concentrations stay positive, and the first of them
+     * swings over four decades, which is the relaxation oscillation itself.
+     */
+    @Test
+    public void testTheOregonatorMeetsItsPublishedReferenceAtThreeSixty() {
+        double[] y0 = { 1.0, 2.0, 3.0 };
+        OdeIntegrator.Result loose = Ode.solveStiff(OREGONATOR, 0.0, y0, 360.0, 1.0e-6);
+        OdeIntegrator.Result tight = Ode.solveStiff(OREGONATOR, 0.0, y0, 360.0, 1.0e-9);
+
+        double looseError = worstRelative(loose.finalState(), OREGONATOR_AT_360);
+        double tightError = worstRelative(tight.finalState(), OREGONATOR_AT_360);
+        assertTrue("off the published state by " + looseError, looseError < 1.0e-4);
+        assertTrue("but by " + tightError + " a thousand times tighter, which is not"
+                + " a hundredfold improvement", 100.0 * tightError < looseError);
+
+        double lowest = Double.MAX_VALUE;
+        double highest = -Double.MAX_VALUE;
+        for (int i = 0; i < tight.length; ++i) {
+            for (int k = 0; k < 3; ++k) {
+                assertTrue("component " + k + " went to " + tight.y[i][k] + " at t = " + tight.t[i],
+                        tight.y[i][k] > 0.0);
+            }
+            lowest = Math.min(lowest, tight.y[i][0]);
+            highest = Math.max(highest, tight.y[i][0]);
+        }
+        assertTrue("the oscillation spans " + (highest / lowest) + " rather than four decades",
+                highest / lowest > 1.0e4);
+        assertTrue("360 units of it cost " + loose.evaluations + " evaluations",
+                loose.evaluations < 20000L);
+    }
+
+    /**
+     * The same equation put to the other two entries, which is the pair the
+     * package comment is about. The explicit one does not merely take longer:
+     * it cannot finish at any tolerance, because what holds its step down is
+     * stability and not accuracy, and it gives up at {@code t = 28.5} whether
+     * it is asked for five digits or for eight.
+     * <p>
+     * <b>And the Oregonator is the case the switching entry exists for.</b> It
+     * is stiff in bursts rather than throughout, so a run that keeps the
+     * explicit method over the slow stretches comes out cheaper than the
+     * implicit one everywhere -- at {@code 1e-06}, 9111 evaluations against
+     * 12402 with the Jacobian differenced and 6644 against 7478 with it
+     * written. The first gap is the wider one because an implicit step also
+     * pays {@code n + 2} evaluations for its linearization there, and those are
+     * exactly what an explicit stretch does not spend.
+     */
+    @Test
+    public void testTheOregonatorIsTheCaseTheSwitchingEntryExistsFor() {
+        double[] y0 = { 1.0, 2.0, 3.0 };
+        try {
+            Ode.solve(OREGONATOR, 0.0, y0, 360.0, 1.0e-6);
+            fail("an explicit method has no business finishing the Oregonator");
+        } catch (ArithmeticException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("step budget"));
+            assertTrue(expected.getMessage(),
+                    expected.getMessage().contains("wants an implicit one"));
+        }
+
+        OdeIntegrator.Result auto = Ode.solveAuto((DVectorField) OREGONATOR, 0.0, y0, 360.0, 1.0e-6);
+        OdeIntegrator.Result stiff = Ode.solveStiff((DVectorField) OREGONATOR, 0.0, y0, 360.0,
+                1.0e-6);
+        double autoError = worstRelative(auto.finalState(), OREGONATOR_AT_360);
+        assertTrue("the switching run is off the published state by " + autoError,
+                autoError < 1.0e-4);
+        assertTrue("and it should be the cheaper of the two: " + auto.evaluations + " against "
+                + stiff.evaluations, auto.evaluations < 0.9 * stiff.evaluations);
+
+        OdeIntegrator.Result autoWritten = Ode.solveAuto(OREGONATOR, 0.0, y0, 360.0, 1.0e-6);
+        OdeIntegrator.Result stiffWritten = Ode.solveStiff(OREGONATOR, 0.0, y0, 360.0, 1.0e-6);
+        assertTrue(
+                "with the Jacobian written the advantage should shrink but survive: "
+                        + autoWritten.evaluations + " against " + stiffWritten.evaluations,
+                autoWritten.evaluations < stiffWritten.evaluations);
+        assertTrue("and it should be the smaller share of the two",
+                autoWritten.evaluations / (double) stiffWritten.evaluations > auto.evaluations
+                        / (double) stiff.evaluations);
+    }
+
+    private static double worstRelative(double[] y, double[] reference) {
+        double worst = 0.0;
+        for (int i = 0; i < reference.length; ++i) {
+            worst = Math.max(worst, Math.abs(y[i] - reference[i]) / Math.abs(reference[i]));
+        }
+        return worst;
+    }
+
+    /**
      * The accurate entry is DOP853 and reaches the same answer as the ordinary
      * one, for a good deal less at a tight tolerance: 3099 evaluations against
      * 9891 over ten orbits at {@code rtol = 1e-12}.
