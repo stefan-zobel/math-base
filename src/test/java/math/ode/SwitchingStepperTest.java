@@ -162,6 +162,25 @@ public class SwitchingStepperTest {
         }
     };
 
+    /**
+     * A decay chain whose two rates are twelve decades apart, and whose three
+     * components sum to one throughout. It is the smallest equation on which a
+     * return to the explicit method is a mistake: run to {@code t = 100} the
+     * fast mode is long gone from the state -- the first component underflows
+     * to zero and the second sits near {@code 1e-39} -- while the mode itself
+     * is still in the equation, so a trial explicit step reads a small, honest,
+     * fifth-order error and proposes a step that no explicit method can
+     * survive.
+     */
+    private static final DVectorField DECAY_CHAIN = new DVectorField() {
+        @Override
+        public void valueAt(double t, double[] y, double[] dydt) {
+            dydt[0] = -1.0e12 * y[0];
+            dydt[1] = 1.0e12 * y[0] - y[1];
+            dydt[2] = y[1];
+        }
+    };
+
     private static DVectorField vanDerPol(final double mu) {
         return new DVectorField() {
             @Override
@@ -386,6 +405,34 @@ public class SwitchingStepperTest {
         assertTrue("a trial that learns nothing costs " + perTrial + " evaluations, more than the "
                 + (2.0 * oneStep) + " that two implicit steps would",
                 perTrial < 2.0 * oneStep);
+    }
+
+    /**
+     * The one thing the cost comparison cannot say. On the decay chain at an
+     * absolute tolerance far below where the fast component has decayed to, the
+     * explicit trial is cheap, accurate and completely wrong to act on: the mode
+     * that would tear it apart is still in the Jacobian even though it has left
+     * the state. Before the stability veto the stepper took the offer 82 times,
+     * thrashed and ran out of steps; the run has to finish, hand over once, and
+     * keep the sum of the three components.
+     */
+    @Test
+    public void aReturnIsRefusedWhileTheStiffModeIsStillThere() {
+        StepController controller = new StepController(1.0e-10, 1.0e-36, 0.9, 0.2, 10.0, 0.04,
+                Double.POSITIVE_INFINITY, 200000);
+        SwitchingStepper switcher = new SwitchingStepper(DECAY_CHAIN, 3, controller);
+        OdeIntegrator.Result r = new OdeIntegrator(switcher, controller).solve(0.0,
+                new double[] { 1.0, 0.0, 0.0 }, 100.0, new double[] { 100.0 });
+
+        double[] y = r.finalState();
+        assertEquals("the chain has drained into the last component", 1.0, y[2], 1.0e-12);
+        assertTrue("the three components still sum to one, off by " + (y[0] + y[1] + y[2] - 1.0),
+                Math.abs(y[0] + y[1] + y[2] - 1.0) < 1.0e-12);
+        assertTrue("hands over and stays there, " + switcher.switches() + " switches",
+                switcher.switches() <= 2L);
+        assertTrue("ends on the implicit side", switcher.isStiffActive());
+        assertTrue("and does not need the whole budget to get there, " + r.evaluations
+                + " evaluations", r.evaluations < 200000L);
     }
 
     /**

@@ -224,6 +224,46 @@ public final class Rosenbrock implements OdeStepper {
         return factorizations;
     }
 
+    /**
+     * The infinity norm of the Jacobian this stepper is currently holding, the
+     * largest of its absolute row sums.
+     * <p>
+     * <b>It is an upper bound on the largest eigenvalue and not the eigenvalue
+     * itself</b>, so <code>|h| jacobianNorm()</code> bounds from above the
+     * product an explicit method's stability region has to contain. The bound is
+     * tight for a normal Jacobian and can be many decades loose for one that is
+     * not, which makes it usable to rule stiffness <em>in</em> and never to rule
+     * it out. This is why {@link #stiffnessMeasure()} does not report it:
+     * measured against {@link #stiffnessThreshold()}, which is calibrated
+     * against the product and not against a bound on it, it would call every
+     * stiff equation violently stiff and would carry that into
+     * {@link OdeIntegrator.Result#stiffness}.
+     * <p>
+     * <b>It is as old as the linearization.</b> A step reuses the Jacobian of
+     * the point it was taken at ({@link #jacobians()} counts how often that has
+     * actually been formed), so between steps this reports the norm at the start
+     * of the last one and not at wherever the solution now is.
+     *
+     * @return <code>||J||_inf</code>, or {@link Double#NaN} if nothing has been
+     *         linearized since this stepper was created or last {@link #reset()}
+     */
+    public double jacobianNorm() {
+        if (!cacheValid) {
+            return Double.NaN;
+        }
+        double worst = 0.0;
+        for (int i = 0; i < n; ++i) {
+            double row = 0.0;
+            for (int j = 0; j < n; ++j) {
+                row += Math.abs(jacobian[j * n + i]);
+            }
+            if (row > worst) {
+                worst = row;
+            }
+        }
+        return worst;
+    }
+
     @Override
     public int dimension() {
         return n;
@@ -248,7 +288,10 @@ public final class Rosenbrock implements OdeStepper {
      * Always {@link Double#NaN}. The estimate exists to tell an explicit method
      * that its step size is being held down by stability rather than by
      * accuracy; this method has no such limit, so there is nothing for it to
-     * report and no pair of stages at one time to form it from.
+     * report and no pair of stages at one time to form it from. The Jacobian it
+     * does hold gives a bound rather than the product this is measured by --
+     * {@link #jacobianNorm()} says why that is a different reading and not this
+     * one.
      *
      * @return {@link Double#NaN}
      */

@@ -124,6 +124,17 @@
  * is reliable when the stiffness arrives suddenly and silent when it arrives
  * gradually.
  * <p>
+ * <b>The price has one blind spot of its own, and it is on the way back.</b>
+ * Never mentioning stability is what makes a cost comparison work in both
+ * directions, and it is also why nothing in it can tell a cheap explicit step
+ * from a cheap explicit step that is about to be destroyed by a mode the state
+ * no longer shows. Measured over a corpus of 64 runs: at an absolute tolerance
+ * far below where a fast component has decayed to, the switcher handed the
+ * equation back 113 times to a method whose stability margin was exceeded by
+ * twelve decades, and the run died where the pure implicit method finishes with
+ * no rejection at all. That one decision, and only that one, therefore reads the
+ * implicit method's own Jacobian as well as the price.
+ * <p>
  * Measured in evaluations against the better of the two methods run alone, and
  * against a solver switching at exactly the right instants -- which is an upper
  * bound no real one reaches -- the dial takes 1749 against 2928 and 1468, van

@@ -656,6 +656,58 @@ public final class RosenbrockTest {
                 1.0e-7);
     }
 
+    /**
+     * The reported norm is the largest absolute row sum of the Jacobian the
+     * field wrote at the point the step was linearized at -- not at wherever the
+     * caller last was, which is the part {@link SwitchingStepper} depends on.
+     */
+    @Test
+    public void testTheJacobianNormIsTheRowSumBoundOfTheLastLinearization() {
+        Rosenbrock written = new Rosenbrock(RosenbrockTableau.RODAS4, ROBERTSON, 3);
+        assertTrue("nothing is linearized yet", Double.isNaN(written.jacobianNorm()));
+
+        double[] start = { 1.0, 0.0, 0.0 };
+        double[] later = { 0.5, 3.6e-5, 0.5 };
+        double[] out = new double[3];
+        double[] err = new double[3];
+
+        written.step(0.0, start, 1.0e-6, out, err);
+        assertEquals("the bound at the start, where two of the terms are zero",
+                robertsonRowSumBound(start), written.jacobianNorm(), 0.0);
+
+        written.step(1.0e-6, later, 1.0e-6, out, err);
+        assertEquals("and it followed the linearization rather than staying behind",
+                robertsonRowSumBound(later), written.jacobianNorm(), 0.0);
+
+        written.reset();
+        assertTrue("a reset forgets the linearization", Double.isNaN(written.jacobianNorm()));
+
+        // the same reading out of a differenced Jacobian, where the components
+        // that carry the norm are alive; at the start they are not, and a
+        // difference quotient of zero against zero is no test of anything
+        Rosenbrock differenced = new Rosenbrock(RosenbrockTableau.RODAS4, (DVectorField) ROBERTSON,
+                3);
+        differenced.step(0.0, later, 1.0e-6, out, err);
+        double gap = Math.abs(differenced.jacobianNorm() / robertsonRowSumBound(later) - 1.0);
+        assertTrue("the differenced norm is off by " + gap, gap < 1.0e-5);
+    }
+
+    /** The largest absolute row sum of Robertson's written Jacobian at {@code y}. */
+    private static double robertsonRowSumBound(double[] y) {
+        double[] dfdy = new double[9];
+        double[] dfdt = new double[3];
+        ROBERTSON.jacobianAt(0.0, y, dfdy, dfdt);
+        double worst = 0.0;
+        for (int i = 0; i < 3; ++i) {
+            double row = 0.0;
+            for (int j = 0; j < 3; ++j) {
+                row += Math.abs(dfdy[j * 3 + i]);
+            }
+            worst = Math.max(worst, row);
+        }
+        return worst;
+    }
+
     @Test
     public void testWhatTheStepperSaysAboutItself() {
         Rosenbrock written = new Rosenbrock(RosenbrockTableau.ROS2, SQUARE, 3);
