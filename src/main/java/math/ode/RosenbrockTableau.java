@@ -31,14 +31,12 @@ import java.util.Arrays;
  * the stage vectors {@code k} are not increments of the solution.
  * <p>
  * <b>What is not checked here.</b> The constructor validates shapes and
- * finiteness and nothing else. The order conditions of a Rosenbrock method are
- * awkward to write down and easy to get wrong, and there is a better check
- * available: on {@code y' = lambda y} one step of any such method is exactly
- * {@code R(z) y} with {@code z = h lambda} and {@code R} rational, so the
- * order, the error constant, the order of the embedded estimate and
- * L-stability all fall out of a single number computed by the machinery
- * itself. That is what the tests do, and it is what polices a transcribed
- * table.
+ * finiteness and nothing else. The order conditions are awkward to write down
+ * and easy to get wrong, and there is a better check: on {@code y' = lambda y}
+ * one step is exactly {@code R(z) y} with {@code z = h lambda} and {@code R}
+ * rational, so the order, the error constant, the order of the embedded
+ * estimate and L-stability all fall out of one number the machinery computes
+ * itself. That is what the tests do, and what polices a transcribed table.
  * <p>
  * Instances are immutable and shareable; every accessor that hands out an
  * array hands out a copy.

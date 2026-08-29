@@ -26,36 +26,24 @@ import math.solve.RootFinder;
  * without a step count are the adaptive ones and need a controller.
  * <p>
  * <b>Time is accumulated, not multiplied out.</b> Each step starts at the time
- * the one before it ended at, rather than at {@code t0 + i h}, and the two are
- * not the same number: the second differs from the first in the last place or
- * two, and a stepper carrying a stage over from the previous step recognizes
- * the point it is handed by comparing it. Multiplying out costs four of the
- * nineteen carried stages over twenty steps of Dormand-Prince, for no gain --
- * the price is that a fixed step run reaches {@code t1} only to within the
- * rounding accumulated on the way, which is far below the error of the
- * integration itself. An adaptive run lands on {@code t1} exactly, because its
- * last step is cut to fit.
- * <p>
- * <b>There is no stepping mode here</b>, because {@link OdeStepper} is one.
- * Where {@link math.ts.KalmanFilter} offers a batch form and an instance that
- * takes one observation at a time, the two live in different classes here, and
- * the batch form is a recording loop over the other.
+ * the one before it ended at rather than at {@code t0 + i h}, because a stepper
+ * carrying a stage over from the previous step recognizes the point it is
+ * handed by comparing it, and the two expressions differ in the last place or
+ * two. The price is that a fixed step run reaches {@code t1} only to within the
+ * rounding accumulated on the way, far below the error of the integration
+ * itself; an adaptive run lands on {@code t1} exactly, because its last step is
+ * cut to fit.
  * <p>
  * <b>Output does not have to be the steps.</b> Handed a list of times, the
  * driver puts the answer at those times and nowhere else, reaching inside the
  * steps through {@link OdeStepper#interpolate(double, double[])}. A time that
  * falls on a step boundary is the state at that boundary exactly, so a grid
- * that happens to line up with the steps cannot disagree with them -- which
- * matters more in the adaptive case, where the steps are not where a caller
- * would have put them and asking for a grid is the normal thing to do.
+ * that lines up with the steps cannot disagree with them.
  * <p>
  * <b>And it does not have to be a time at all.</b> An {@link Event} is a
  * quantity along the solution whose sign change ends a step bracketing a root;
  * {@link RootFinder#brentDekker} then finds it on the interpolant, at a
- * precision that has nothing to do with the step size. That is the whole reason
- * the continuous extension is not an afterthought here: without it, "when did
- * the ball land" could only be answered by shortening every step until the
- * grid nearly contained the answer.
+ * precision that has nothing to do with the step size.
  * <p>
  * An integrator is as shareable between threads as the stepper it drives, which
  * is to say not at all.

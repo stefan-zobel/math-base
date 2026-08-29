@@ -21,27 +21,21 @@ package math.ode;
  * The new step follows <code>safety err^-a errPrevious^b</code>, clamped so
  * that no single step can grow or shrink without limit. With {@code b} at zero
  * that is the textbook controller, which reacts to the last step alone and
- * tends to oscillate -- a step that was slightly too long is followed by one
- * that is too short, and the sequence rings instead of settling. The
- * proportional-integral form, {@code b} at {@code 0.04} as Hairer's
- * {@code dopri5} sets it, damps that by remembering the step before.
+ * tends to ring instead of settling; the proportional-integral form, {@code b}
+ * at {@code 0.04} as Hairer's {@code dopri5} sets it, damps that by remembering
+ * the step before.
  * <p>
- * <b>The damped form is the default, and it is not free.</b> Measured against
- * the textbook one, it costs between two and eight percent more evaluations on
- * every smooth problem tried -- the harmonic oscillator, Kepler orbits at
- * eccentricities from {@code 0.6} to {@code 0.99}, Lotka-Volterra, the
- * Brusselator -- because on those the step size moves slowly and there is
- * nothing to damp. What it buys shows up where the step size has to move fast:
- * on van der Pol at {@code mu = 1000} it takes the rejected steps from
- * {@code 42444} down to {@code 72}, and saves evaluations doing it. A bounded
- * loss on the easy problems against an unbounded gain on the hard ones is the
- * right way round for a default, but a caller who knows the equation is smooth
- * can set {@code beta} to zero and keep the few percent.
+ * <b>The damped form is the default, and it is not free.</b> It costs two to
+ * eight percent more evaluations on a smooth problem, where the step size moves
+ * slowly and there is nothing to damp. What it buys shows up where the step
+ * size has to move fast: on van der Pol at {@code mu = 1000} it takes the
+ * rejected steps from {@code 42444} down to {@code 72} and saves evaluations
+ * doing it. A caller who knows the equation is smooth can set {@code beta} to
+ * zero and keep the few percent.
  * <p>
  * <b>The exponent is one over the order of the method</b>, because the estimate
- * measures the error of the <em>lower</em> half of the embedded pair and that
- * one falls with the order of the method rather than one below it. It is the
- * exponent Hairer uses for both of his pairs.
+ * measures the error of the <em>lower</em> half of the embedded pair, which
+ * falls with the order of the method rather than one below it.
  * <p>
  * Instances are immutable and can be shared between threads and between
  * integrators.
@@ -270,20 +264,13 @@ public final class StepController {
      * <p>
      * <code>err = s1 sqrt(1 / (n (s1 + eps s2)))</code>
      * <p>
-     * with {@code eps} of {@code 0.01}. This is Hairer's expression, which
-     * carries a leading <code>|h|</code> because there the two estimates are
-     * combinations of derivatives; the ones arriving here are already
-     * multiplied by the step size, and that factor comes out of the ratio by
-     * itself. Where the first estimate dominates this
-     * is the plain root mean square of it. Where the second does -- which is
+     * with {@code eps} of {@code 0.01}. Where the first estimate dominates this
+     * is the plain root mean square of it; where the second does -- which is
      * what happens as the step shrinks, since the lower order estimate goes to
-     * zero more slowly -- it becomes {@code |h| s1 / sqrt(eps n s2)}, and with
-     * <code>s1 ~ h^(2 p1 + 2)</code> and <code>s2 ~ h^(2 p2 + 2)</code> that
-     * falls like <code>h^(2 p1 - p2 + 1)</code>. For DOP853, where the orders
-     * are 5 and 3, the exponent is 8: the number falls at the order of the
-     * solution the method actually advances, and controlling the step on it
-     * controls the accuracy that is kept rather than the accuracy that is
-     * thrown away.
+     * zero more slowly -- it falls like <code>h^(2 p1 - p2 + 1)</code>, an
+     * exponent of 8 for DOP853. So the number falls at the order of the solution
+     * the method actually advances, and controlling the step on it controls the
+     * accuracy that is kept rather than the accuracy that is thrown away.
      * <p>
      * The formula is Hairer's, and so is the guard: a denominator that is not
      * positive -- both estimates exactly zero -- is replaced by one, which

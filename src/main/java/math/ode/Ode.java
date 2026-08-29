@@ -41,10 +41,7 @@ import math.solve.Quadrature;
  * <p>
  * The fixed step form uses {@link ButcherTableau#CLASSIC_RK4} instead, because
  * that is what a fixed step size usually means and because its four stages are
- * the cheapest fourth order step there is. Dormand-Prince at the same step
- * count costs half again as much and buys an order, which is usually the better
- * trade -- {@code new OdeIntegrator(new ExplicitRungeKutta(
- * ButcherTableau.DORMAND_PRINCE_45, f, n))} is that trade.
+ * the cheapest fourth order step there is.
  *
  * @since 1.5.3
  */
@@ -203,13 +200,13 @@ public final class Ode {
      * making symplectic is looser than that. The result holds the position and
      * the velocity stacked, position first.
      * <p>
-     * <b>This is not the accurate answer, it is the stable one.</b> Over ten
-     * orbits of a two body problem at matched cost, the adaptive fifth order
+     * <b>This is not the accurate answer, it is the stable one.</b> At matched
+     * cost over ten orbits of a two body problem the adaptive fifth order
      * method above is nearly three orders of magnitude closer to the truth.
-     * What this buys instead is that the energy error stays inside a band
-     * instead of growing, and that the position error grows linearly with time
-     * rather than as its square -- which is worth nothing over ten orbits and
-     * decisive over ten thousand.
+     * What this buys instead is an energy error that stays inside a band
+     * instead of growing, and a position error that grows linearly with time
+     * rather than as its square -- worth nothing over ten orbits and decisive
+     * over ten thousand.
      * <p>
      * <b>The force must not read the velocity.</b> It is handed one because
      * {@link math.fun.DSecondOrderField} carries it; a field that uses it still
@@ -257,20 +254,17 @@ public final class Ode {
      * eighth order method, for an answer wanted to many digits.
      * <p>
      * <b>Use this when the tolerance is tight and not otherwise.</b> An eighth
-     * order step costs twelve evaluations against Dormand-Prince's six, and it
-     * pays for them by needing far fewer steps as the tolerance falls: the step
+     * order step costs twelve evaluations against Dormand-Prince's six and pays
+     * for them by needing far fewer steps as the tolerance falls, since the step
      * count grows like <code>rtol^(-1/9)</code> rather than
-     * <code>rtol^(-1/5)</code>. Measured on the two body problem over ten
-     * orbits, the crossing sits near {@code 1e-07} -- at {@code 1e-06}
-     * {@link #solve(math.fun.DVectorField, double, double[], double, double)}
-     * costs 831 evaluations against this one's 891, at {@code 1e-07} it is 1149
-     * against 1095, at {@code 1e-10} it is 3951 against 2091, and at
-     * {@code 1e-13} it is 15669 against 4035.
+     * <code>rtol^(-1/5)</code>. <b>The crossing sits near {@code 1e-07}</b>, and
+     * past it the advantage keeps growing: at {@code 1e-10} this costs about
+     * half what {@link #solve(math.fun.DVectorField, double, double[], double,
+     * double)} costs and at {@code 1e-13} about a quarter.
      * <p>
      * It also interpolates far more accurately, at {@code 2^8} per halving
-     * against {@code 2^5}, and that is worth knowing for a run with an output
-     * grid or an event: the three stages its continuous extension needs are
-     * evaluated only inside a step somebody looked into.
+     * against {@code 2^5}, which matters for a run with an output grid or an
+     * event.
      * <p>
      * <b>It is still an explicit method.</b> On a stiff equation it fails the
      * same way Dormand-Prince does, a little later; the answer to
@@ -311,12 +305,10 @@ public final class Ode {
      * <b>Use this when {@link OdeIntegrator.Result#seemsStiff} came back
      * {@code true}</b>, and not before. A stiff method is not a better method:
      * it costs a Jacobian, a matrix factorization and a back substitution per
-     * stage, so on a problem that is not stiff it loses outright. Measured on
-     * van der Pol's oscillator, where the stiffness is a dial: at
-     * {@code mu = 10} the explicit method costs 789 evaluations against this
-     * one's 1763, at {@code mu = 1000} they have crossed, at {@code mu = 1e4}
-     * it is 74205 against 10034, and at {@code mu = 1e5} the explicit method
-     * does not finish at all.
+     * stage, so on a problem that is not stiff it loses outright. On van der
+     * Pol's oscillator, where the stiffness is a dial, the two cross near
+     * {@code mu = 1000}; by {@code mu = 1e5} the explicit method does not
+     * finish at all.
      * <p>
      * <b>What it costs to have no Jacobian.</b> Differencing one takes
      * {@code n + 1} further evaluations of the field per step, so this form
@@ -394,38 +386,24 @@ public final class Ode {
      * relaxation oscillator, a reaction with a fast transient, a system with a
      * dial in it: on those neither {@link #solve} nor {@link #solveStiff} is
      * right everywhere, and picking one of them is picking which half of the
-     * run to be wrong about. Measured against the better of the two run alone,
-     * and against a solver switching at exactly the right instants, which no
-     * real one can beat:
-     * <table border="1">
-     * <caption>evaluations</caption>
-     * <tr><th>problem</th><th>this</th><th>better pure</th><th>perfect</th></tr>
-     * <tr><td>a dial from 1 to 1e5 and back, tolerance 1e-6</td>
-     * <td>1749</td><td>2928</td><td>1468</td></tr>
-     * <tr><td>van der Pol at mu = 1000, tolerance 1e-6</td>
-     * <td>4774</td><td>8902</td><td>2747</td></tr>
-     * <tr><td>Robertson to 1e5, tolerance 1e-8</td>
-     * <td>3220</td><td>3147</td><td>3073</td></tr>
-     * </table>
+     * run to be wrong about. On the two that change their mind it closes 81 %
+     * and 67 % of the distance from the better pure method to a solver
+     * switching at exactly the right instants.
      * <p>
      * <b>It is not the answer to the other two cases, and it does not need to
      * be.</b> On an equation with no stiffness in it this takes no trial at all
-     * and its run is {@link #solve}'s run <em>bit for bit</em>, so nothing is
-     * lost by reaching for it; on one that is stiff from beginning to end,
-     * Robertson's row above is the whole story -- a few percent for insurance
-     * on a claim never made.
+     * and its run is {@link #solve}'s run <em>bit for bit</em>; on one that is
+     * stiff from beginning to end it costs a few percent for insurance on a
+     * claim never made.
      * <p>
      * <b>Where it does not pay: a large system whose Jacobian has to be
-     * differenced.</b> This overload has no Jacobian to work from, so every
-     * trial costs {@code n + 7} evaluations and has to prove a step
-     * {@code (n + 7) / 6} times longer -- both growing with the dimension while
-     * the work between trials does not. Measured on a semi-discretized PDE, the
-     * share of the run spent probing runs 16 %, 30 %, 57 %, 79 % at
-     * {@code n} of 10, 20, 40, 100, and at {@code n = 100} the worst cell costs
-     * 2.20 times {@link #solveStiff}. Past a few dozen equations without a
-     * written Jacobian, call {@link #solveStiff} directly; with one, use the
-     * {@link DiffDVectorField} overload below, where the same cell costs 1.11.
-     * {@link SwitchingStepper} carries the table.
+     * differenced.</b> This overload has none to work from, so every trial costs
+     * {@code n + 7} evaluations and has to prove a step {@code (n + 7) / 6}
+     * times longer -- both growing with the dimension while the work between
+     * trials does not. At {@code n = 100} the worst measured cell costs 2.20
+     * times {@link #solveStiff}, against 1.11 with a written Jacobian. Past a
+     * few dozen equations without one, call {@link #solveStiff} directly; with
+     * one, use the {@link DiffDVectorField} overload below.
      * <p>
      * How it decides is {@link SwitchingStepper}, and a caller who wants to see
      * what it did builds that object instead and reads

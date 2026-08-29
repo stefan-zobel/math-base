@@ -24,26 +24,20 @@ import java.util.Arrays;
  * SRKN coefficients drops straight in here.
  * <p>
  * <b>A method begins either with a drift or with a kick, and it matters to what
- * a step costs.</b> One that begins with a drift ends with one -- its last kick
- * coefficient is zero -- and costs one evaluation per non-zero kick. One that
- * begins with a kick ends with a kick too, and the two that meet at a step
- * boundary sit at the same time and the same position, so the field is
- * evaluated there once and used twice: such a method costs one evaluation
- * <em>less</em> than it has kicks, and only its very first step pays the extra.
- * That is the saving Dormand-Prince gets from being first-same-as-last, reached
- * from the other side.
+ * a step costs.</b> One that begins with a drift costs one evaluation per
+ * non-zero kick. One that begins with a kick ends with one too, and the two
+ * that meet at a step boundary sit at the same time and position, so the field
+ * is evaluated there once and used twice: such a method costs one evaluation
+ * <em>less</em> than it has kicks, and only its first step pays the extra.
  * <p>
  * <b>What separates methods of the same order is the size of their
  * sub-steps.</b> Every method of order four or higher has at least one negative
  * coefficient, so parts of the step run backwards in time and the leading error
- * term grows with them. {@link #oneNorm()} measures that: it is one for a
- * method whose sub-steps all go forward, {@code 4.40} for {@link #YOSHIDA_4},
- * whose middle step is {@code -1.70} times the step it is embedded in, and only
- * {@code 1.16} for {@link #BLANES_MOAN_4}, which barely runs backwards at all.
- * The leading error constants that follow -- {@code 1.0e-01},
- * {@code 4.5e-03}, {@code 1.6e-05} for the three fourth order methods here --
- * are four orders of magnitude apart at the same order, which is why order
- * alone is not an argument for anything.
+ * term grows with them. {@link #oneNorm()} measures that -- {@code 4.40} for
+ * {@link #YOSHIDA_4} against {@code 1.16} for {@link #BLANES_MOAN_4} -- and the
+ * leading error constants of the three fourth order methods here are four
+ * orders of magnitude apart because of it. Order alone is not an argument for
+ * anything.
  * <p>
  * <b>See</b>
  * <a href="https://en.wikipedia.org/wiki/Symplectic_integrator">Wikipedia

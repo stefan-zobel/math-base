@@ -10,185 +10,63 @@ import math.fun.DiffDVectorField;
  * <b>Why a switch is worth anything.</b> An explicit method is cheap and is
  * stable only while the step size times the largest eigenvalue stays inside a
  * region a few units across; an implicit one has no such limit and costs a
- * Jacobian, a factorization and a back substitution per step. On an equation
- * that is stiff throughout, the implicit method wins everywhere and there is
- * nothing to switch. What makes switching pay is an equation that is stiff
- * only for part of its run -- a relaxation oscillator, a reaction with a fast
- * transient, anything with a dial in it.
+ * Jacobian, a factorization and a back substitution per step. What makes
+ * switching pay is an equation that is stiff only for <em>part</em> of its run
+ * -- a relaxation oscillator, a reaction with a fast transient, anything with a
+ * dial in it.
  * <p>
  * <b>The decision is a price, not a diagnosis.</b> Every {@code probeEvery}
  * steps the method that is <em>not</em> stepping is given the step to try, and
  * what that trial costs per unit of time is compared with what the method in
- * charge costs per unit of time. The same question decides both directions,
- * though not by the same reading: coming back to the explicit method one trial
- * step is enough, and going to the implicit one it is not, because a
- * stability-limited step size is no baseline to extrapolate from.
- * {@link #theImplicitSettlesCheaper} is where that is measured out. The way
- * back has one thing the price alone cannot say, and
- * {@link #stabilityVetoesTheReturn} is it.
- * <p>
- * <b>Neither side can diagnose stiffness on its own, which is why the price is
- * asked instead.</b> Both of the obvious tests were built first and measured,
- * and both have a blind spot:
- * <ul>
- * <li>an <b>implicit</b> method damps the fast modes <em>between its own
- * stages</em>, so no difference quotient it can form sees what would limit an
- * explicit method; on Robertson's reaction such an estimate disagreed with the
- * truth on half the steps;</li>
- * <li>an <b>explicit</b> method whose step size has settled at the stability
- * limit sits just <em>below</em> {@link OdeStepper#stiffnessThreshold()} rather
- * than above it, so a threshold test almost never fires. On a dial rising
- * smoothly from <code>lambda = 1</code> to <code>1e5</code>,
- * {@link OdeStepper#stiffnessMeasure()} read a mean of {@code 2.97} and a worst
- * of {@code 3.2501} against a threshold of {@code 3.25} over 29158 steps,
- * exceeding it on five. Hairer's test catches a run being pushed past the limit
- * and rejected; it does not catch one that has already adapted to it.</li>
- * </ul>
- * A cost comparison has neither blind spot, because it never mentions
- * stability: an explicit method held down by stability is simply an explicit
- * method whose steps are short, and short steps are expensive.
- * <p>
- * <b>Never mentioning stability is also the one place a cost comparison is
- * wrong.</b> An explicit step that is cheap and unstable is still cheap, so on
- * the way <em>back</em> the price alone will hand the equation to a method that
- * cannot hold it -- measured, and it kills a run rather than slowing one.
- * {@link #stabilityVetoesTheReturn} is the one reading that is not a price, it
- * applies in that direction only, and it is asked only once the price has
- * already said "switch".
- * <p>
- * <b>The free estimate is still used, but to time the trials rather than to
- * decide one.</b> It is bad at saying "stiff", good at saying "not stiff", and
- * it does not lie when it does speak up, so it schedules: far below its
- * threshold no trial is taken at all, on the rising edge past it one is taken
- * at once, and in between the cadence decides. {@link #dueForTrial()} has the
- * three cases and what each was measured against. The first is what keeps an
- * equation with no stiffness in it from paying for any of this -- on the
- * harmonic oscillator no trial is taken and the run is the pure explicit run
- * <em>bit for bit</em>.
+ * charge costs per unit of time. Neither side can diagnose stiffness on its own
+ * -- an implicit method damps the fast modes between its own stages and so
+ * never sees what limits an explicit one, and an explicit method whose step has
+ * settled at the stability limit sits just <em>below</em>
+ * {@link OdeStepper#stiffnessThreshold()} rather than above it -- and a cost
+ * comparison needs neither reading. The two directions ask the same question
+ * but not by the same reading: {@link #theImplicitSettlesCheaper} says why one
+ * trial step is enough coming back and not enough going out, and
+ * {@link #stabilityVetoesTheReturn} is the one thing the price alone cannot say.
  * <p>
  * <b>A successful trial is not thrown away.</b> It is the step, so a trial that
  * says "switch" costs nothing at all and only a trial that says "stay" costs
  * the evaluations it took.
  * <p>
- * <b>What it costs, measured</b> against the better of the two methods run
- * alone, and against an oracle switching at exactly the right instants, which
- * bounds every switching solver from above:
- * <table border="1">
- * <caption>evaluations, at {@code probeEvery} of 20</caption>
- * <tr><th>problem</th><th>this</th><th>better pure</th><th>oracle</th></tr>
- * <tr><td>a dial from 1 to 1e5 and back, rtol 1e-6</td>
- * <td>1749</td><td>2928</td><td>1468</td></tr>
- * <tr><td>van der Pol at mu = 1000, rtol 1e-6</td>
- * <td>4774</td><td>8902</td><td>2747</td></tr>
- * <tr><td>Robertson to 1e5, rtol 1e-8</td>
- * <td>3220</td><td>3147</td><td>3073</td></tr>
- * <tr><td>a chain of 50 cells under the same dial, rtol 1e-6</td>
- * <td>8365</td><td>19948</td><td>--</td></tr>
- * </table>
+ * <b>What it is worth.</b> Measured against the better of the two methods run
+ * alone, and against an oracle switching at exactly the right instants, it
+ * closes <b>81 %</b> and <b>67 %</b> of the distance to that oracle on the dial
+ * and on van der Pol at {@code mu = 1000}, and costs about 3 % on Robertson,
+ * which is stiff throughout and has nothing to win. Where there is no stiffness
+ * at all it takes no trial and is the pure explicit run <em>bit for bit</em>,
+ * so the premium is paid only by an equation that really is stiff.
  * <p>
- * The first two are what switching is for, and it closes 81 % and 67 % of the
- * distance to the oracle. Robertson is an equation that is stiff throughout,
- * where there is nothing to win and the trials are an insurance premium of a
- * few percent on a claim never made. Over tolerances from {@code 1e-4} to
- * {@code 1e-12} the two winners stay winners -- van der Pol between 41 % and
- * 85 % of the pure implicit run, the dial never above 99 % of it -- and
- * Robertson's premium stays between 2 % and 17 %.
- * <p>
- * <b>The dimension no longer decides whether it hands over, but it decides what
- * asking costs.</b> The last row is there because the handover twice stopped
- * altogether. A switch needs the implicit method's step to be
- * worth its price, <code>implicitCost / explicitCost</code>, which for a
- * differenced Jacobian is <code>(n + 7) / 6</code> and so <em>rises with the
- * dimension</em>; a trial that can only reveal a fixed multiple of the step it
- * starts from therefore stops handing over above some {@code n}. Judged on one
- * step that bound was {@code n < 9}; judged on four it was about {@code n < 21}.
- * Judged, as now, by settling until the answer is in, there is no such bound.
- * See {@link #theImplicitSettlesCheaper} for both measurements and what
- * replaced them.
- * <p>
- * <b>A large system without a written Jacobian is the one regime where this
- * class loses, and by how much is measured.</b> Both factors of a trial's bill
- * grow with the dimension at once: the settled step has to climb past
- * <code>(n + 7) / 6</code>, and every climbing step costs
- * <code>stages + n + 1</code> evaluations, while the
- * {@link #DEFAULT_PROBE_EVERY} explicit steps between one trial and the next
- * cost a fixed six each. On a semi-discretized diffusion-reaction PDE at
- * {@code rtol = 1e-6}, with the Jacobian differenced:
- * <table border="1">
- * <caption>what one trial costs, and what share of the whole run goes into
- * trials, against the dimension</caption>
- * <tr><th>n</th><th>implicit steps per trial</th><th>evaluations per
- * trial</th><th>share of the run spent probing</th></tr>
- * <tr><td>10</td><td>2.9</td><td>49</td><td>16 %</td></tr>
- * <tr><td>20</td><td>4.1</td><td>111</td><td>30 %</td></tr>
- * <tr><td>40</td><td>6.3</td><td>296</td><td>57 %</td></tr>
- * <tr><td>100</td><td>7.1</td><td>761</td><td>79 %</td></tr>
- * </table>
- * <p>
- * The worst cell measured on that problem is {@code n = 100} at
- * {@code rtol = 1e-4}, where the pair costs <b>2.20 times</b> the better pure
- * method; the same cell with a written Jacobian costs 1.11. Note also that the
- * evaluation count flatters the pair here, because the trial's LU
- * factorizations are not evaluations and so appear in none of these numbers.
- * <p>
- * <b>So: with a large system and no analytic Jacobian, prefer
+ * <b>The one regime where it loses is a large system without a written
+ * Jacobian</b>, and by enough to matter: both factors of a trial's bill grow
+ * with the dimension at once, since the settled step has to climb past
+ * <code>(n + 7) / 6</code> and every climbing step costs
+ * <code>stages + n + 1</code> evaluations. On a semi-discretized
+ * diffusion-reaction PDE at {@code n = 100} the pair costs <b>2.20 times</b> the
+ * better pure method with the Jacobian differenced and <b>1.11</b> with it
+ * written. <b>So: with a large system and no analytic Jacobian, prefer
  * {@link Ode#solveStiff} outright.</b> Where a Jacobian can be written, the
  * {@link DiffDVectorField} constructor removes the problem rather than easing
- * it: it drops <code>implicitCost</code> to the stage count, so the ratio a
- * switch must clear stops depending on {@code n} altogether, and it spares the
- * {@code n + 1} evaluations a differenced Jacobian costs per step. On that
- * chain of 50 the written Jacobian costs 1466 evaluations against 8365.
- * <p>
- * <b>Which explicit method to pair.</b> {@link ButcherTableau#DOP853} works
- * here unchanged and is worth reaching for under two conditions at once: the
- * tolerance is below about {@code 1e-6}, where an eighth order method beats a
- * fifth order one at all, <em>and</em> the explicit side carries a large share
- * of the evaluations. Only that share is exposed to the improvement, so the
- * whole effect is
- * <p>
- * <code>cost(DOP853 pair) / cost(DP45 pair) = (1 - share) + share * q</code>
- * <p>
- * with {@code q} what DOP853 costs on the explicit part alone, and the measured
- * ratios follow that expression to a few percent. What it comes to:
- * <table border="1">
- * <caption>DOP853 pair against the Dormand-Prince pair, at the best tolerance
- * for each</caption>
- * <tr><th>problem</th><th>explicit share of the bill</th><th>best ratio</th></tr>
- * <tr><td>Robertson to 1e5</td><td>4 % to 6 %</td><td>1.03 -- never pays</td></tr>
- * <tr><td>a dial with the stiff window a third of the run</td>
- * <td>9 % to 37 %</td><td>0.98 at 1e-8 -- not worth it</td></tr>
- * <tr><td>van der Pol at mu = 1000</td><td>about 50 %</td>
- * <td>0.86 at 1e-9</td></tr>
- * <tr><td>a dial with the stiff window a twentieth of the run</td>
- * <td>62 % to 83 %</td><td>0.73 at 1e-6</td></tr>
- * </table>
- * <p>
- * <b>The share is of the evaluations and not of the time axis</b>, and the two
- * are nothing alike: on van der Pol the explicit method holds under 1 % of the
- * time and half the bill, because what it carries is the brief violent
- * transitions. <b>And the window closes again at a tight enough tolerance</b>,
- * because the implicit half of the bill grows like <code>rtol^(-1/4)</code>
- * against DOP853's <code>rtol^(-1/9)</code>: on the dial the explicit share
- * falls from 80 % at {@code 1e-6} to 11 % at {@code 1e-11}, and with it the
- * advantage. Only van der Pol, whose share stays near half at every tolerance,
- * keeps the gain all the way down.
+ * it -- it drops the ratio a switch must clear to a constant, so it stops
+ * depending on {@code n} at all.
  * <p>
  * <b>Where switching is not the answer</b> is an equation with no stiffness at
  * all, which {@link Ode#solve(math.fun.DVectorField, double, double[], double,
- * double)} does at exactly the same cost and with none of this apparatus, and
- * one that is stiff from beginning to end, which
+ * double)} does at the same cost and with none of this apparatus, and one that
+ * is stiff from beginning to end, which
  * {@link Ode#solveStiff(math.fun.DVectorField, double, double[], double,
  * double)} does a few percent cheaper. This is for the equations that are
  * neither, and for the caller who does not know which of the three they have.
  * <p>
  * <b>What it reports about stiffness.</b> {@link #stiffnessMeasure()} is
  * {@link Double#NaN} while the implicit side is stepping, because there is
- * genuinely nothing there to measure, and
- * {@link OdeIntegrator.Result#stiffness} therefore stays exactly what it is
- * documented to be -- the largest such measure actually seen. Nothing here is
- * decided by it. {@link OdeIntegrator.Result#seemsStiff} likewise speaks for the
- * explicit side alone and is not the question to ask here; {@link #stiffSteps()}
- * and {@link #switches()} are.
+ * genuinely nothing there to measure, so
+ * {@link OdeIntegrator.Result#seemsStiff} speaks for the explicit side alone
+ * and is not the question to ask here; {@link #stiffSteps()} and
+ * {@link #switches()} are.
  * <p>
  * Instances are stateful and cannot be shared between threads.
  * <p>
@@ -201,32 +79,35 @@ public final class SwitchingStepper implements OdeStepper {
 
     /**
      * How many steps go by before the method that is not stepping is given one
-     * to try. Measured over {@code 5}, {@code 10}, {@code 20} and {@code 40} on
-     * the three problems above, {@code 20} was the best or equal best on all of
-     * them.
+     * to try. Swept over {@code 5}, {@code 10}, {@code 20} and {@code 40} on
+     * four problems and six tolerances, where {@code 20} was best or equal best
+     * throughout.
      * <p>
-     * <b>A caller who already knows the equation is stiff from beginning to
-     * end can pass {@code 50}</b> to the constructor that takes it and save
-     * about two percent, since every trial such a run takes is one it throws
-     * away. That is the whole of what the cadence is worth: policies that vary
-     * it -- holding the trial overhead to a share of the bill, or backing off
-     * while the answers keep coming back the same -- were measured over four
-     * problems and six tolerances, and the best of them beat this constant by
-     * {@code 0.9} percent on average while adding a setting of its own.
+     * <b>A caller who already knows the equation is stiff from beginning to end
+     * can pass {@code 50}</b> to the constructor that takes it and save about
+     * two percent, since every trial such a run takes is one it throws away.
+     * That is the whole of what the cadence is worth: adaptive policies -- a
+     * budget on the trial overhead, or backing off while the answers keep coming
+     * back the same -- were measured twice and the best of them beat this
+     * constant by {@code 0.9} percent while adding a setting of its own.
      */
     public static final int DEFAULT_PROBE_EVERY = 20;
 
     /**
      * The share of {@link OdeStepper#stiffnessThreshold()} the free estimate has
-     * to reach before an implicit trial is worth taking at all.
+     * to reach before an implicit trial is worth taking at all. Half leaves a
+     * factor of two below the value a stability-limited step settles at, which
+     * is about {@code 2.97} of {@code 3.25} for Dormand-Prince, and is still
+     * some thirty times what the measure reads on a smooth problem.
      */
     private static final double VETO_FRACTION = 0.5;
 
     /**
      * How many times {@link OdeStepper#stiffnessThreshold()} the bound
      * <code>|h| ||J||_inf</code> has to reach before the equation is not given
-     * back to the explicit method, whatever the trial step cost. See
-     * {@link #stabilityVetoesTheReturn} for the three populations it separates
+     * back to the explicit method, whatever the trial step cost. It sits in the
+     * middle of eight clear decades between a return that was kept and one that
+     * killed the run; see {@link #stabilityVetoesTheReturn} for the populations
      * and for why the bound and not the free estimate.
      */
     private static final double RETURN_VETO_FACTOR = 1.0e6;
@@ -687,39 +568,27 @@ public final class SwitchingStepper implements OdeStepper {
      * where the free estimate is used -- to time the trials, never to decide
      * one.
      * <p>
-     * <b>The free estimate is no good at saying "stiff" and is very good at
-     * saying "not stiff", and it does not lie when it does speak up.</b> Those
-     * three facts make it a schedule rather than a test, and while the explicit
-     * method is stepping it reads three ways:
+     * <b>The free estimate is no good at saying "stiff", very good at saying
+     * "not stiff", and it does not lie when it does speak up.</b> That makes it
+     * a schedule rather than a test, and while the explicit method is stepping
+     * it reads three ways:
      * <ul>
-     * <li><b>Rising past the threshold, ask now.</b> The step that was just
-     * taken ran outside the stability region and was kept anyway, which the
-     * local error test will do at a loose tolerance -- on Robertson at
-     * {@code rtol = 1e-4} the very first step is accepted at a measure of
-     * {@code 6.64} against a threshold of {@code 3.25}. Waiting the ordinary
-     * cadence out costs the run: twenty attempts later the second concentration
-     * stands at {@code -0.12} where it belongs near {@code 1e-05}, and no
-     * method recovers from that. This is Hairer's signal, and its known failure
-     * is silence rather than a false alarm, so acting on it at once is safe.
-     * <b>On the rising edge and not on the level</b>, because a run that stays
-     * above the threshold while the trial keeps answering "stay" would
-     * otherwise ask on every step -- measured at 39 trials in 40 steps before
-     * the edge was put in.</li>
+     * <li><b>Rising past the threshold, ask now.</b> A step outside the
+     * stability region that the local error test kept anyway, which happens at
+     * a loose tolerance. This is Hairer's signal and its known failure is
+     * silence rather than a false alarm, so acting at once is safe. <b>On the
+     * rising edge and not on the level</b>, or a run that stays above the
+     * threshold while the trial keeps saying "stay" asks on every step.</li>
      * <li><b>Far below the threshold, never ask.</b> An implicit method of a
      * <em>lower</em> order cannot take longer steps than an explicit one whose
      * step is short for accuracy rather than stability, so the trial could only
      * come back saying "stay". This is what keeps an equation with no stiffness
      * in it from paying anything at all.</li>
-     * <li><b>In between, ask on the cadence.</b> This is the blind band the
-     * measurements found -- a step size that has <em>settled</em> at the
-     * stability limit sits just under the threshold, at a mean of {@code 2.97}
-     * of {@code 3.25} over 29158 steps -- and nothing but a trial sees into it.
-     * Half the threshold is the lower edge, which leaves a factor of two below
-     * that settled value and is still some thirty times what the measure reads
-     * on a smooth problem.</li>
+     * <li><b>In between, ask on the cadence.</b> A step size that has
+     * <em>settled</em> at the stability limit sits just under the threshold,
+     * and nothing but a trial sees into that band.</li>
      * </ul>
-     * A measure that is not a number -- a method that cannot form one, or a
-     * step that came back infinite -- is no information, so the cadence decides.
+     * A measure that is not a number is no information, so the cadence decides.
      * On the implicit side there is no such estimate and the cadence is all
      * there is.
      */
@@ -762,55 +631,38 @@ public final class SwitchingStepper implements OdeStepper {
      * <b>Why this side cannot be asked the one-step question.</b>
      * {@link #theOtherLooksCheaper} reads the step size a single trial would
      * propose next, <code>h safety err^(-1/p)</code>, which is exact inside the
-     * asymptotic regime and useless across it. The step size an explicit method
-     * is being driven at while it is stability-limited is far below anything the
-     * implicit method would choose, so the trial lands deep inside that regime
-     * and its own natural step does not: measured on a chain of diffusing cells
-     * under a dial of {@code 1e5}, RODAS4 probed at the explicit method's
-     * {@code h = 3.3e-05} reported an error of {@code 0.0131} and therefore
-     * proposed {@code 2.7 h}, where a pure implicit run at that instant was
-     * taking steps <b>1500 times longer</b>. One step cannot show a ramp, and the
-     * ramp is the whole of what an implicit method has to offer.
+     * asymptotic regime and useless across it. An implicit method probed at the
+     * explicit method's stability-limited step is deep inside that regime while
+     * its own natural step is not, and under-predicts by three orders: probed at
+     * {@code h = 3.3e-05} it proposed {@code 2.7 h} where a pure implicit run
+     * was taking steps <b>1500 times longer</b>. One step cannot show a ramp,
+     * and the ramp is the whole of what an implicit method has to offer. The
+     * switch then happened only while {@code n < 9}, a bound with nothing in it
+     * about the equation. So this side lets the implicit method run under its
+     * own control and reads where the step size <em>settles</em>.
      * <p>
-     * <b>What that cost.</b> The switch then happened only while
-     * <code>implicitCost &lt; explicitCost * 2.7</code>, which for a differenced
-     * Jacobian is <code>n + 7 &lt; 16.2</code>, or {@code n < 9}: a bound with
-     * nothing in it about the equation. Above it the stepper never handed over
-     * at all -- at {@code n = 50}, 2677596 evaluations against the pure implicit
-     * method's 19948, a hundredfold loss. So this side lets the implicit method
-     * run under its own control and reads where the step size <em>settles</em>.
-     * <p>
-     * <b>How long it is allowed to settle is not a fixed number, and a fixed
-     * number is what failed next.</b> A run of four steps moved the bound from
-     * {@code n < 9} to about {@code n < 21} and left it there, because the ratio
-     * a switch has to clear, <code>implicitCost / explicitCost</code>, grows with
-     * {@code n} while what four steps can reveal does not. Measured over 1100
-     * drawn problems, four steps reveal {@code 4.6 h} where {@code 9.5 h} was
-     * wanted at {@code n = 50}. Raising the number closes that and costs more
-     * everywhere else, since a trial answered "stay" pays for every step it took:
-     * eight steps took the share of problems costing more than twice the better
-     * pure method from 3.1 % to 4.8 %.
-     * <p>
-     * <b>So the trial stops as soon as the answer is in.</b> It is given the
-     * ratio it must clear and returns the moment it clears it, and it gives up
-     * the moment the step size stops climbing -- under {@link #STALL_FACTOR} per
-     * accepted step -- because a climb that has died away short of the mark will
-     * not resume. {@link #MAX_SETTLE_STEPS} is only the ceiling. The same exit
-     * that finds a long ramp early also abandons a hopeless probe early, which
-     * is why this is the one rule that improves both ends at once: the share of
-     * a run spent exploring, on runs that probe and never switch, falls from
-     * 30 % to 4.1 %.
+     * <b>How long it settles is not a fixed number, and a fixed number is what
+     * failed next</b>, because the ratio a switch has to clear grows with
+     * {@code n} while what a fixed count reveals does not -- four steps moved
+     * the bound only to about {@code n < 21}. Instead the trial is given the
+     * ratio it must clear and returns the moment it clears it, and gives up the
+     * moment the climb stops -- under {@link #STALL_FACTOR} per accepted step --
+     * because a climb that died short will not resume. {@link #MAX_SETTLE_STEPS}
+     * is only the ceiling. The same exit that finds a long ramp early also
+     * abandons a hopeless probe early, which is why it improves both ends at
+     * once: exploration on runs that probe and never switch fell from 30 % to
+     * 4.1 %.
      * <p>
      * <b>Only this side.</b> Coming back the other way the one-step reading was
-     * never shown wrong, and settling there is what costs the most, since a
-     * trial on the implicit side is nearly always answered "stay": doing it on
-     * both sides took Robertson's premium from 2 % to 34 %.
+     * never shown wrong, and settling there costs the most, since a trial on the
+     * implicit side is nearly always answered "stay": doing it on both sides
+     * took Robertson's premium from 2 % to 34 %.
      * <p>
      * <b>What is still not seen.</b> Where the stiff modes <em>rotate</em> as
      * well as decay, an implicit method has to resolve the rotation and cannot
      * ramp away from the explicit method's step at all, so no amount of settling
-     * finds a ramp that is not there. On such a problem the trial is right to
-     * answer "stay" and the cost of asking is what remains.
+     * finds a ramp that is not there. There the trial is right to answer "stay"
+     * and the cost of asking is what remains.
      */
     private boolean theImplicitSettlesCheaper(double t, double[] y, double h) {
         double settled = settledStep(t, y, h);
@@ -834,6 +686,19 @@ public final class SwitchingStepper implements OdeStepper {
      * that the one carrying the solution is not disturbed, and bounded in
      * attempts so that a point where the implicit method cannot make progress
      * either costs a fixed amount rather than an unbounded one.
+     * <p>
+     * <b>{@code enough} is not a truncation of the decision, it is the decision,
+     * written as an early exit.</b> <code>|trial| &gt; enough</code> says exactly
+     * that <code>implicitCost / trial &lt; explicitCost / |h|</code> holds --
+     * which is why the loop is allowed to stop there, and why the two must be
+     * changed together or not at all. Moving one alone opens a band in which the
+     * probe stops before it can answer and the answer is then always no: with
+     * {@code enough} lowered by a sixth on its own, the probe exits after a
+     * single step and the unscaled comparison refuses the result, which on
+     * OREGO turned 33 trials into 10006 and the run into <b>342 times</b> its
+     * cost. Most probes end at the stall rather than here -- 19 of 22 and 42 of
+     * 47 on the reference problems -- and the ceiling is reached at most twice
+     * a run.
      */
     private double settledStep(double t, double[] y, double h) {
         scout.reset();
@@ -901,23 +766,11 @@ public final class SwitchingStepper implements OdeStepper {
      * currently stepping has already answered for itself, since the step size
      * it is being driven at is the one it proposed.
      * <p>
-     * <b>It is also the whole of the switching logic, in both directions.</b>
-     * The obvious alternative for the way <em>to</em> the implicit side is
-     * {@link OdeStepper#stiffnessMeasure()} against its threshold, and that was
-     * built first and measured: an explicit method whose step size has settled
-     * at the stability limit sits just <em>below</em> the threshold rather than
-     * above it, so the test almost never fires. On a dial rising smoothly from
-     * <code>lambda = 1</code> to <code>1e5</code> the measure read a mean of
-     * {@code 2.97} and a worst of {@code 3.2501} against a threshold of
-     * {@code 3.25} over 29158 steps, exceeding it on five of them, and the run
-     * cost 44 % more than the pure implicit method rather than 22 % less.
-     * Hairer's test catches a run being pushed past the limit and rejected; it
-     * does not catch one that has already adapted to it. A cost comparison has
-     * neither blind spot, because it never mentions stability -- and that is
-     * also its own one, which is what {@link #stabilityVetoesTheReturn} is
-     * about: a method that is cheap per unit of time and unstable is not a
-     * method that can carry the equation, and only the way <em>back</em> can
-     * choose one.
+     * <b>Never mentioning stability is what makes it work in both directions,
+     * and it is also its own blind spot.</b> A method that is cheap per unit of
+     * time and unstable is not a method that can carry the equation, and only
+     * the way <em>back</em> can choose one -- which is what
+     * {@link #stabilityVetoesTheReturn} is for.
      * <p>
      * The proposal is formed unclamped, without the bounds a controller puts on
      * a single step: those keep one step from jumping, and this is a comparison
@@ -970,57 +823,38 @@ public final class SwitchingStepper implements OdeStepper {
      * that it must not be handed the equation, whatever the trial step cost.
      * <p>
      * <b>This is the counterpart {@link #dueForTrial()} has and this direction
-     * did not.</b> Going to the implicit side, the free estimate vetoes a trial
+     * did not.</b> Going to the implicit side the free estimate vetoes a trial
      * that has nothing to find; coming back, nothing stopped a trial that
      * happened to be cheap from taking the equation off a method that was
-     * holding it together. What that cost was a run that dies: on E5 at
-     * {@code rtol 1e-10} with an absolute tolerance below the level the second
-     * concentration has decayed to, the switcher returned to the explicit
-     * method 113 times, thrashed, and did not reach the endpoint where the pure
-     * implicit method finishes with no rejection at all.
+     * holding it together, and that kills a run rather than slowing one.
      * <p>
      * <b>The reading is the implicit method's own Jacobian and not the free
      * estimate</b>, which is the part that had to be measured rather than
-     * assumed. At those decisions {@link OdeStepper#stiffnessMeasure()} reads
-     * {@code 0.0033} of its threshold -- the difference quotient has lost the
-     * fast mode, because the stiff combination has decayed to {@code 1e-34}
-     * while the norm is carried by components a hundred decades apart -- where
-     * {@link Rosenbrock#jacobianNorm()} is fourteen decades higher and right.
-     * Over 172 returns in a corpus of 64 runs, <code>|h| ||J||_inf</code>
-     * against the threshold:
-     * <table border="1">
-     * <caption>what separates a return that was kept from one that was
-     * regretted</caption>
-     * <tr><th>population</th><th>count</th><th>min</th><th>max</th></tr>
-     * <tr><td>kept, outside the dying cells</td><td>34</td><td>0.06</td>
-     * <td>2.1e+03</td></tr>
-     * <tr><td>regretted, outside them</td><td>25</td><td>2.2</td>
-     * <td>101</td></tr>
-     * <tr><td>every return the dying cells made</td><td>113</td>
-     * <td>4.6e+11</td><td>8.5e+12</td></tr>
-     * </table>
-     * Eight clear decades, and {@link #RETURN_VETO_FACTOR} sits in the middle
-     * of them.
+     * assumed: where {@link Rosenbrock#jacobianNorm()} is right,
+     * {@link OdeStepper#stiffnessMeasure()} can be fourteen decades low, because
+     * the difference quotient loses a fast mode whose own combination has
+     * decayed away while the norm is carried by components far apart. Over 172
+     * returns in a corpus of 64 runs, <code>|h| ||J||_inf</code> against the
+     * threshold separated a kept return (up to {@code 2.1e+03}) from a run that
+     * dies ({@code 4.6e+11} and above) by <b>eight clear decades</b>, and
+     * {@link #RETURN_VETO_FACTOR} sits in the middle of them.
      * <p>
      * <b>What it is honestly.</b> At those decisions the explicit trial is not
-     * malfunctioning: its scaled error is 146 times the level rounding alone
-     * explains, halving the step divides it by <code>2^5</code>, and the state
-     * it returns is smooth. Every local signal endorses the handover. This
-     * vetoes it anyway, because a stability margin of {@code 1e12} leaves
-     * nothing to recover from when the fast mode comes back -- and it does come
-     * back, thirteen decades of time later, exactly where the run dies. It is a
-     * veto on the margin and not on the reading.
+     * malfunctioning -- it converges at its own order and returns a smooth
+     * state, and every local signal endorses the handover. This vetoes it
+     * anyway, because a stability margin of {@code 1e12} leaves nothing to
+     * recover from when the fast mode comes back. It is a veto on the margin
+     * and not on the reading.
      * <p>
-     * <b>What it costs.</b> The Jacobian is one the implicit method already
-     * holds, so the whole of it is one pass over a matrix that is factored on
-     * every step anyway, and it is taken only where the cost comparison has
-     * already said "switch" -- 172 of 7372 return trials, {@code 2.3 %}. The
-     * reading is as old as the linearization, which at this point is the start
-     * of the previous accepted step; measured over the same corpus, that
-     * staleness does not move a single one of the three populations above.
-     * Where there is no Jacobian to read the answer is {@link Double#NaN} and
-     * nothing is vetoed, the same way {@link #dueForTrial()} treats a measure it
-     * cannot form: no information is not evidence.
+     * <b>What it costs.</b> One pass over a matrix the implicit method already
+     * holds and factors on every step anyway, taken only where the cost
+     * comparison has already said "switch" -- 2.3 % of return trials. The
+     * reading is as old as the last linearization, which at this point is the
+     * start of the previous accepted step; measured, that staleness moves none
+     * of the populations. Where there is no Jacobian to read the answer is
+     * {@link Double#NaN} and nothing is vetoed, the same way
+     * {@link #dueForTrial()} treats a measure it cannot form: no information is
+     * not evidence.
      */
     private boolean stabilityVetoesTheReturn(double h) {
         if (!onStiff) {

@@ -18,26 +18,21 @@ import java.util.Arrays;
  * <p>
  * <b>This is data, not an algorithm.</b> {@link ExplicitRungeKutta} executes
  * whichever tableau it is handed, so a further method is a set of numbers
- * rather than a class, and the order conditions that decide whether those
- * numbers are the ones intended can be checked generically. That check is worth
- * naming, because the failure it prevents is silent: a mistyped coefficient
- * does not throw, it lowers the order of the method, and the symptom appears
- * much later as an accuracy that does not improve the way it should.
- * <p>
- * The three tableaux the library ships are {@link #CLASSIC_RK4},
- * {@link #DORMAND_PRINCE_45} and {@link #DOP853}.
+ * rather than a class, and the order conditions can be checked generically --
+ * which matters because the failure they prevent is silent: a mistyped
+ * coefficient does not throw, it lowers the order of the method. The three
+ * tableaux shipped are {@link #CLASSIC_RK4}, {@link #DORMAND_PRINCE_45} and
+ * {@link #DOP853}.
  * <p>
  * <b>Stage counts come in two.</b> {@link #stages()} is how many evaluations
  * advance the solution; {@link #denseStages()} is how many are needed when a
- * value strictly inside the step is wanted. They are equal for the first two,
- * whose continuous extensions cost no extra evaluation, and differ by three for
- * DOP853, whose seventh order interpolant does not come free -- which is why
- * {@link ExplicitRungeKutta} evaluates those three only when an interior value
- * is actually asked for.
+ * value strictly inside the step is wanted. They are equal for the first two
+ * and differ by three for DOP853, whose seventh order interpolant does not come
+ * free -- which is why {@link ExplicitRungeKutta} evaluates those three only
+ * when an interior value is actually asked for.
  * <p>
- * The arrays handed out by the accessors are copies, so a caller may keep and
- * modify them; the constants are therefore immutable in fact and not only by
- * convention.
+ * The arrays handed out by the accessors are copies, so the constants are
+ * immutable in fact and not only by convention.
  * <p>
  * <b>See</b>
  * <a href="https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods">Wikipedia
