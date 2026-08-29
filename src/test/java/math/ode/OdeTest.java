@@ -400,6 +400,46 @@ public final class OdeTest {
         }
     }
 
+    /**
+     * A switching run that dies without ever switching says so, because the
+     * diagnosis the driver appends is written for {@link Ode#solve} and reads
+     * wrongly here -- it either advises reaching for an implicit method, which
+     * is what this call already was, or reports a measure the streak test never
+     * confirmed. Here it is the second: the measure passes {@code 3.25} and the
+     * message still declines to call the equation stiff.
+     */
+    @Test
+    public void testAnAutomaticRunThatNeverSwitchedSaysSo() {
+        double[] start = { 1.0, 0.0 };
+        // a rotating stiff pair: the implicit method has to resolve the
+        // rotation, so no settling finds a ramp and the trial never switches
+        DVectorField rotating = new DVectorField() {
+            @Override
+            public void valueAt(double t, double[] y, double[] dydt) {
+                dydt[0] = -1.0e4 * (y[0] - Math.cos(t)) - 1.0e5 * (y[1] - Math.sin(t))
+                        - Math.sin(t);
+                dydt[1] = 1.0e5 * (y[0] - Math.cos(t)) - 1.0e4 * (y[1] - Math.sin(t))
+                        + Math.cos(t);
+            }
+        };
+        try {
+            Ode.solveAuto(rotating, 0.0, start, 20.0, 1.0e-9);
+            fail("the switching run was expected to run out of its budget");
+        } catch (ArithmeticException e) {
+            String m = e.getMessage();
+            assertTrue("says the two methods never changed places, not " + m,
+                    m.contains("never changed places"));
+            assertTrue("and points at solveStiff, not " + m, m.contains("solveStiff"));
+            assertTrue("keeping what the driver said", m.contains("step budget"));
+        }
+        // and the advice it gives is the right one: the implicit method alone
+        // solves the same problem, which is what makes the message worth having
+        OdeIntegrator.Result stiff = Ode.solveStiff(rotating, 0.0, start, 20.0, 1.0e-9);
+        double[] y = stiff.finalState();
+        assertEquals("y[0] against cos(20)", Math.cos(20.0), y[0], 1.0e-6);
+        assertEquals("y[1] against sin(20)", Math.sin(20.0), y[1], 1.0e-6);
+    }
+
     @Test
     public void testTheAutomaticEntryChecksItsArguments() {
         try {

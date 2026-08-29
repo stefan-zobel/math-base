@@ -431,8 +431,12 @@ public final class Ode {
             throw new IllegalArgumentException("y0 must not be null");
         }
         StepController controller = new StepController(tolerance, tolerance);
-        return new OdeIntegrator(new SwitchingStepper(f, y0.length, controller), controller).solve(t0, y0,
-                t1);
+        SwitchingStepper stepper = new SwitchingStepper(f, y0.length, controller);
+        try {
+            return new OdeIntegrator(stepper, controller).solve(t0, y0, t1);
+        } catch (ArithmeticException e) {
+            throw neverHandedOver(stepper, e);
+        }
     }
 
     /**
@@ -461,8 +465,53 @@ public final class Ode {
             throw new IllegalArgumentException("y0 must not be null");
         }
         StepController controller = new StepController(tolerance, tolerance);
-        return new OdeIntegrator(new SwitchingStepper(f, y0.length, controller), controller).solve(t0, y0,
-                t1);
+        SwitchingStepper stepper = new SwitchingStepper(f, y0.length, controller);
+        try {
+            return new OdeIntegrator(stepper, controller).solve(t0, y0, t1);
+        } catch (ArithmeticException e) {
+            throw neverHandedOver(stepper, e);
+        }
+    }
+
+    /**
+     * Says so when a switching run died without the two methods ever changing
+     * places, because the diagnosis the driver appends is written for
+     * {@link #solve} and reads wrongly here.
+     * <p>
+     * {@link OdeIntegrator} forms its verdict from the explicit method's own
+     * estimate. On a run that fails this way it either advises reaching for an
+     * implicit method -- which is what this call already was -- or, because that
+     * estimate has a blind spot on a step size that has <em>settled</em> at the
+     * stability limit, reports a measure <em>below</em> the threshold to a
+     * caller whose run has just stopped. Neither helps.
+     * <p>
+     * What is always true and always useful is the fact: the trial never handed
+     * the equation over, so what failed is the explicit run. Measured on the
+     * draws that fail this way it is the pure explicit run to the last digit.
+     * The advice is left conditional on the verdict above, since a run can also
+     * exhaust its budget with no stiffness in it at all, and there
+     * {@link #solveStiff} would be the wrong answer.
+     *
+     * @param stepper
+     *            the stepper that was driven, asked whether it ever switched
+     * @param cause
+     *            what the driver threw
+     * @return the exception to throw in its place, which is {@code cause} itself
+     *         where the two methods did change places
+     */
+    private static ArithmeticException neverHandedOver(SwitchingStepper stepper,
+            ArithmeticException cause) {
+        if (stepper.switches() > 0L) {
+            return cause;
+        }
+        ArithmeticException corrected = new ArithmeticException(cause.getMessage()
+                + ". The two methods never changed places, so this is the explicit run and the"
+                + " implicit one was never given the equation: where the stiffness above is real,"
+                + " call solveStiff directly rather than switching. A large system whose Jacobian"
+                + " has to be differenced is where the trial cannot see far enough ahead to"
+                + " switch");
+        corrected.initCause(cause);
+        return corrected;
     }
 
     /**
