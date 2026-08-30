@@ -649,20 +649,27 @@ public class OwlQnTest {
      * overflowed, no step could satisfy an Armijo bound of {@code -Infinity},
      * and the search stalled without leaving the starting point.
      * <p>
-     * The upper end is asserted down to the solution. The lower end is not, and
-     * deliberately: there the run still stops early on
-     * {@code checkValueTerminationCondition}, whose {@code eps} is an absolute
-     * {@code 1.0e-5} added to an otherwise relative test, so an objective whose
-     * values sit far below that converges on the floor instead. That is a
-     * separate defect and not this one.
+     * Both ends are asserted down to the solution. The lower one could not
+     * be until the floor under the value tolerance stopped being absolute:
+     * a run whose values sat far below {@code 1.0e-5} used to converge on
+     * that constant rather than on the tolerance it was given, and stopped
+     * after no iterations at all. It reaches the solution to about
+     * {@code 2e-11} now rather than exactly, because at {@code 2^-600} the
+     * squared quantities inside the BFGS update itself leave the range and
+     * the update is skipped, which leaves plain steepest descent.
      */
     @Test
     public void testABadlyScaledObjectiveIsNeitherABadGradientNorAStalledSearch() {
         int[] tiny = { -600, -540 };
         for (int ei = 0; ei < tiny.length; ++ei) {
+            String where = "at 2^" + tiny[ei];
             ScaledQuadratic f = new ScaledQuadratic(Math.scalb(1.0, tiny[ei]));
-            assertTrue("a correct gradient must not be rejected as a non-ascent direction, at 2^" + tiny[ei],
+            assertTrue("a correct gradient must not be rejected as a non-ascent direction, " + where,
                     forScale(f).optimize());
+            double[] w = new double[QUADRATIC_TARGET.length];
+            f.getParameters(w);
+            assertTrue("deviation " + maxDeviation(QUADRATIC_TARGET, w) + " " + where,
+                    maxDeviation(QUADRATIC_TARGET, w) < 1.0e-9);
         }
 
         int[] huge = { 512, 520 };
@@ -678,6 +685,54 @@ public class OwlQnTest {
             f.getParameters(w);
             assertTrue("deviation " + maxDeviation(QUADRATIC_TARGET, w) + " " + where,
                     maxDeviation(QUADRATIC_TARGET, w) < 1.0e-9);
+        }
+    }
+
+    /**
+     * The whole stopping rule, not just the first step: the same problem at
+     * any scale must stop after the same number of iterations, on the same
+     * rule, at the same parameters -- bit for bit, since a power of two
+     * scales every term of the criterion exactly.
+     * <p>
+     * The band is bounded by the BFGS update rather than by the stopping
+     * rule: {@code rho} and {@code y.y} in {@code shift()} are squared, so
+     * outside roughly {@code 2^-537} to {@code 2^512} they leave the range,
+     * the update is skipped, and the search degenerates to steepest descent.
+     * Widening the exponents below without knowing that will look like a
+     * regression in this test and be neither.
+     * <p>
+     * That the rule which fires is {@code VALUE_TOLERANCE} matters too. The
+     * optimum of this objective is exactly zero, which is the case the floor
+     * exists for: with a purely relative test no run could satisfy
+     * {@code 2|d| <= tolerance*(|v| + |v_old|)} as the values approach zero,
+     * and it would report a stalled line search instead of converging.
+     */
+    @Test
+    public void testTheStoppingRuleDoesNotDependOnTheScaleOfTheObjective() {
+        int[] exponents = { -500, -100, 0, 100, 500 };
+        double[] reference = null;
+        int referenceIterations = -1;
+        for (int ei = 0; ei < exponents.length; ++ei) {
+            String where = "at 2^" + exponents[ei];
+            ScaledQuadratic f = new ScaledQuadratic(Math.scalb(1.0, exponents[ei]));
+            OrthantWiseLimitedMemoryBFGS owlqn = forScale(f);
+
+            assertTrue(where, owlqn.optimize());
+            assertEquals("the rule that fired, " + where, Termination.VALUE_TOLERANCE,
+                    owlqn.getTermination());
+
+            double[] w = new double[QUADRATIC_TARGET.length];
+            f.getParameters(w);
+            if (reference == null) {
+                reference = w;
+                referenceIterations = owlqn.getIteration();
+            } else {
+                assertEquals("iterations " + where, referenceIterations, owlqn.getIteration());
+                for (int j = 0; j < w.length; ++j) {
+                    assertEquals("coefficient " + j + " " + where, Double.doubleToRawLongBits(reference[j]),
+                            Double.doubleToRawLongBits(w[j]));
+                }
+            }
         }
     }
 }

@@ -9,6 +9,7 @@ package math.optim;
 
 import java.util.logging.Logger;
 
+import math.MathConsts;
 import math.linalg.VectorOps;
 
 
@@ -51,7 +52,23 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
     private final int maxIterations;
     private final double tolerance;
     private final double gradientTolerance;
-    private final double eps = 1.0e-5;
+    /**
+     * The floor under the value tolerance, as a fraction of the scale of
+     * the objective itself. An absolute floor would make the stopping rule
+     * depend on how the objective happens to be scaled: below it the test
+     * stops being relative, and a run whose values sit far under it
+     * converges on the constant instead of on the tolerance asked for.
+     * <p>
+     * {@code sqrt(MACH_EPS_DBL)}, about {@code 1.05e-8}, because a value
+     * near a minimum carries only half the digits the arithmetic has --
+     * the objective is flat there -- so that is where it stops being
+     * resolvable. Anything smaller was measured to behave identically;
+     * anything larger truncates the tail of an objective that converges
+     * towards zero.
+     */
+    private static final double RELATIVE_VALUE_FLOOR = Math.sqrt(MathConsts.MACH_EPS_DBL);
+    /** The largest magnitude of the value seen, which sets that scale. */
+    private double valueScale;
     private double l1Weight;
 
     // The number of corrections used in BFGS update
@@ -181,6 +198,7 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
         // get initial value
         value = evalL1();
+        noteValueScale(value);
 
         // get initial gradient
         grad = new double[numParameters];
@@ -575,6 +593,7 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
             // find new value
             value = evalL1();
+            noteValueScale(value);
 
             logger.fine("iter[" + iterations + "] Using alpha = " + alpha
                     + " new value = " + value + " |grad|="
@@ -610,10 +629,22 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
         optimizable.setParameters(parameters);
     }
 
+    /**
+     * Records the scale of the objective, which the value tolerance below
+     * is measured against.
+     */
+    private void noteValueScale(double v) {
+        double magnitude = Math.abs(v);
+        if (magnitude > valueScale) {
+            valueScale = magnitude;
+        }
+    }
+
     // termination conditions
     private boolean checkValueTerminationCondition() {
         return (2.0 * Math.abs(value - oldValue) <= tolerance
-                * (Math.abs(value) + Math.abs(oldValue) + eps));
+                * (Math.abs(value) + Math.abs(oldValue)
+                        + RELATIVE_VALUE_FLOOR * valueScale));
     }
 
 }
