@@ -91,38 +91,26 @@ final class Ilaenv {
 
                     String s4 = name;
                     char c = s4.substring(0, 1).charAt(0);
-                    char c1 = 'Z';
-                    if ((c1 == 'Z') || (c1 == 'z')) {
-                        if ((c >= 'a') && (c <= 'z')) {
-                            s4 = Util.stringInsert(s4, Character.valueOf((char) (c - 32)).toString(), 1, 1);
-                            j = 2;
-                            for (i = 5; i > 0; i--) {
-                                c = s4.substring(j + -1, j).charAt(0);
-                                if ((c >= 'a') && (c <= 'z'))
-                                    s4 = Util.stringInsert(s4, Character.valueOf((char) (c - 32)).toString(), j, j);
-                                j++;
-                            }
-                        }
-                    } else if ((c1 == '\351') || (c1 == '\251')) {
-                        if ((((c >= '\201') && (c <= '\211')) || ((c >= '\221') && (c <= '\231')))
-                                || ((c >= '\242') && (c <= '\251'))) {
-                            s4 = Util.stringInsert(s4, Character.valueOf((char) (c + 64)).toString(), 1, 1);
-                            j = 2;
-                            for (i = 5; i > 0; i--) {
-                                c = s4.substring(j + -1, j).charAt(0);
-                                if ((((c >= '\201') && (c <= '\211')) || ((c >= '\221') && (c <= '\231')))
-                                        || ((c >= '\242') && (c <= '\251')))
-                                    s4 = Util.stringInsert(s4, Character.valueOf((char) (c + 64)).toString(), j, j);
-                                j++;
-                            }
-                        }
-                    } else if (((c1 == '\332') || (c1 == '\372')) && ((c >= '\341') && (c <= '\372'))) {
+                    // Reference ILAENV asks the runtime what number 'Z' has and
+                    // uppercases the name with the arithmetic that fits the
+                    // answer: 90 or 122 for ASCII, 233 or 169 for EBCDIC, whose
+                    // letters are not contiguous, and 218 or 250 for Prime
+                    // machines, whose PRIMOS stored characters as ASCII with the
+                    // high bit set. Fortran 77 had neither a toupper nor a
+                    // guaranteed character set.
+                    //
+                    // A Java char is UTF-16, so 'Z' is 90 on every JVM and the
+                    // other two branches could not be reached under any
+                    // configuration. They are gone; the ASCII arithmetic below is
+                    // what the reference does for IZ == 90.
+                    if ((c >= 'a') && (c <= 'z')) {
                         s4 = Util.stringInsert(s4, Character.valueOf((char) (c - 32)).toString(), 1, 1);
                         j = 2;
                         for (i = 5; i > 0; i--) {
                             c = s4.substring(j + -1, j).charAt(0);
-                            if ((c >= '\341') && (c <= '\372'))
+                            if ((c >= 'a') && (c <= 'z')) {
                                 s4 = Util.stringInsert(s4, Character.valueOf((char) (c - 32)).toString(), j, j);
+                            }
                             j++;
                         }
                     }
