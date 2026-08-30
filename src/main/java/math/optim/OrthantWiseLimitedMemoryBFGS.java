@@ -539,8 +539,12 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
         double alpha = 1.0;
         double backoff = 0.5;
         if (iterations == 0) {
-            double normDir = Math.sqrt(VectorOps.dotProduct(direction,
-                    direction));
+            // the first step is normalized to unit length, so the norm
+            // here must be the safe one -- the naive sum of squares
+            // this used to take answers Infinity above about 8.4e152
+            // per element and 0.0 below about 1.1e-162, and alpha is
+            // one divided by it
+            double normDir = VectorOps.twoNorm(direction);
             alpha = 1.0 / normDir;
             backoff = 0.1;
         }

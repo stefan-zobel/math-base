@@ -638,4 +638,90 @@ public class VectorOpsTest {
     public void testTheMeanOfAnEmptyArrayIsNotANumber() {
         assertTrue(Double.isNaN(VectorOps.mean(new double[0])));
     }
+
+    // ------------------------------------------------------------------
+    // twoNorm against sqrt(v . v), the form OrthantWiseLimitedMemoryBFGS
+    // used to take for the length of its first step
+    // ------------------------------------------------------------------
+
+    /**
+     * The Euclidean norm as {@code sqrt(v . v)}, which is the naive
+     * accumulation of squares wearing a different name.
+     */
+    private static double naiveNormFromDotProduct(double[] v) {
+        return Math.sqrt(VectorOps.dotProduct(v, v));
+    }
+
+    /**
+     * Over the whole range in which the naive form works at all, the two agree.
+     * That is what makes replacing one by the other a change no existing caller
+     * can feel: {@code OrthantWiseLimitedMemoryBFGS} normalizes its first step
+     * by this norm, and every direction it forms is far inside this band.
+     * <p>
+     * On the scalar tree the agreement is exact, because {@code twoNorm}'s
+     * ordinary branch and {@code dotProduct(v, v)} are the same loop in the
+     * same order. On the vectorized tree it is not: both accumulate with
+     * {@code fma} and reduce with {@code reduceLanes(ADD)}, whose order the
+     * Vector API leaves unspecified, and the two call sites were measured
+     * disagreeing by one unit in the last place on about a tenth of several
+     * thousand probe vectors.
+     */
+    @Test
+    public void testTheTwoNormAgreesWithTheNaiveSumOfSquaresInTheOrdinaryRange() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            for (int k = -500; k <= 500; k += 4) {
+                double s = Math.scalb(1.0, k);
+                double[] v = new double[n];
+                for (int i = 0; i < n; ++i) {
+                    v[i] = next() * s;
+                }
+                double naive = naiveNormFromDotProduct(v);
+                if (naive == 0.0 || Double.isInfinite(naive)) {
+                    continue;
+                }
+                double actual = VectorOps.twoNorm(v);
+                String where = "n = " + n + " at 2^" + k;
+                if (VectorOps.isVectorized()) {
+                    assertEquals(where, naive, actual, 1.0e-15 * naive);
+                } else {
+                    assertSameBits(where, naive, actual);
+                }
+            }
+        }
+    }
+
+    /**
+     * And where the two part company. The naive form squares before it sums, so
+     * it reaches {@code Infinity} from about {@code 2^508} per element upwards
+     * -- {@code 2^512} for a single element, {@code 2^508} for a thousand of
+     * them -- and collapses to {@code 0.0} at {@code 2^-538} and below, at every
+     * length. {@code twoNorm} scales by a power of two instead and stays exact
+     * on both sides: for {@code n} copies of {@code 2^k} it returns
+     * {@code 2^k * sqrt(n)} bit for bit, on either tree.
+     * <p>
+     * Without this the test above would read as though the change it justifies
+     * had been pointless.
+     */
+    @Test
+    public void testTheTwoNormAndTheNaiveSumOfSquaresPartCompanyOnlyAtTheEnds() {
+        int[] exponents = { 520, -600 };
+        for (int ei = 0; ei < exponents.length; ++ei) {
+            int k = exponents[ei];
+            for (int li = 0; li < LENGTHS.length; ++li) {
+                int n = LENGTHS[li];
+                double[] v = new double[n];
+                java.util.Arrays.fill(v, Math.scalb(1.0, k));
+                String where = "n = " + n + " at 2^" + k;
+
+                double naive = naiveNormFromDotProduct(v);
+                if (k > 0) {
+                    assertTrue("the naive form must overflow, " + where, Double.isInfinite(naive));
+                } else {
+                    assertSameBits("the naive form must underflow, " + where, 0.0, naive);
+                }
+                assertSameBits(where, Math.scalb(Math.sqrt(n), k), VectorOps.twoNorm(v));
+            }
+        }
+    }
 }
