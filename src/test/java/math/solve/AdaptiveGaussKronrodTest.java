@@ -3,6 +3,7 @@ package math.solve;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -216,5 +217,68 @@ public class AdaptiveGaussKronrodTest {
         // and all of them still integrate correctly
         assertEquals("forced subdivisions must not change the value on a smooth integrand",
                      Math.E - 1.0, byDefault, STRICT_TOLERANCE);
+    }
+
+    /**
+     * The {@code WithError} forms are the same subdivision, reading off what
+     * the plain forms drop: the values agree to the bit, because one is the
+     * other's {@code value}.
+     */
+    @Test
+    public void theErrorFormsAreTheSameSubdivision() {
+        DFunction f = x -> Math.exp(-x * x) + 0.25 * x;
+        assertEquals("1D", AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, f, -3.0, 3.0, 1.0e-10, 20),
+                AdaptiveGaussKronrod.integrate1DAdaptiveWithError(ruleSetup, f, -3.0, 3.0, 1.0e-10, 20).value, 0.0);
+        assertEquals("1D, forced levels named",
+                AdaptiveGaussKronrod.integrate1DAdaptive(ruleSetup, f, -3.0, 3.0, 1.0e-10, 20, 6),
+                AdaptiveGaussKronrod.integrate1DAdaptiveWithError(ruleSetup, f, -3.0, 3.0, 1.0e-10, 20, 6).value, 0.0);
+
+        DBiFunction g = (x, y) -> Math.exp(-(x * x + y * y));
+        assertEquals("2D", AdaptiveGaussKronrod.integrate2DAdaptive(ruleSetup, g, -3.0, 3.0, -3.0, 3.0, 1.0e-9, 10),
+                AdaptiveGaussKronrod.integrate2DAdaptiveWithError(ruleSetup, g, -3.0, 3.0, -3.0, 3.0, 1.0e-9, 10).value,
+                0.0);
+        assertEquals("2D, forced levels named",
+                AdaptiveGaussKronrod.integrate2DAdaptive(ruleSetup, g, -3.0, 3.0, -3.0, 3.0, 1.0e-9, 10, 6),
+                AdaptiveGaussKronrod.integrate2DAdaptiveWithError(ruleSetup, g, -3.0, 3.0, -3.0, 3.0, 1.0e-9, 10, 6).value,
+                0.0);
+
+        DTriFunction h = (x, y, z) -> Math.exp(-(x * x + y * y + z * z));
+        assertEquals("3D",
+                AdaptiveGaussKronrod.integrate3DAdaptive(ruleSetup, h, -3.0, 3.0, -3.0, 3.0, -3.0, 3.0, 1.0e-6, 14),
+                AdaptiveGaussKronrod.integrate3DAdaptiveWithError(ruleSetup, h, -3.0, 3.0, -3.0, 3.0, -3.0, 3.0, 1.0e-6,
+                        14).value, 0.0);
+        assertEquals("3D, forced levels named",
+                AdaptiveGaussKronrod.integrate3DAdaptive(ruleSetup, h, -3.0, 3.0, -3.0, 3.0, -3.0, 3.0, 1.0e-6, 14, 6),
+                AdaptiveGaussKronrod.integrate3DAdaptiveWithError(ruleSetup, h, -3.0, 3.0, -3.0, 3.0, -3.0, 3.0, 1.0e-6,
+                        14, 6).value, 0.0);
+    }
+
+    /**
+     * A budget too small to meet the tolerance is the case the flag exists for:
+     * a panel is handed out without meeting the tolerance it was given, and the
+     * result says so instead of the caller having no way to find out.
+     */
+    @Test
+    public void anExhaustedBudgetIsReported() {
+        DFunction wiggly = x -> Math.sin(500.0 * x);
+        AdaptiveGaussKronrod.IntegralResult starved =
+                AdaptiveGaussKronrod.integrate1DAdaptiveWithError(ruleSetup, wiggly, 0.0, 1.0, 1.0e-12, 2);
+        assertFalse("two levels cannot resolve 500 half waves, was " + starved, starved.converged);
+
+        AdaptiveGaussKronrod.IntegralResult ample =
+                AdaptiveGaussKronrod.integrate1DAdaptiveWithError(ruleSetup, wiggly, 0.0, 1.0, 1.0e-12, 24);
+        assertTrue("with room to subdivide it converges, was " + ample, ample.converged);
+        assertEquals("and gets the right answer", (1.0 - Math.cos(500.0)) / 500.0, ample.value, 1.0e-12);
+    }
+
+    /** A single application of the rule has no tolerance to miss. */
+    @Test
+    public void anUndividedRuleReportsConverged() {
+        DFunction f = x -> x * x;
+        assertTrue("1D", AdaptiveGaussKronrod.integrate1D(ruleSetup, f, 0.0, 3.0).converged);
+        assertTrue("2D", AdaptiveGaussKronrod.integrate2DParallel(ruleSetup, (x, y) -> x * y, 0.0, 1.0, 0.0, 1.0)
+                .converged);
+        assertTrue("3D", AdaptiveGaussKronrod.integrate3DParallel(ruleSetup, (x, y, z) -> x * y * z, 0.0, 1.0, 0.0, 1.0,
+                0.0, 1.0).converged);
     }
 }

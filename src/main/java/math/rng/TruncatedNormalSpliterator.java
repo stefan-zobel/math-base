@@ -31,11 +31,30 @@ final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implement
     final double b;
     final PseudoRandom prng;
 
-    TruncatedNormalSpliterator(PseudoRandom prng, long index, long fence, double lower, double upper) {
-        super(index, fence);
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkBounds(double lower, double upper) {
         if (!(lower < upper)) {
             throw new IllegalArgumentException("lower must be smaller than upper : " + lower + ", " + upper);
         }
+    }
+
+    /**
+     * One draw for the bounds as the caller states them. The core below wants
+     * the two error function values the stream derives once in its constructor,
+     * and derives them the same way -- including the reflection at
+     * {@code upper == -lower}, which is not merely an optimization: it makes a
+     * symmetric interval come out exactly symmetric.
+     */
+    static double sampleFor(PseudoRandom prng, double lower, double upper) {
+        checkBounds(lower, upper);
+        double a = ProbabilityFuncs.errorFunction(lower / MathConsts.SQRT_TWO);
+        double b = (upper == -lower) ? -a : ProbabilityFuncs.errorFunction(upper / MathConsts.SQRT_TWO);
+        return sample(prng, a, b, lower, upper);
+    }
+
+    TruncatedNormalSpliterator(PseudoRandom prng, long index, long fence, double lower, double upper) {
+        super(index, fence);
+        checkBounds(lower, upper);
         this.lower = lower;
         this.upper = upper;
         this.a = ProbabilityFuncs.errorFunction(lower / MathConsts.SQRT_TWO);
@@ -91,6 +110,10 @@ final class TruncatedNormalSpliterator extends PseudoRandomSpliterator implement
     }
 
     private double nextTruncatedNormal() {
+        return sample(prng, a, b, lower, upper);
+    }
+
+    static double sample(PseudoRandom prng, double a, double b, double lower, double upper) {
         double u = prng.nextDouble(a, b);
         double out = MathConsts.SQRT_TWO * ProbabilityFuncs.errorFunctionInverse(u);
         // Clamp the value to the open interval (lower, upper). The round trip

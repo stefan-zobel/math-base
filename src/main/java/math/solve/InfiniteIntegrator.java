@@ -277,6 +277,38 @@ public class InfiniteIntegrator {
      */
     public static double integrate1DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
                                                double a, double b, double epsTol) {
+        return integrate1D(setup, f, a, b, epsTol, Double.NaN).value;
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate1DInfinite(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double)},
+     * with the error estimate of whichever rule answered and whether that rule
+     * reached the tolerance. The substitution folds its Jacobian into the
+     * integrand, so the estimate is an estimate of the integral that was asked
+     * for and not of the transformed one.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param a
+     *            lower limit, possibly {@code Double.NEGATIVE_INFINITY}
+     * @param b
+     *            upper limit, possibly {@code Double.POSITIVE_INFINITY}
+     * @param epsTol
+     *            error tolerance
+     * @return the approximated integral, its estimate and whether the rule that
+     *         supplied it reached {@code epsTol}
+     * @throws ArithmeticException
+     *             if the substitution demonstrably never sampled the region
+     *             that carries the integrand and the double-exponential
+     *             fallback could not resolve it either
+     * @since 1.5.3
+     */
+    public static AdaptiveGaussKronrod.IntegralResult integrate1DInfiniteWithError(
+                                               AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
+                                               double a, double b, double epsTol) {
         return integrate1D(setup, f, a, b, epsTol, Double.NaN);
     }
 
@@ -324,10 +356,47 @@ public class InfiniteIntegrator {
      */
     public static double integrate1DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
                                                double a, double b, double epsTol, double center) {
+        return integrate1D(setup, f, a, b, epsTol, center).value;
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate1DInfinite(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double, double)},
+     * with the error estimate of whichever rule answered and whether that rule
+     * reached the tolerance. See
+     * {@link #integrate1DInfiniteWithError(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double)}.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param a
+     *            lower limit, possibly {@code Double.NEGATIVE_INFINITY}
+     * @param b
+     *            upper limit, possibly {@code Double.POSITIVE_INFINITY}
+     * @param epsTol
+     *            error tolerance
+     * @param center
+     *            where the mass of the integrand lies, or {@code Double.NaN}
+     *            for none
+     * @return the approximated integral, its estimate and whether the rule that
+     *         supplied it reached {@code epsTol}
+     * @throws IllegalArgumentException
+     *             if {@code center} is infinite, or does not lie strictly
+     *             inside an interval that has a finite end
+     * @throws ArithmeticException
+     *             if the substitution demonstrably never sampled the region
+     *             that carries the integrand and the double-exponential
+     *             fallback could not resolve it either
+     * @since 1.5.3
+     */
+    public static AdaptiveGaussKronrod.IntegralResult integrate1DInfiniteWithError(
+                                               AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
+                                               double a, double b, double epsTol, double center) {
         return integrate1D(setup, f, a, b, epsTol, center);
     }
 
-    private static double integrate1D(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
+    private static AdaptiveGaussKronrod.IntegralResult integrate1D(AdaptiveGaussKronrod.G7_K15 setup, DFunction f,
                                                double a, double b, double epsTol, double rawCenter) {
 
         boolean aInf = (a == Double.NEGATIVE_INFINITY);
@@ -355,7 +424,8 @@ public class InfiniteIntegrator {
             };
             double lo = aInf ? -1.0 : preimage(a - center);
             double hi = bInf ? 1.0 : preimage(b - center);
-            double result = MetaIntegrator.integrate1DSmart(setup, transformed, lo, hi, epsTol);
+            AdaptiveGaussKronrod.IntegralResult result = MetaIntegrator.integrate1DSmartWithError(setup,
+                    transformed, lo, hi, epsTol);
             return verify1D(f, seen, a, b, result, epsTol, center);
         }
 
@@ -374,7 +444,8 @@ public class InfiniteIntegrator {
                 return seen.record(f.apply(x)) * derivative;
             };
             // We integrate the transformed function strictly from -1 to 1
-            double result = MetaIntegrator.integrate1DSmart(setup, transformed, -1.0, 1.0, epsTol);
+            AdaptiveGaussKronrod.IntegralResult result = MetaIntegrator.integrate1DSmartWithError(setup,
+                    transformed, -1.0, 1.0, epsTol);
             return verify1D(f, seen, a, b, result, epsTol, center);
         }
 
@@ -390,7 +461,8 @@ public class InfiniteIntegrator {
                 double derivative = 1.0 / (divisor * divisor);
                 return seen.record(f.apply(x)) * derivative;
             };
-            double result = MetaIntegrator.integrate1DSmart(setup, transformed, 0.0, 1.0, epsTol);
+            AdaptiveGaussKronrod.IntegralResult result = MetaIntegrator.integrate1DSmartWithError(setup,
+                    transformed, 0.0, 1.0, epsTol);
             return verify1D(f, seen, a, b, result, epsTol, center);
         }
 
@@ -406,12 +478,13 @@ public class InfiniteIntegrator {
                 double derivative = 1.0 / (divisor * divisor);
                 return seen.record(f.apply(x)) * derivative;
             };
-            double result = MetaIntegrator.integrate1DSmart(setup, transformed, 0.0, 1.0, epsTol);
+            AdaptiveGaussKronrod.IntegralResult result = MetaIntegrator.integrate1DSmartWithError(setup,
+                    transformed, 0.0, 1.0, epsTol);
             return verify1D(f, seen, a, b, result, epsTol, center);
         }
 
         // CASE D: Ordinary finite integral [a, b]
-        return MetaIntegrator.integrate1DSmart(setup, f, a, b, epsTol);
+        return MetaIntegrator.integrate1DSmartWithError(setup, f, a, b, epsTol);
     }
 
     /**
@@ -457,6 +530,41 @@ public class InfiniteIntegrator {
      *             the same integral split around it
      */
     public static double integrate2DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
+                                               double ax, double bx, double ay, double by, double epsTol) {
+        return integrate2D(setup, f, ax, bx, ay, by, epsTol, true, Double.NaN, Double.NaN).value;
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate2DInfinite(AdaptiveGaussKronrod.G7_K15, DBiFunction, double, double, double, double, double)},
+     * with the error estimate of whichever rule answered and whether that rule
+     * reached the tolerance. See
+     * {@link #integrate1DInfiniteWithError(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double)}.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x, possibly infinite
+     * @param bx
+     *            upper limit in x, possibly infinite
+     * @param ay
+     *            lower limit in y, possibly infinite
+     * @param by
+     *            upper limit in y, possibly infinite
+     * @param epsTol
+     *            error tolerance
+     * @return the approximated integral, its estimate and whether the rule that
+     *         supplied it reached {@code epsTol}
+     * @throws ArithmeticException
+     *             if the substitution never sampled the mass of the integrand,
+     *             or sampled it but disagrees with the same integral split
+     *             around it
+     * @since 1.5.3
+     */
+    public static AdaptiveGaussKronrod.IntegralResult integrate2DInfiniteWithError(
+                                               AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
                                                double ax, double bx, double ay, double by, double epsTol) {
         return integrate2D(setup, f, ax, bx, ay, by, epsTol, true, Double.NaN, Double.NaN);
     }
@@ -504,10 +612,53 @@ public class InfiniteIntegrator {
     public static double integrate2DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
                                                double ax, double bx, double ay, double by, double epsTol,
                                                double centerX, double centerY) {
+        return integrate2D(setup, f, ax, bx, ay, by, epsTol, true, centerX, centerY).value;
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate2DInfinite(AdaptiveGaussKronrod.G7_K15, DBiFunction, double, double, double, double, double, double, double)},
+     * with the error estimate of whichever rule answered and whether that rule
+     * reached the tolerance. See
+     * {@link #integrate1DInfiniteWithError(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double)}.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x, possibly infinite
+     * @param bx
+     *            upper limit in x, possibly infinite
+     * @param ay
+     *            lower limit in y, possibly infinite
+     * @param by
+     *            upper limit in y, possibly infinite
+     * @param epsTol
+     *            error tolerance
+     * @param centerX
+     *            where the mass lies in x, or {@code Double.NaN} for none
+     * @param centerY
+     *            where the mass lies in y, or {@code Double.NaN} for none
+     * @return the approximated integral, its estimate and whether the rule that
+     *         supplied it reached {@code epsTol}
+     * @throws IllegalArgumentException
+     *             if a center is infinite, or does not lie strictly inside an
+     *             axis that has a finite end
+     * @throws ArithmeticException
+     *             if the substitution never sampled the mass of the integrand,
+     *             or sampled it but disagrees with the same integral split
+     *             around it
+     * @since 1.5.3
+     */
+    public static AdaptiveGaussKronrod.IntegralResult integrate2DInfiniteWithError(
+                                               AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
+                                               double ax, double bx, double ay, double by, double epsTol,
+                                               double centerX, double centerY) {
         return integrate2D(setup, f, ax, bx, ay, by, epsTol, true, centerX, centerY);
     }
 
-    private static double integrate2D(AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
+    private static AdaptiveGaussKronrod.IntegralResult integrate2D(AdaptiveGaussKronrod.G7_K15 setup, DBiFunction f,
                                         double ax, double bx, double ay, double by, double epsTol,
                                         boolean verify, double rawCx, double rawCy) {
 
@@ -572,8 +723,8 @@ public class InfiniteIntegrator {
         };
 
         // Delegate to the parallel 2D meta-integrator
-        double result = MetaIntegrator.integrate2DSmart(setup, transformed, transAx, transBx, transAy, transBy,
-                epsTol);
+        AdaptiveGaussKronrod.IntegralResult result = MetaIntegrator.integrate2DSmartWithError(setup,
+                transformed, transAx, transBx, transAy, transBy, epsTol);
 
         boolean anyInfinite = axInf || bxInf || ayInf || byInf;
         if (!verify || !anyInfinite) {
@@ -599,10 +750,10 @@ public class InfiniteIntegrator {
         for (int quadrant = 0; quadrant < 4; ++quadrant) {
             double[] rx = orthant(probed.x, ax, bx, (quadrant & 1) == 0);
             double[] ry = orthant(probed.y, ay, by, (quadrant & 2) == 0);
-            split += integrate2D(setup, f, rx[0], rx[1], ry[0], ry[1], epsTol, false, Double.NaN, Double.NaN);
+            split += integrate2D(setup, f, rx[0], rx[1], ry[0], ry[1], epsTol, false, Double.NaN, Double.NaN).value;
         }
-        if (disagree(split, result)) {
-            throw disagreement(point(probed.x, probed.y), result, split);
+        if (disagree(split, result.value)) {
+            throw disagreement(point(probed.x, probed.y), result.value, split);
         }
         return result;
     }
@@ -643,6 +794,46 @@ public class InfiniteIntegrator {
      */
     public static double integrate3DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
                                                double ax, double bx, double ay, double by, double az, double bz, double epsTol) {
+        return integrate3D(setup, f, ax, bx, ay, by, az, bz, epsTol, true, Double.NaN, Double.NaN, Double.NaN).value;
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate3DInfinite(AdaptiveGaussKronrod.G7_K15, DTriFunction, double, double, double, double, double, double, double)},
+     * with the error estimate of whichever rule answered and whether that rule
+     * reached the tolerance. See
+     * {@link #integrate1DInfiniteWithError(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double)}.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x, possibly infinite
+     * @param bx
+     *            upper limit in x, possibly infinite
+     * @param ay
+     *            lower limit in y, possibly infinite
+     * @param by
+     *            upper limit in y, possibly infinite
+     * @param az
+     *            lower limit in z, possibly infinite
+     * @param bz
+     *            upper limit in z, possibly infinite
+     * @param epsTol
+     *            error tolerance
+     * @return the approximated integral, its estimate and whether the rule that
+     *         supplied it reached {@code epsTol}
+     * @throws ArithmeticException
+     *             if the substitution never sampled the mass of the integrand,
+     *             or sampled it but disagrees with the same integral split
+     *             around it
+     * @since 1.5.3
+     */
+    public static AdaptiveGaussKronrod.IntegralResult integrate3DInfiniteWithError(
+                                               AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
+                                               double ax, double bx, double ay, double by, double az, double bz,
+                                               double epsTol) {
         return integrate3D(setup, f, ax, bx, ay, by, az, bz, epsTol, true, Double.NaN, Double.NaN, Double.NaN);
     }
 
@@ -694,10 +885,59 @@ public class InfiniteIntegrator {
     public static double integrate3DInfinite(AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
                                                double ax, double bx, double ay, double by, double az, double bz,
                                                double epsTol, double centerX, double centerY, double centerZ) {
+        return integrate3D(setup, f, ax, bx, ay, by, az, bz, epsTol, true, centerX, centerY, centerZ).value;
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate3DInfinite(AdaptiveGaussKronrod.G7_K15, DTriFunction, double, double, double, double, double, double, double, double, double, double)},
+     * with the error estimate of whichever rule answered and whether that rule
+     * reached the tolerance. See
+     * {@link #integrate1DInfiniteWithError(AdaptiveGaussKronrod.G7_K15, DFunction, double, double, double)}.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x, possibly infinite
+     * @param bx
+     *            upper limit in x, possibly infinite
+     * @param ay
+     *            lower limit in y, possibly infinite
+     * @param by
+     *            upper limit in y, possibly infinite
+     * @param az
+     *            lower limit in z, possibly infinite
+     * @param bz
+     *            upper limit in z, possibly infinite
+     * @param epsTol
+     *            error tolerance
+     * @param centerX
+     *            where the mass lies in x, or {@code Double.NaN} for none
+     * @param centerY
+     *            where the mass lies in y, or {@code Double.NaN} for none
+     * @param centerZ
+     *            where the mass lies in z, or {@code Double.NaN} for none
+     * @return the approximated integral, its estimate and whether the rule that
+     *         supplied it reached {@code epsTol}
+     * @throws IllegalArgumentException
+     *             if a center is infinite, or does not lie strictly inside an
+     *             axis that has a finite end
+     * @throws ArithmeticException
+     *             if the substitution never sampled the mass of the integrand,
+     *             or sampled it but disagrees with the same integral split
+     *             around it
+     * @since 1.5.3
+     */
+    public static AdaptiveGaussKronrod.IntegralResult integrate3DInfiniteWithError(
+                                               AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
+                                               double ax, double bx, double ay, double by, double az, double bz,
+                                               double epsTol, double centerX, double centerY, double centerZ) {
         return integrate3D(setup, f, ax, bx, ay, by, az, bz, epsTol, true, centerX, centerY, centerZ);
     }
 
-    private static double integrate3D(AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
+    private static AdaptiveGaussKronrod.IntegralResult integrate3D(AdaptiveGaussKronrod.G7_K15 setup, DTriFunction f,
                                         double ax, double bx, double ay, double by, double az, double bz,
                                         double epsTol, boolean verify, double rawCx, double rawCy, double rawCz) {
 
@@ -752,8 +992,8 @@ public class InfiniteIntegrator {
             return seen.record(f.apply(x, y, z)) * jX * jY * jZ;
         };
 
-        double result = MetaIntegrator.integrate3DSmart(setup, transformed, transAx, transBx, transAy, transBy,
-                transAz, transBz, epsTol);
+        AdaptiveGaussKronrod.IntegralResult result = MetaIntegrator.integrate3DSmartWithError(setup,
+                transformed, transAx, transBx, transAy, transBy, transAz, transBz, epsTol);
 
         boolean anyInfinite = axInf || bxInf || ayInf || byInf || azInf || bzInf;
         if (!verify || !anyInfinite) {
@@ -782,10 +1022,10 @@ public class InfiniteIntegrator {
             double[] ry = orthant(probed.y, ay, by, (octant & 2) == 0);
             double[] rz = orthant(probed.z, az, bz, (octant & 4) == 0);
             split += integrate3D(setup, f, rx[0], rx[1], ry[0], ry[1], rz[0], rz[1], epsTol, false, Double.NaN,
-                    Double.NaN, Double.NaN);
+                    Double.NaN, Double.NaN).value;
         }
-        if (disagree(split, result)) {
-            throw disagreement(point(probed.x, probed.y, probed.z), result, split);
+        if (disagree(split, result.value)) {
+            throw disagreement(point(probed.x, probed.y, probed.z), result.value, split);
         }
         return result;
     }
@@ -959,8 +1199,8 @@ public class InfiniteIntegrator {
      * finds nothing at all does not accuse: an integrand negligible everywhere
      * the ladder reaches is entitled to integrate to zero.
      */
-    private static double verify1D(DFunction f, Watch seen, double a, double b, double result, double epsTol,
-            double center) {
+    private static AdaptiveGaussKronrod.IntegralResult verify1D(DFunction f, Watch seen, double a, double b,
+            AdaptiveGaussKronrod.IntegralResult result, double epsTol, double center) {
         Peak probed = probe(f, a, b, center);
         if (probed.value <= 0.0) {
             // The ladder found nothing anywhere, and an integrand negligible
@@ -968,8 +1208,8 @@ public class InfiniteIntegrator {
             // the caller named a place to look, which is worth trying before
             // that zero is handed out.
             if (!Double.isNaN(center)) {
-                double named = rescue1D(f, a, b, center, epsTol);
-                if (!Double.isNaN(named)) {
+                AdaptiveGaussKronrod.IntegralResult named = rescue1D(f, a, b, center, epsTol);
+                if (named != null) {
                     return named;
                 }
             }
@@ -986,8 +1226,8 @@ public class InfiniteIntegrator {
             // where the mass is and let the rule that crowds its nodes there
             // settle the disagreement.
             if (!Double.isNaN(center) && farFromAnchor(probed.x, a, b, center)) {
-                double split = rescue1D(f, a, b, probed.x, epsTol);
-                if (!Double.isNaN(split) && disagree(split, result)) {
+                AdaptiveGaussKronrod.IntegralResult split = rescue1D(f, a, b, probed.x, epsTol);
+                if (split != null && disagree(split.value, result.value)) {
                     return split;
                 }
             }
@@ -998,8 +1238,8 @@ public class InfiniteIntegrator {
         // probe knows where that is, so do it here instead: split there and
         // hand both halves to DoubleExponential, whose nodes crowd towards the
         // finite end of each - which is now the peak itself.
-        double rescued = rescue1D(f, a, b, probed.x, epsTol);
-        if (!Double.isNaN(rescued)) {
+        AdaptiveGaussKronrod.IntegralResult rescued = rescue1D(f, a, b, probed.x, epsTol);
+        if (rescued != null) {
             return rescued;
         }
         throw missed("[" + limit(a) + ", " + limit(b) + "]", seen.value(), probed.value, point(probed.x));
@@ -1007,23 +1247,26 @@ public class InfiniteIntegrator {
 
     /**
      * The integral over {@code [a, cut]} plus the one over {@code [cut, b]}, or
-     * {@code NaN} when either half declines to converge - which is what happens
+     * {@code null} when either half declines to converge - which is what happens
      * when {@code cut} is not in fact where the mass is, so the two flags
-     * together are the check on the probe as well as on the rule.
+     * together are the check on the probe as well as on the rule. Both halves
+     * having converged is why the result reports that it did.
      */
-    private static double rescue1D(DFunction f, double a, double b, double cut, double epsTol) {
+    private static AdaptiveGaussKronrod.IntegralResult rescue1D(DFunction f, double a, double b, double cut,
+            double epsTol) {
         if (!(cut > a) || !(cut < b)) {
-            return Double.NaN;
+            return null;
         }
         DoubleExponential.IntegralResult lower = DoubleExponential.integrate1D(f, a, cut, epsTol);
         if (!lower.converged) {
-            return Double.NaN;
+            return null;
         }
         DoubleExponential.IntegralResult upper = DoubleExponential.integrate1D(f, cut, b, epsTol);
         if (!upper.converged) {
-            return Double.NaN;
+            return null;
         }
-        return lower.value + upper.value;
+        return new AdaptiveGaussKronrod.IntegralResult(lower.value + upper.value,
+                lower.approximatedErrorEstimate + upper.approximatedErrorEstimate, true);
     }
 
     /** Is this coordinate far from the point its substitution is centered on? */

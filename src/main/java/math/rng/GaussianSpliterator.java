@@ -27,7 +27,7 @@ final class GaussianSpliterator extends PseudoRandomSpliterator implements Split
 
     GaussianSpliterator(PseudoRandom prng, long index, long fence, double mu, double sigma) {
         super(index, fence);
-        if (sigma <= 0.0) {
+        if (!(sigma > 0.0)) {
             throw new IllegalArgumentException("Standard deviation must be positive (" + sigma + ")");
         }
         this.mu = mu;

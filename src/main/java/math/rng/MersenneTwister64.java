@@ -92,11 +92,19 @@ public class MersenneTwister64 extends AbstractRng64 {
     /* mti == NN + 1 means mt[] is not initialized */
     private int mti = NN + 1;
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public MersenneTwister64() {
         setSeed(SplitMix64Seed.seed());
         saveSeed(mt);
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed; {@code 0} is replaced by {@code -1}, so the two
+     *            give the same sequence
+     */
     public MersenneTwister64(long seed) {
         setSeed(seed == 0L ? -1L : seed);
         saveSeed(mt);

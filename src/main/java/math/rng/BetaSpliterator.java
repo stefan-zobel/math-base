@@ -26,14 +26,19 @@ final class BetaSpliterator extends PseudoRandomSpliterator implements Spliterat
     final PseudoRandom prng_U;
     final PseudoRandom prng_V;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkParameters(double alpha, double beta) {
+        if (!(alpha > 0.0)) {
+            throw new IllegalArgumentException("alpha must be greater than zero (" + alpha + ")");
+        }
+        if (!(beta > 0.0)) {
+            throw new IllegalArgumentException("beta must be greater than zero (" + beta + ")");
+        }
+    }
+
     BetaSpliterator(PseudoRandom prng, long index, long fence, double alpha, double beta) {
         super(index, fence);
-        if (alpha <= 0.0) {
-            throw new IllegalArgumentException("alpha <= 0.0 (" + alpha + ")");
-        }
-        if (beta <= 0.0) {
-            throw new IllegalArgumentException("beta <= 0.0 (" + beta + ")");
-        }
+        checkParameters(alpha, beta);
         this.alpha = alpha;
         this.beta = beta;
         this.prng_U = prng;
@@ -131,7 +136,9 @@ final class BetaSpliterator extends PseudoRandomSpliterator implements Spliterat
      * @param prng_U
      *            the generator for the first gamma variate
      * @param prng_V
-     *            an independent generator for the second
+     *            the generator for the second. It may be {@code prng_U}
+     *            itself, in which case the two variates are drawn from it in
+     *            sequence, which is what a single draw does
      * @param alpha
      *            the first shape, greater than zero
      * @param beta

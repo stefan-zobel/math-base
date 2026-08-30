@@ -31,14 +31,28 @@ public class Interleaved4Stc64 extends AbstractRng64 implements SplittablePseudo
     private int pos = 0;
     private final Stc64[] prng = new Stc64[SIZE];
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public Interleaved4Stc64() {
         this(new Stc64());
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public Interleaved4Stc64(long seed) {
         this(new Stc64(seed));
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public Interleaved4Stc64(long[] seed) {
         this(new Stc64(seed));
     }
@@ -47,6 +61,18 @@ public class Interleaved4Stc64 extends AbstractRng64 implements SplittablePseudo
         this(gen0, gen0.split(), gen0.split(), gen0.split());
     }
 
+    /**
+     * Creates a generator from four sub-generators, as {@link #split()} does.
+     *
+     * @param gen0
+     *            the generator drawn from first
+     * @param gen1
+     *            the generator drawn from second
+     * @param gen2
+     *            the generator drawn from third
+     * @param gen3
+     *            the generator drawn from fourth
+     */
     protected Interleaved4Stc64(Stc64 gen0, Stc64 gen1, Stc64 gen2, Stc64 gen3) {
         prng[0] = gen0;
         prng[1] = gen1;

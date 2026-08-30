@@ -182,6 +182,11 @@ public class VectorOpsTest {
      * exactly the one the straightforward loop gives, so nothing that was
      * already working can move.
      * <p>
+     * Since {@code twoNorm} takes the optimistic order this is no longer a
+     * coincidence but the definition: in that range the method is nothing but
+     * {@code sqrt} of the straightforward sum, and the scaling pass is never
+     * reached. The test is kept because it is what pins that range down.
+     * <p>
      * On the Java 25 tree that equality holds up to the reduction order, which
      * {@code DoubleVector.reduceLanes(ADD)} deliberately leaves unspecified:
      * the same call site there produces two different results one unit in the
@@ -482,5 +487,325 @@ public class VectorOpsTest {
             assertSameBits("infinityNorm at n = " + n, Math.max(Math.abs(hi), Math.abs(lo)),
                     VectorOps.infinityNorm(w));
         }
+    }
+
+    // ------------------------------------------------------------------
+    // mean, whose accumulator can leave the range where the answer does not
+    // ------------------------------------------------------------------
+
+    /** The mean as the straightforward loop computes it. */
+    private static double naiveMean(double[] v) {
+        double sum = 0.0;
+        for (int i = 0; i < v.length; i++) {
+            sum += v[i];
+        }
+        return sum / v.length;
+    }
+
+    /**
+     * For every vector whose sum stays in range -- which is every vector this
+     * library is likely to see -- the result is exactly the one the
+     * straightforward loop gives, so nothing that was already working can move.
+     * <p>
+     * Unlike the same assertion for {@code twoNorm} above, this one needs no
+     * {@link VectorOps#isVectorized()} case. Both loops in {@code mean} are
+     * scalar in both source trees, so the reduction order that
+     * {@code DoubleVector.reduceLanes(ADD)} leaves unspecified never enters,
+     * and every assertion in this section holds bit for bit on either tree.
+     */
+    @Test
+    public void testTheMeanOfTheOrdinaryCaseIsExactlyTheStraightforwardLoop() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            for (int trial = 0; trial < 60; ++trial) {
+                double s = Math.scalb(1.0, -240 + trial * 8);
+                double[] v = new double[n];
+                for (int i = 0; i < n; ++i) {
+                    v[i] = next() * s;
+                }
+                double naive = naiveMean(v);
+                assertTrue("the probe itself must not overflow, n = " + n + " trial " + trial,
+                        !Double.isInfinite(naive));
+                assertSameBits("n = " + n + " trial " + trial, naive, VectorOps.mean(v));
+            }
+        }
+    }
+
+    /**
+     * A vector of {@code n} copies of {@code 2^k} has mean {@code 2^k},
+     * whether or not the sum of the copies overflows on the way. The value is
+     * a power of two so that the answer is exact on both paths and the
+     * assertion can be made on the bits: {@code 1000} copies of {@code 2^1020}
+     * sum to {@code Infinity}, and {@code 1000} scaled copies sum to exactly
+     * {@code 1000}.
+     */
+    @Test
+    public void testTheMeanOfAConstantVectorIsThatConstant() {
+        int[] exponents = { 1023, 1020, 1000, 900, 0, -900, -1020 };
+        for (int ei = 0; ei < exponents.length; ++ei) {
+            double c = Math.scalb(1.0, exponents[ei]);
+            for (int li = 0; li < LENGTHS.length; ++li) {
+                int n = LENGTHS[li];
+                double[] v = new double[n];
+                java.util.Arrays.fill(v, c);
+                assertSameBits("n = " + n + " at 2^" + exponents[ei], c, VectorOps.mean(v));
+            }
+        }
+    }
+
+    /**
+     * The two shapes the direct accumulation gets wrong: a sum that runs past
+     * the range although the mean is well inside it, and a sum that overflows
+     * in the middle and would have cancelled back afterwards. The second is
+     * the one a division at the end could not have repaired either.
+     */
+    @Test
+    public void testTheMeanDoesNotOverflowWhereTheAnswerIsRepresentable() {
+        // the sum runs to Infinity, the mean is Double.MAX_VALUE
+        double[] atTheTop = { Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE };
+        assertSameBits("three copies of MAX_VALUE", Double.MAX_VALUE, VectorOps.mean(atTheTop));
+
+        // the sum overflows on the second element and cancels back on the
+        // third, so the naive loop keeps an Infinity that is not in the answer
+        double top = Math.scalb(1.0, 1023);
+        double[] cancelling = { top, top, -top };
+        assertSameBits("an overflow that cancels", Math.scalb(1.0 / 3.0, 1023), VectorOps.mean(cancelling));
+        assertTrue("the probe must be one the naive loop gets wrong",
+                Double.isInfinite(naiveMean(cancelling)));
+
+        // and a thousand elements just below the top
+        double[] many = new double[1000];
+        java.util.Arrays.fill(many, 1.0e306);
+        double mean = VectorOps.mean(many);
+        assertTrue("the mean of a finite vector must be finite", !Double.isInfinite(mean));
+        assertEquals("a thousand copies of 1e306", 1.0e306, mean, 1.0e-12 * 1.0e306);
+        assertTrue("the probe must be one the naive loop gets wrong", Double.isInfinite(naiveMean(many)));
+    }
+
+    /**
+     * {@code mean(c * v) == c * mean(v)} for {@code c} a power of two, which
+     * scales every term by the same exact factor and so cannot change the
+     * rounding. The exponents run high enough for the scaled vectors to
+     * overflow the direct sum, so this crosses the branch and must stay exact
+     * across it.
+     * <p>
+     * It stops being exact at the other end, and the guard below is where that
+     * boundary is recorded: once an element falls under
+     * {@link Double#MIN_NORMAL} the multiplication by {@code c} rounds, and no
+     * arrangement of the summation can put back what the data lost before it
+     * arrived.
+     */
+    @Test
+    public void testTheMeanIsHomogeneousUnderPowersOfTwo() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            double[] v = new double[n];
+            for (int i = 0; i < n; ++i) {
+                v[i] = next();
+            }
+            double base = VectorOps.mean(v);
+            for (int k = -1020; k <= 1020; k += 20) {
+                double c = Math.scalb(1.0, k);
+                double[] scaled = new double[n];
+                boolean allNormal = true;
+                for (int i = 0; i < n; ++i) {
+                    scaled[i] = v[i] * c;
+                    allNormal = allNormal && Math.abs(scaled[i]) >= Double.MIN_NORMAL;
+                }
+                if (!allNormal) {
+                    continue;
+                }
+                assertSameBits("n = " + n + " at 2^" + k, base * c, VectorOps.mean(scaled));
+            }
+        }
+    }
+
+    /** Both branches carry a {@code NaN} and an infinity through unchanged. */
+    @Test
+    public void testANaNOrAnInfinityReachesTheMean() {
+        assertTrue("a NaN anywhere", Double.isNaN(VectorOps.mean(new double[] { 1.0, Double.NaN, 3.0 })));
+        assertTrue("a NaN beside an infinity",
+                Double.isNaN(VectorOps.mean(new double[] { Double.POSITIVE_INFINITY, Double.NaN })));
+        assertTrue("both infinities cancel to a NaN",
+                Double.isNaN(VectorOps.mean(new double[] { Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY })));
+        assertSameBits("an infinity alone", Double.POSITIVE_INFINITY,
+                VectorOps.mean(new double[] { Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY }));
+        assertSameBits("an infinity beside a finite element", Double.NEGATIVE_INFINITY,
+                VectorOps.mean(new double[] { 1.0, Double.NEGATIVE_INFINITY }));
+    }
+
+    /**
+     * An empty array gives {@code NaN}, from the division by a length of zero.
+     * That is what the method always did and what its javadoc now says; a
+     * published method does not start throwing.
+     */
+    @Test
+    public void testTheMeanOfAnEmptyArrayIsNotANumber() {
+        assertTrue(Double.isNaN(VectorOps.mean(new double[0])));
+    }
+
+    // ------------------------------------------------------------------
+    // twoNorm against sqrt(v . v), the form OrthantWiseLimitedMemoryBFGS
+    // used to take for the length of its first step
+    // ------------------------------------------------------------------
+
+    /**
+     * The Euclidean norm as {@code sqrt(v . v)}, which is the naive
+     * accumulation of squares wearing a different name.
+     */
+    private static double naiveNormFromDotProduct(double[] v) {
+        return Math.sqrt(VectorOps.dotProduct(v, v));
+    }
+
+    /**
+     * Over the whole range in which the naive form works at all, the two agree.
+     * That is what makes replacing one by the other a change no existing caller
+     * can feel: {@code OrthantWiseLimitedMemoryBFGS} normalizes its first step
+     * by this norm, and every direction it forms is far inside this band.
+     * <p>
+     * On the scalar tree the agreement is exact, because {@code twoNorm}'s
+     * ordinary branch and {@code dotProduct(v, v)} are the same loop in the
+     * same order. On the vectorized tree it is not: both accumulate with
+     * {@code fma} and reduce with {@code reduceLanes(ADD)}, whose order the
+     * Vector API leaves unspecified, and the two call sites were measured
+     * disagreeing by one unit in the last place on about a tenth of several
+     * thousand probe vectors.
+     */
+    @Test
+    public void testTheTwoNormAgreesWithTheNaiveSumOfSquaresInTheOrdinaryRange() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            for (int k = -500; k <= 500; k += 4) {
+                double s = Math.scalb(1.0, k);
+                double[] v = new double[n];
+                for (int i = 0; i < n; ++i) {
+                    v[i] = next() * s;
+                }
+                double naive = naiveNormFromDotProduct(v);
+                if (naive == 0.0 || Double.isInfinite(naive)) {
+                    continue;
+                }
+                double actual = VectorOps.twoNorm(v);
+                String where = "n = " + n + " at 2^" + k;
+                if (VectorOps.isVectorized()) {
+                    assertEquals(where, naive, actual, 1.0e-15 * naive);
+                } else {
+                    assertSameBits(where, naive, actual);
+                }
+            }
+        }
+    }
+
+    /**
+     * And where the two part company. The naive form squares before it sums, so
+     * it reaches {@code Infinity} from about {@code 2^508} per element upwards
+     * -- {@code 2^512} for a single element, {@code 2^508} for a thousand of
+     * them -- and collapses to {@code 0.0} at {@code 2^-538} and below, at every
+     * length. {@code twoNorm} scales by a power of two instead and stays exact
+     * on both sides: for {@code n} copies of {@code 2^k} it returns
+     * {@code 2^k * sqrt(n)} bit for bit, on either tree.
+     * <p>
+     * Without this the test above would read as though the change it justifies
+     * had been pointless.
+     */
+    @Test
+    public void testTheTwoNormAndTheNaiveSumOfSquaresPartCompanyOnlyAtTheEnds() {
+        int[] exponents = { 520, -600 };
+        for (int ei = 0; ei < exponents.length; ++ei) {
+            int k = exponents[ei];
+            for (int li = 0; li < LENGTHS.length; ++li) {
+                int n = LENGTHS[li];
+                double[] v = new double[n];
+                java.util.Arrays.fill(v, Math.scalb(1.0, k));
+                String where = "n = " + n + " at 2^" + k;
+
+                double naive = naiveNormFromDotProduct(v);
+                if (k > 0) {
+                    assertTrue("the naive form must overflow, " + where, Double.isInfinite(naive));
+                } else {
+                    assertSameBits("the naive form must underflow, " + where, 0.0, naive);
+                }
+                assertSameBits(where, Math.scalb(Math.sqrt(n), k), VectorOps.twoNorm(v));
+            }
+        }
+    }
+
+    /**
+     * The seam the optimistic order creates. The route is chosen from the sum
+     * of the squares rather than from the largest element, so it switches at a
+     * different place than it used to -- and in the Java 25 tree at a place
+     * that sits downstream of {@code reduceLanes(ADD)}, whose order the Vector
+     * API leaves unspecified, so the two trees need not switch on the same
+     * vector.
+     * <p>
+     * What has to hold across that seam is that the answer does not jump. For
+     * {@code n} copies of {@code +/-2^k} both routes are exact -- a power of
+     * two squares exactly, and sums exactly {@code n} times -- so that sweep is
+     * asserted bit for bit. For a random vector the two routes can disagree,
+     * and the measured size of it is one unit in the last place: over 50391
+     * vectors spanning the whole exponent range the route changed 107 times,
+     * of which 4 changed a bit, none by more than an ulp. That is what this
+     * holds the method to.
+     * <p>
+     * A vector is skipped once the scaling drives its own elements subnormal.
+     * The data has lost bits before the norm is asked for at that point, and
+     * no arrangement of the summation puts them back.
+     */
+    @Test
+    public void testTheDirectAndTheScaledRouteAgreeAcrossTheBoundary() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            for (int k = -560; k <= -490; ++k) {
+                assertUniformVectorIsExact(n, k);
+            }
+            for (int k = 470; k <= 540; ++k) {
+                assertUniformVectorIsExact(n, k);
+            }
+
+            double[] unit = new double[n];
+            for (int i = 0; i < n; ++i) {
+                unit[i] = next();
+            }
+            double reference = VectorOps.twoNorm(unit);
+            if (reference == 0.0) {
+                continue;
+            }
+            for (int k = -560; k <= 540; ++k) {
+                if (k > -490 && k < 470) {
+                    // away from either boundary, and covered elsewhere
+                    continue;
+                }
+                double[] v = new double[n];
+                boolean usable = true;
+                for (int i = 0; i < n; ++i) {
+                    v[i] = Math.scalb(unit[i], k);
+                    if (v[i] != 0.0 && Math.abs(v[i]) < Double.MIN_NORMAL) {
+                        usable = false;
+                    }
+                }
+                double expected = Math.scalb(reference, k);
+                if (!usable || expected == 0.0 || Double.isInfinite(expected)) {
+                    continue;
+                }
+                double actual = VectorOps.twoNorm(v);
+                assertTrue("n = " + n + " at 2^" + k + " : " + expected + " vs " + actual,
+                        Math.abs(expected - actual) <= Math.ulp(expected));
+            }
+        }
+    }
+
+    /**
+     * {@code n} copies of {@code +/-2^k} have the norm {@code 2^k * sqrt(n)},
+     * and both routes reach it exactly: the squares are powers of two, the
+     * partial sums are small integer multiples of one, and the scaling factor
+     * of the other route is itself a power of two.
+     */
+    private static void assertUniformVectorIsExact(int n, int k) {
+        double s = Math.scalb(1.0, k);
+        double[] v = new double[n];
+        for (int i = 0; i < n; ++i) {
+            v[i] = ((i & 1) == 0) ? s : -s;
+        }
+        assertSameBits("n = " + n + " at 2^" + k, Math.scalb(Math.sqrt(n), k), VectorOps.twoNorm(v));
     }
 }

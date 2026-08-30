@@ -46,6 +46,23 @@ public class LogNormal implements ContinuousDistribution {
         return Math.exp((-d * d) / (2.0 * (sigma * sigma))) / (Math.sqrt(2.0 * Math.PI) * sigma * x);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The density underflows to zero from about {@code x = 2.1e16} for the
+     * standard log-normal, which is well inside the range of the variable
+     * itself; this goes on answering there.
+     */
+    @Override
+    public double logPdf(double x) {
+        if (x <= 0.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        double logX = Math.log(x);
+        double z = (logX - mu) / sigma;
+        return -0.5 * (z * z) - Math.log(sigma) - logX - Math.log(Math.sqrt(2.0 * Math.PI));
+    }
+
     @Override
     public double cdf(double x) {
         if (x <= 0.0) {

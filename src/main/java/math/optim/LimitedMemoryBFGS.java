@@ -10,6 +10,7 @@ package math.optim;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import math.MathConsts;
 import math.linalg.VectorOps;
 
 
@@ -49,7 +50,23 @@ public final class LimitedMemoryBFGS implements Optimizer {
     // xxx need a more principled stopping point
     private double tolerance;
     private final double gradientTolerance;
-    private final double eps = 1.0e-5;
+    /**
+     * The floor under the value tolerance, as a fraction of the scale of
+     * the objective itself. An absolute floor would make the stopping rule
+     * depend on how the objective happens to be scaled: below it the test
+     * stops being relative, and a run whose values sit far under it
+     * converges on the constant instead of on the tolerance asked for.
+     * <p>
+     * {@code sqrt(MACH_EPS_DBL)}, about {@code 1.05e-8}, because a value
+     * near a minimum carries only half the digits the arithmetic has --
+     * the objective is flat there -- so that is where it stops being
+     * resolvable. Anything smaller was measured to behave identically;
+     * anything larger truncates the tail of an objective that converges
+     * towards zero.
+     */
+    private static final double RELATIVE_VALUE_FLOOR = Math.sqrt(MathConsts.MACH_EPS_DBL);
+    /** The largest magnitude of the value seen, which sets that scale. */
+    private double valueScale;
 
     // The number of corrections used in BFGS update
     // ideally 3 <= m <= 7. Larger m means more cpu time, memory.
@@ -335,6 +352,7 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
         for (int iterationCount = 0; iterationCount < numIterations; iterationCount++) {
             double value = optimizable.getValue();
+            noteValueScale(value);
 
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("L-BFGS iteration=" + iterationCount + ", value="
@@ -456,6 +474,7 @@ public final class LimitedMemoryBFGS implements Optimizer {
             }
 
             double newValue = optimizable.getValue();
+            noteValueScale(newValue);
 
             // The gradient norm is taken before the tests rather than between
             // them, because it is what tells the caller whether the exit below
@@ -465,9 +484,12 @@ public final class LimitedMemoryBFGS implements Optimizer {
 
             // Test for terminations
             if (2.0 * Math.abs(newValue - value) <= tolerance
-                    * (Math.abs(newValue) + Math.abs(value) + eps)) {
-                logger.info("Exiting L-BFGS on termination #1:\nvalue difference below tolerance (oldValue: "
-                        + value + " newValue: " + newValue);
+                    * (Math.abs(newValue) + Math.abs(value)
+                            + RELATIVE_VALUE_FLOOR * valueScale)) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Exiting L-BFGS on termination #1:\nvalue difference below tolerance (oldValue: "
+                            + value + " newValue: " + newValue);
+                }
                 termination = Termination.VALUE_TOLERANCE;
                 return true;
             }
@@ -523,7 +545,21 @@ public final class LimitedMemoryBFGS implements Optimizer {
      * Hessian. NOTE - If the {@link Optimizable} object is modified externally,
      * this method should be called to avoid IllegalStateExceptions.
      */
+    /**
+     * Records the scale of the objective, which the value tolerance is
+     * measured against.
+     */
+    private void noteValueScale(double v) {
+        double magnitude = Math.abs(v);
+        if (magnitude > valueScale) {
+            valueScale = magnitude;
+        }
+    }
+
     public void reset() {
         g = null;
+        // a scale remembered from another objective would be the wrong
+        // one, and this method exists for exactly that situation
+        valueScale = 0.0;
     }
 }

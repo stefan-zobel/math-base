@@ -26,14 +26,28 @@ final class InverseGammaSpliterator extends PseudoRandomSpliterator implements S
     final double inverse_scale_theta;
     final PseudoRandom prng;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkParameters(double alpha, double beta) {
+        if (!(alpha > 0.0)) {
+            throw new IllegalArgumentException("alpha must be greater than zero (" + alpha + ")");
+        }
+        if (!(beta > 0.0)) {
+            throw new IllegalArgumentException("beta must be greater than zero (" + beta + ")");
+        }
+    }
+
+    /**
+     * One draw for the scale as the caller states it. The core below wants the
+     * reciprocal, which the stream derives once in its constructor.
+     */
+    static double sampleFor(PseudoRandom prng, double alpha, double beta) {
+        checkParameters(alpha, beta);
+        return sample(prng, alpha, 1.0 / beta);
+    }
+
     InverseGammaSpliterator(PseudoRandom prng, long index, long fence, double alpha, double beta) {
         super(index, fence);
-        if (alpha <= 0.0) {
-            throw new IllegalArgumentException("alpha <= 0.0 (" + alpha + ")");
-        }
-        if (beta <= 0.0) {
-            throw new IllegalArgumentException("beta <= 0.0 (" + beta + ")");
-        }
+        checkParameters(alpha, beta);
         this.alpha = alpha;
         this.beta = beta;
         this.inverse_scale_theta = 1.0 / beta;

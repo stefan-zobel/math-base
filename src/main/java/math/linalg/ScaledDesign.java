@@ -15,31 +15,44 @@ package math.linalg;
  * is what lets the coordinate update in {@link CoordinateDescent} divide by
  * {@code n} instead of by a per column norm.
  * <p>
- * That is also why this class is not the general one and is not public. It
- * divides by the root mean square {@code sqrt(ss/n)} rather than by the sample
- * standard deviation {@code sqrt(ss/(n-1))}, and it does so because
+ * <b>This is not the general standardizer, and it is public only because a
+ * second penalized estimator needs it from another package.</b> It divides by
+ * the root mean square {@code sqrt(ss/n)} rather than by the sample standard
+ * deviation {@code sqrt(ss/(n-1))}, and it does so because
  * {@link CoordinateDescent} requires it, not because that is the customary
  * scale: the divisor is coupled to an inner loop one class away. For
  * standardizing a table of observations, use {@link Standardization}, which
  * divides by the sample standard deviation, keeps no response beside the
  * design, and can be applied again to data it was not fitted on.
+ * <p>
+ * It was package private until version 1.5.3, and the reason it stopped being so
+ * is worth stating: {@code math.stats.bayes.BayesianLinearRegression} is a
+ * penalized estimator like the ones here -- it is a ridge with the penalty
+ * stated as a prior -- and it lives in another package only because it needs
+ * {@code math.optim.BrentMinimizer} to choose that penalty, which
+ * {@code math.linalg} cannot import without closing a cycle. Any estimator
+ * that fits <em>this</em> parameterization must use this class rather than
+ * repeat it, because {@code lambda} means what it means only relative to this
+ * divisor.
+ *
+ * @since 1.5.3 (the type and its members; the code is older)
  */
-final class ScaledDesign {
+public final class ScaledDesign {
 
     /** Number of rows actually used. */
-    final int n;
+    public final int n;
     /** Number of columns. */
-    final int p;
+    public final int p;
     /** Centered and scaled design, {@code n x p}, column-major. */
-    final double[] x;
+    public final double[] x;
     /** Centered response, length {@code n}. */
-    final double[] y;
+    public final double[] y;
     /** Column means of the original design, length {@code p}. */
-    final double[] xBar;
+    public final double[] xBar;
     /** Column scales, {@code sqrt(sum (x_ij - xBar_j)^2 / n)}, length {@code p}. */
-    final double[] scale;
+    public final double[] scale;
     /** Mean of the original response. */
-    final double yBar;
+    public final double yBar;
 
     private ScaledDesign(int n, int p, double[] x, double[] y, double[] xBar, double[] scale, double yBar) {
         this.n = n;
@@ -69,7 +82,7 @@ final class ScaledDesign {
      * @throws IllegalArgumentException
      *             if a column is constant over the rows used
      */
-    static ScaledDesign of(double[] xs, double[] ys, int rows, int p, int[] use) {
+    public static ScaledDesign of(double[] xs, double[] ys, int rows, int p, int[] use) {
         int n = (use == null) ? rows : use.length;
         double[] x = new double[n * p];
         double[] y = new double[n];
@@ -123,7 +136,7 @@ final class ScaledDesign {
      *            coefficients in the standardized scale, length {@code p}
      * @return a new array of coefficients in the original scale
      */
-    double[] unscale(double[] betaScaled) {
+    public double[] unscale(double[] betaScaled) {
         double[] beta = new double[p];
         for (int j = 0; j < p; j++) {
             beta[j] = betaScaled[j] / scale[j];
@@ -138,7 +151,7 @@ final class ScaledDesign {
      *            coefficients in the original scale, length {@code p}
      * @return {@code yBar - sum(beta_j * xBar_j)}
      */
-    double intercept(double[] beta) {
+    public double intercept(double[] beta) {
         double intercept = yBar;
         for (int j = 0; j < p; j++) {
             intercept -= beta[j] * xBar[j];

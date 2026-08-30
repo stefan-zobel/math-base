@@ -55,18 +55,61 @@ public class AdaptiveGaussKronrod {
         return Math.max(3, 2 * dimensions);
     }
 
+    /** The result of one integration, with the estimate that decided when to stop. */
     public static class IntegralResult {
-        public final double value;
-        public final double approximatedErrorEstimate;
 
+        /** The approximated integral. */
+        public final double value;
+        /**
+         * {@code |K - G|} for a single application of the rule, and the sum of
+         * those over all panels for a subdivision. Not a bound; see the class
+         * comment on why the estimate of an undivided domain is not to be
+         * trusted.
+         */
+        public final double approximatedErrorEstimate;
+        /**
+         * Whether every panel met the tolerance it was given, rather than being
+         * handed out because the recursion budget ran out. A single application
+         * of the rule has no tolerance to miss and reports {@code true}.
+         *
+         * @since 1.5.3
+         */
+        public final boolean converged;
+
+        /**
+         * The result of a single application of the rule, which has no
+         * tolerance to miss.
+         *
+         * @param value
+         *            the approximated integral
+         * @param approximatedError
+         *            the estimate {@code |K - G|}
+         */
         public IntegralResult(double value, double approximatedError) {
+            this(value, approximatedError, true);
+        }
+
+        /**
+         * The result of a subdivision, which can run out of budget.
+         *
+         * @param value
+         *            the approximated integral
+         * @param approximatedError
+         *            the estimate, summed over the panels
+         * @param converged
+         *            whether every panel met the tolerance it was given
+         * @since 1.5.3
+         */
+        public IntegralResult(double value, double approximatedError, boolean converged) {
             this.value = value;
             this.approximatedErrorEstimate = approximatedError;
+            this.converged = converged;
         }
 
         @Override
         public String toString() {
-            return String.format(Locale.ROOT, "Value: %.8f (approx. Error: %.2e)", value, approximatedErrorEstimate);
+            return String.format(Locale.ROOT, "Value: %.8f (approx. Error: %.2e, converged: %b)", value,
+                    approximatedErrorEstimate, converged);
         }
     }
 
@@ -145,7 +188,41 @@ public class AdaptiveGaussKronrod {
                                              double ax, double bx, double ay, double by,
                                              double epsTol, int maxDepth) {
         return subdivide2D(setup, f, ax, bx, ay, by, epsTol, maxDepth,
-                Math.min(forcedSubdivisions(2), maxDepth));
+                Math.min(forcedSubdivisions(2), maxDepth), new Acc());
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate2DAdaptive(G7_K15, DBiFunction, double, double, double, double, double, int)},
+     * with the summed panel estimate and the convergence flag that method drops.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x
+     * @param bx
+     *            upper limit in x
+     * @param ay
+     *            lower limit in y
+     * @param by
+     *            upper limit in y
+     * @param epsTol
+     *            error tolerance, halved for each subdivision
+     * @param maxDepth
+     *            maximal recursion depth
+     * @return the approximated integral, the summed estimate and whether every
+     *         panel met the tolerance it was given
+     * @since 1.5.3
+     */
+    public static IntegralResult integrate2DAdaptiveWithError(G7_K15 setup, DBiFunction f,
+                                             double ax, double bx, double ay, double by,
+                                             double epsTol, int maxDepth) {
+        Acc acc = new Acc();
+        double value = subdivide2D(setup, f, ax, bx, ay, by, epsTol, maxDepth,
+                Math.min(forcedSubdivisions(2), maxDepth), acc);
+        return acc.result(value);
     }
 
     /**
@@ -179,20 +256,62 @@ public class AdaptiveGaussKronrod {
     public static double integrate2DAdaptive(G7_K15 setup, DBiFunction f,
                                              double ax, double bx, double ay, double by,
                                              double epsTol, int maxDepth, int forcedSubdivisions) {
-        return subdivide2D(setup, f, ax, bx, ay, by, epsTol, maxDepth, clamp(forcedSubdivisions, maxDepth));
+        return subdivide2D(setup, f, ax, bx, ay, by, epsTol, maxDepth, clamp(forcedSubdivisions, maxDepth),
+                new Acc());
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate2DAdaptive(G7_K15, DBiFunction, double, double, double, double, double, int, int)},
+     * with the summed panel estimate and the convergence flag that method drops.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x
+     * @param bx
+     *            upper limit in x
+     * @param ay
+     *            lower limit in y
+     * @param by
+     *            upper limit in y
+     * @param epsTol
+     *            error tolerance, halved for each subdivision
+     * @param maxDepth
+     *            maximal recursion depth
+     * @param forcedSubdivisions
+     *            number of leading levels that bisect without consulting the
+     *            error estimate
+     * @return the approximated integral, the summed estimate and whether every
+     *         panel met the tolerance it was given
+     * @since 1.5.3
+     */
+    public static IntegralResult integrate2DAdaptiveWithError(G7_K15 setup, DBiFunction f,
+                                             double ax, double bx, double ay, double by,
+                                             double epsTol, int maxDepth, int forcedSubdivisions) {
+        Acc acc = new Acc();
+        double value = subdivide2D(setup, f, ax, bx, ay, by, epsTol, maxDepth,
+                clamp(forcedSubdivisions, maxDepth), acc);
+        return acc.result(value);
     }
 
     private static double subdivide2D(G7_K15 setup, DBiFunction f,
                                       double ax, double bx, double ay, double by,
-                                      double epsTol, int maxDepth, int forced) {
+                                      double epsTol, int maxDepth, int forced, Acc acc) {
 
         if (maxDepth <= 0) {
-            return integrate2DParallel(setup, f, ax, bx, ay, by).value;
+            // see subdivide1D
+            IntegralResult res = integrate2DParallel(setup, f, ax, bx, ay, by);
+            acc.leaf(res.approximatedErrorEstimate, epsTol);
+            return res.value;
         }
         // see forcedSubdivisions
         if (forced <= 0) {
             IntegralResult res = integrate2DParallel(setup, f, ax, bx, ay, by);
             if (res.approximatedErrorEstimate <= epsTol) {
+                acc.leaf(res.approximatedErrorEstimate, epsTol);
                 return res.value;
             }
         }
@@ -202,12 +321,12 @@ public class AdaptiveGaussKronrod {
 
         if (dx >= dy) {
             double midX = ax + dx / 2.0;
-            return subdivide2D(setup, f, ax, midX, ay, by, epsTol / 2.0, maxDepth - 1, forced - 1)
-                 + subdivide2D(setup, f, midX, bx, ay, by, epsTol / 2.0, maxDepth - 1, forced - 1);
+            return subdivide2D(setup, f, ax, midX, ay, by, epsTol / 2.0, maxDepth - 1, forced - 1, acc)
+                 + subdivide2D(setup, f, midX, bx, ay, by, epsTol / 2.0, maxDepth - 1, forced - 1, acc);
         } else {
             double midY = ay + dy / 2.0;
-            return subdivide2D(setup, f, ax, bx, ay, midY, epsTol / 2.0, maxDepth - 1, forced - 1)
-                 + subdivide2D(setup, f, ax, bx, midY, by, epsTol / 2.0, maxDepth - 1, forced - 1);
+            return subdivide2D(setup, f, ax, bx, ay, midY, epsTol / 2.0, maxDepth - 1, forced - 1, acc)
+                 + subdivide2D(setup, f, ax, bx, midY, by, epsTol / 2.0, maxDepth - 1, forced - 1, acc);
         }
     }
 
@@ -247,7 +366,45 @@ public class AdaptiveGaussKronrod {
                                              double ax, double bx, double ay, double by, double az, double bz,
                                              double epsTol, int maxRecursions) {
         return subdivide3D(setup, f, ax, bx, ay, by, az, bz, epsTol, maxRecursions,
-                Math.min(forcedSubdivisions(3), maxRecursions));
+                Math.min(forcedSubdivisions(3), maxRecursions), new Acc());
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate3DAdaptive(G7_K15, DTriFunction, double, double, double, double, double, double, double, int)},
+     * with the summed panel estimate and the convergence flag that method drops.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x
+     * @param bx
+     *            upper limit in x
+     * @param ay
+     *            lower limit in y
+     * @param by
+     *            upper limit in y
+     * @param az
+     *            lower limit in z
+     * @param bz
+     *            upper limit in z
+     * @param epsTol
+     *            error tolerance, halved for each subdivision
+     * @param maxRecursions
+     *            maximal recursion depth
+     * @return the approximated integral, the summed estimate and whether every
+     *         panel met the tolerance it was given
+     * @since 1.5.3
+     */
+    public static IntegralResult integrate3DAdaptiveWithError(G7_K15 setup, DTriFunction f,
+                                             double ax, double bx, double ay, double by, double az, double bz,
+                                             double epsTol, int maxRecursions) {
+        Acc acc = new Acc();
+        double value = subdivide3D(setup, f, ax, bx, ay, by, az, bz, epsTol, maxRecursions,
+                Math.min(forcedSubdivisions(3), maxRecursions), acc);
+        return acc.result(value);
     }
 
     /**
@@ -290,21 +447,66 @@ public class AdaptiveGaussKronrod {
                                              double ax, double bx, double ay, double by, double az, double bz,
                                              double epsTol, int maxRecursions, int forcedSubdivisions) {
         return subdivide3D(setup, f, ax, bx, ay, by, az, bz, epsTol, maxRecursions,
-                clamp(forcedSubdivisions, maxRecursions));
+                clamp(forcedSubdivisions, maxRecursions), new Acc());
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate3DAdaptive(G7_K15, DTriFunction, double, double, double, double, double, double, double, int, int)},
+     * with the summed panel estimate and the convergence flag that method drops.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param ax
+     *            lower limit in x
+     * @param bx
+     *            upper limit in x
+     * @param ay
+     *            lower limit in y
+     * @param by
+     *            upper limit in y
+     * @param az
+     *            lower limit in z
+     * @param bz
+     *            upper limit in z
+     * @param epsTol
+     *            error tolerance, halved for each subdivision
+     * @param maxRecursions
+     *            maximal recursion depth
+     * @param forcedSubdivisions
+     *            number of leading levels that bisect without consulting the
+     *            error estimate
+     * @return the approximated integral, the summed estimate and whether every
+     *         panel met the tolerance it was given
+     * @since 1.5.3
+     */
+    public static IntegralResult integrate3DAdaptiveWithError(G7_K15 setup, DTriFunction f,
+                                             double ax, double bx, double ay, double by, double az, double bz,
+                                             double epsTol, int maxRecursions, int forcedSubdivisions) {
+        Acc acc = new Acc();
+        double value = subdivide3D(setup, f, ax, bx, ay, by, az, bz, epsTol, maxRecursions,
+                clamp(forcedSubdivisions, maxRecursions), acc);
+        return acc.result(value);
     }
 
     private static double subdivide3D(G7_K15 setup, DTriFunction f,
                                       double ax, double bx, double ay, double by, double az, double bz,
-                                      double epsTol, int maxRecursions, int forced) {
+                                      double epsTol, int maxRecursions, int forced, Acc acc) {
 
         if (maxRecursions <= 0) {
-            return integrate3DParallel(setup, f, ax, bx, ay, by, az, bz).value;
+            // see subdivide1D
+            IntegralResult res = integrate3DParallel(setup, f, ax, bx, ay, by, az, bz);
+            acc.leaf(res.approximatedErrorEstimate, epsTol);
+            return res.value;
         }
         // see forcedSubdivisions. Three forced levels bisect the longest edge
         // three times, which on a cube is one bisection of every axis
         if (forced <= 0) {
             IntegralResult res = integrate3DParallel(setup, f, ax, bx, ay, by, az, bz);
             if (res.approximatedErrorEstimate <= epsTol) {
+                acc.leaf(res.approximatedErrorEstimate, epsTol);
                 return res.value;
             }
         }
@@ -315,16 +517,16 @@ public class AdaptiveGaussKronrod {
 
         if (dx >= dy && dx >= dz) {
             double midX = ax + dx / 2.0;
-            return subdivide3D(setup, f, ax, midX, ay, by, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1)
-                 + subdivide3D(setup, f, midX, bx, ay, by, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1);
+            return subdivide3D(setup, f, ax, midX, ay, by, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1, acc)
+                 + subdivide3D(setup, f, midX, bx, ay, by, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1, acc);
         } else if (dy >= dx && dy >= dz) {
             double midY = ay + dy / 2.0;
-            return subdivide3D(setup, f, ax, bx, ay, midY, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1)
-                 + subdivide3D(setup, f, ax, bx, midY, by, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1);
+            return subdivide3D(setup, f, ax, bx, ay, midY, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1, acc)
+                 + subdivide3D(setup, f, ax, bx, midY, by, az, bz, epsTol / 2.0, maxRecursions - 1, forced - 1, acc);
         } else {
             double midZ = az + dz / 2.0;
-            return subdivide3D(setup, f, ax, bx, ay, by, az, midZ, epsTol / 2.0, maxRecursions - 1, forced - 1)
-                 + subdivide3D(setup, f, ax, bx, ay, by, midZ, bz, epsTol / 2.0, maxRecursions - 1, forced - 1);
+            return subdivide3D(setup, f, ax, bx, ay, by, az, midZ, epsTol / 2.0, maxRecursions - 1, forced - 1, acc)
+                 + subdivide3D(setup, f, ax, bx, ay, by, midZ, bz, epsTol / 2.0, maxRecursions - 1, forced - 1, acc);
         }
     }
 
@@ -347,7 +549,36 @@ public class AdaptiveGaussKronrod {
     }
 
     public static double integrate1DAdaptive(G7_K15 setup, DFunction f, double a, double b, double epsTol, int maxDepth) {
-        return subdivide1D(setup, f, a, b, epsTol, maxDepth, Math.min(forcedSubdivisions(1), maxDepth));
+        return subdivide1D(setup, f, a, b, epsTol, maxDepth, Math.min(forcedSubdivisions(1), maxDepth),
+                new Acc());
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate1DAdaptive(G7_K15, DFunction, double, double, double, int)},
+     * with the summed panel estimate and the convergence flag that method drops.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param a
+     *            lower limit
+     * @param b
+     *            upper limit
+     * @param epsTol
+     *            error tolerance, halved for each subdivision
+     * @param maxDepth
+     *            maximal recursion depth
+     * @return the approximated integral, the summed estimate and whether every
+     *         panel met the tolerance it was given
+     * @since 1.5.3
+     */
+    public static IntegralResult integrate1DAdaptiveWithError(G7_K15 setup, DFunction f, double a, double b,
+                                             double epsTol, int maxDepth) {
+        Acc acc = new Acc();
+        double value = subdivide1D(setup, f, a, b, epsTol, maxDepth, Math.min(forcedSubdivisions(1), maxDepth), acc);
+        return acc.result(value);
     }
 
     /**
@@ -376,26 +607,98 @@ public class AdaptiveGaussKronrod {
      */
     public static double integrate1DAdaptive(G7_K15 setup, DFunction f, double a, double b, double epsTol,
                                              int maxDepth, int forcedSubdivisions) {
-        return subdivide1D(setup, f, a, b, epsTol, maxDepth, clamp(forcedSubdivisions, maxDepth));
+        return subdivide1D(setup, f, a, b, epsTol, maxDepth, clamp(forcedSubdivisions, maxDepth), new Acc());
+    }
+
+    /**
+     * The same integral as
+     * {@link #integrate1DAdaptive(G7_K15, DFunction, double, double, double, int, int)},
+     * with the summed panel estimate and the convergence flag that method drops.
+     *
+     * @param setup
+     *            the Gauss-Kronrod rule to use
+     * @param f
+     *            the integrand
+     * @param a
+     *            lower limit
+     * @param b
+     *            upper limit
+     * @param epsTol
+     *            error tolerance, halved for each subdivision
+     * @param maxDepth
+     *            maximal recursion depth
+     * @param forcedSubdivisions
+     *            number of leading levels that bisect without consulting the
+     *            error estimate
+     * @return the approximated integral, the summed estimate and whether every
+     *         panel met the tolerance it was given
+     * @since 1.5.3
+     */
+    public static IntegralResult integrate1DAdaptiveWithError(G7_K15 setup, DFunction f, double a, double b,
+                                             double epsTol, int maxDepth, int forcedSubdivisions) {
+        Acc acc = new Acc();
+        double value = subdivide1D(setup, f, a, b, epsTol, maxDepth, clamp(forcedSubdivisions, maxDepth), acc);
+        return acc.result(value);
     }
 
     private static double subdivide1D(G7_K15 setup, DFunction f, double a, double b, double epsTol,
-                                      int maxDepth, int forced) {
+                                      int maxDepth, int forced, Acc acc) {
         if (maxDepth <= 0) {
-            return integrate1D(setup, f, a, b).value;
+            // the budget is gone and this panel is handed out as it stands; the
+            // estimate still says what it thinks of itself, and whether that met
+            // the tolerance is exactly what the WithError form has to report
+            IntegralResult res = integrate1D(setup, f, a, b);
+            acc.leaf(res.approximatedErrorEstimate, epsTol);
+            return res.value;
         }
         // see forcedSubdivisions: while forced > 0 the error estimate
         // is not consulted at all, the panel is bisected in any case
         if (forced <= 0) {
             IntegralResult res = integrate1D(setup, f, a, b);
             if (res.approximatedErrorEstimate <= epsTol) {
+                acc.leaf(res.approximatedErrorEstimate, epsTol);
                 return res.value;
             }
         }
 
         double mid = a + (b - a) / 2.0;
-        return subdivide1D(setup, f, a, mid, epsTol / 2.0, maxDepth - 1, forced - 1)
-             + subdivide1D(setup, f, mid, b, epsTol / 2.0, maxDepth - 1, forced - 1);
+        return subdivide1D(setup, f, a, mid, epsTol / 2.0, maxDepth - 1, forced - 1, acc)
+             + subdivide1D(setup, f, mid, b, epsTol / 2.0, maxDepth - 1, forced - 1, acc);
+    }
+
+    /**
+     * What a subdivision learns about itself on the way down, kept beside the
+     * recursion rather than returned from it: a result object per panel costs
+     * 15 percent on a deep 1D subdivision, where a leaf is only 15 integrand
+     * evaluations, and that cost would fall on the plain {@code double} methods
+     * that every existing caller uses.
+     * <p>
+     * The recursion is sequential - the parallelism sits inside
+     * {@link #integrate2DParallel} and {@link #integrate3DParallel}, which have
+     * returned before this is touched - so a plain mutable carrier is safe.
+     */
+    private static final class Acc {
+
+        /** The sum of the panel estimates, which is what QUADPACK's {@code abserr} is. */
+        double error;
+        /** Whether every panel met the tolerance it was given. */
+        boolean converged = true;
+
+        void leaf(double estimate, double epsTol) {
+            error += estimate;
+            if (estimate > epsTol) {
+                converged = false;
+            }
+        }
+
+        /**
+         * Since the tolerance is halved at every level, the leaf tolerances of
+         * a full tree sum to the tolerance the caller asked for, so a converged
+         * sum is bounded by it.
+         */
+        IntegralResult result(double value) {
+            return new IntegralResult(value, error, converged);
+        }
     }
 
     /** Keeps the forced level count inside {@code [0, maxDepth]}. */

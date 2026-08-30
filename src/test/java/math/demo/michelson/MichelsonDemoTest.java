@@ -12,6 +12,7 @@ import java.io.UnsupportedEncodingException;
 import org.junit.Test;
 
 import math.distribution.StudentT;
+import math.probe.ACF;
 
 /**
  * The bounds here were measured before they were asserted. The ones that are
@@ -169,15 +170,77 @@ public class MichelsonDemoTest {
                 m.intervals[afternoon][0] < 0.0 && m.intervals[afternoon][1] > 0.0);
     }
 
-    /** What does survive is the drift over the month. */
+    /** The drift appears to survive the model -- on the runs, which is the wrong row. */
     @Test
-    public void theDriftSurvivesTheModel() {
+    public void theDriftSurvivesTheModelOnTheRuns() {
         MichelsonDemo.Model m = MichelsonDemo.model();
         int day = m.indexOf("day");
         assertTrue("the drift is downward: " + m.beta[day], m.beta[day] < 0.0);
         assertTrue("p = " + m.pValues[day], m.pValues[day] < 0.001);
-        assertTrue("the interval must exclude zero", m.intervals[day][1] < 0.0);
+        assertTrue("the interval excludes zero", m.intervals[day][1] < 0.0);
         assertEquals("about four km/s per day", -4.4, 1000.0 * m.beta[day], 0.5);
+    }
+
+    /** But it does not survive the row being the measurement set. */
+    @Test
+    public void theDriftDoesNotSurviveTheMeasurementSets() {
+        MichelsonDemo.Model runs = MichelsonDemo.model();
+        MichelsonDemo.Model sets = MichelsonDemo.setModel();
+        int day = sets.indexOf("day");
+
+        // 24 rows and four terms
+        assertEquals(20, sets.degreesOfFreedom);
+        // the estimate hardly moves, measured -3.90 against -4.40 km/s per day
+        assertEquals("the coefficient is the same story", -3.9, 1000.0 * sets.beta[day], 0.5);
+        // what moves is what it is worth: measured p 0.055 against 0.00023
+        assertTrue("p = " + sets.pValues[day], sets.pValues[day] > 0.02);
+        assertTrue("the interval must now cover zero, was [" + sets.intervals[day][0] + ", "
+                + sets.intervals[day][1] + "]",
+                sets.intervals[day][0] < 0.0 && sets.intervals[day][1] > 0.0);
+        assertTrue("the p value should move by two orders of magnitude, moved by "
+                + sets.pValues[day] / runs.pValues[day],
+                sets.pValues[day] / runs.pValues[day] > 100.0);
+
+        // and the temperature term goes the same way, measured 0.050 -> 0.153
+        int temperature = sets.indexOf("temperature");
+        assertTrue("temperature was nominally significant on the runs",
+                runs.pValues[temperature] < 0.05);
+        assertTrue("and is not on the sets: " + sets.pValues[temperature],
+                sets.pValues[temperature] > 0.1);
+    }
+
+    /** The set column decides that, and nothing before this used it. */
+    @Test
+    public void theClusteringIsWhatDecidesTheUnitOfAnalysis() {
+        MichelsonDemo.Clustering c = MichelsonDemo.clustering();
+        assertEquals("the variance ratio", 7.075, c.fRatio, 0.01);
+        assertEquals(23, c.betweenDf);
+        assertEquals(76, c.withinDf);
+        assertEquals("the intraclass correlation", 0.594, c.intraclass, 0.005);
+        assertEquals("the design effect", 2.88, c.designEffect, 0.02);
+        assertEquals("the effective sample size", 34.7, c.effectiveSize, 0.5);
+        assertTrue("the sets differ by more than the runs within them do, "
+                + c.setSd + " against " + c.runSd, c.setSd > c.runSd);
+    }
+
+    /** Every set mean is the mean of the runs the data file assigns to it. */
+    @Test
+    public void theSetsAreTheAggregationTheDataFileRecords() {
+        MichelsonDemo.Sets s = MichelsonDemo.sets();
+        assertEquals(Datasets.SETS, s.speed.length);
+        int total = 0;
+        for (int j = 0; j < s.size.length; ++j) {
+            assertTrue("set " + (j + 1) + " is empty", s.size[j] > 0);
+            total += s.size[j];
+        }
+        assertEquals("every run belongs to exactly one set", 100, total);
+
+        // the set means average back to the grand mean, weighted by size
+        double weighted = 0.0;
+        for (int j = 0; j < s.speed.length; ++j) {
+            weighted += s.size[j] * s.speed[j];
+        }
+        assertEquals(MichelsonDemo.describe().mean, weighted / total, 1.0e-12);
     }
 
     /** The model explains some of the scatter and none of the bias. */
@@ -203,6 +266,107 @@ public class MichelsonDemoTest {
         assertFalse("a locale slipped into the output", first.contains("299,8"));
         assertTrue("the demo must say what it established", first.contains("what this run established"));
         assertTrue("and it must name the value it is judged against", first.contains("299.792458"));
+    }
+
+    @Test
+    public void testTheHundredRunsAreNotExchangeable() {
+        // The class comment says the three intervals of section 3 share one
+        // assumption and that section 5 of the same demo contradicts it. This
+        // measures the size of it, so that the claim cannot go stale: a one way
+        // decomposition of the 100 runs into the 24 measurement sets the data
+        // file records and nothing else in the demo uses.
+        double[] speed = Datasets.speed();
+        int[] set = Datasets.set();
+        int n = speed.length;
+        int k = Datasets.SETS;
+
+        double grand = 0.0;
+        for (int i = 0; i < n; ++i) {
+            grand += speed[i];
+        }
+        grand /= n;
+
+        double[] sums = new double[k];
+        int[] counts = new int[k];
+        for (int i = 0; i < n; ++i) {
+            sums[set[i] - 1] += speed[i];
+            ++counts[set[i] - 1];
+        }
+        double[] means = new double[k];
+        for (int s = 0; s < k; ++s) {
+            assertTrue("set " + (s + 1) + " is empty", counts[s] > 0);
+            means[s] = sums[s] / counts[s];
+        }
+
+        double between = 0.0;
+        double within = 0.0;
+        for (int s = 0; s < k; ++s) {
+            between += counts[s] * (means[s] - grand) * (means[s] - grand);
+        }
+        for (int i = 0; i < n; ++i) {
+            double d = speed[i] - means[set[i] - 1];
+            within += d * d;
+        }
+        double msBetween = between / (k - 1);
+        double msWithin = within / (n - k);
+        // measured 7.075 on 23 and 76 degrees of freedom
+        assertEquals("the variance ratio", 7.075, msBetween / msWithin, 0.01);
+
+        double squares = 0.0;
+        for (int s = 0; s < k; ++s) {
+            squares += counts[s] * (double) counts[s];
+        }
+        double nBar = (n - squares / n) / (k - 1);
+        double setVariance = (msBetween - msWithin) / nBar;
+        double intraclass = setVariance / (setVariance + msWithin);
+        // measured 0.594: a run tells you rather less about the next run than
+        // an independent draw would
+        assertEquals("the intraclass correlation", 0.594, intraclass, 0.005);
+
+        double designEffect = 1.0 + (n / (double) k - 1.0) * intraclass;
+        // measured 2.88, so the 100 runs are worth about 35 independent ones
+        assertEquals("the design effect", 2.88, designEffect, 0.02);
+        assertTrue("which is what makes every half width in section 3 too small",
+                designEffect > 2.0);
+        assertTrue("100 correlated runs are worth fewer than 50 independent ones",
+                n / designEffect < 50.0);
+
+        // and this whole method is the oracle for the demo's own version of it,
+        // written out here rather than calling it, so that the two are two
+        MichelsonDemo.Clustering c = MichelsonDemo.clustering();
+        assertEquals("F", msBetween / msWithin, c.fRatio, 1.0e-12);
+        assertEquals("the intraclass correlation", intraclass, c.intraclass, 1.0e-12);
+        assertEquals("the design effect", designEffect, c.designEffect, 1.0e-12);
+        assertEquals("the effective size", n / designEffect, c.effectiveSize, 1.0e-12);
+    }
+
+    @Test
+    public void testTheSetMeansAreExchangeableEvenThoughTheRunsAreNot() {
+        // where the correlation lives: between the sets, not along the month.
+        // The 24 set means show no autocorrelation, so the structure section 3
+        // trips over is a block effect and not the drift section 5 reports
+        double[] speed = Datasets.speed();
+        int[] set = Datasets.set();
+        int k = Datasets.SETS;
+        double[] sums = new double[k];
+        int[] counts = new int[k];
+        for (int i = 0; i < speed.length; ++i) {
+            sums[set[i] - 1] += speed[i];
+            ++counts[set[i] - 1];
+        }
+        double[] means = new double[k];
+        for (int s = 0; s < k; ++s) {
+            means[s] = sums[s] / counts[s];
+        }
+
+        double[] runs = ACF.acf(speed, 4);
+        double[] sets = ACF.acf(means, 4);
+        // measured +0.535 against a band of 0.196
+        assertTrue("the runs correlate at lag one, was " + runs[1],
+                runs[1] > 1.96 / Math.sqrt(speed.length));
+        // measured -0.150 against a band of 0.400
+        assertTrue("the set means do not, was " + sets[1],
+                Math.abs(sets[1]) < 1.96 / Math.sqrt(k));
     }
 
     private static String run() {

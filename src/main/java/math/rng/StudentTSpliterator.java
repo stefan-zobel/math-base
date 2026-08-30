@@ -24,11 +24,16 @@ final class StudentTSpliterator extends PseudoRandomSpliterator implements Split
     final double df;
     final PseudoRandom prng;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkDegreesOfFreedom(double df) {
+        if (!(df > 0.0)) {
+            throw new IllegalArgumentException("df must be greater than zero : " + df);
+        }
+    }
+
     StudentTSpliterator(PseudoRandom prng, long index, long fence, double df) {
         super(index, fence);
-        if (df <= 0.0) {
-            throw new IllegalArgumentException("df <= 0.0 : " + df);
-        }
+        checkDegreesOfFreedom(df);
         this.df = df;
         this.prng = prng;
     }

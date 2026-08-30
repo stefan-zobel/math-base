@@ -51,13 +51,27 @@ public class Poisson implements DiscreteDistribution {
 
     @Override
     public double pmf(int k) {
+        // the mass was already formed as the exponential of the logarithm, so
+        // this returns the bits it always did
+        return Math.exp(logPmf(k));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The form {@link #pmf(int)} is the exponential of. The mass of a
+     * {@code Poisson(1)} underflows to zero from {@code k = 178} upwards,
+     * where this goes on answering.
+     */
+    @Override
+    public double logPmf(int k) {
         if (k < 0) {
-            return 0.0;
+            return Double.NEGATIVE_INFINITY;
         }
         if (lambda == 0.0) {
-            return k == 0 ? 1.0 : 0.0;
+            return k == 0 ? 0.0 : Double.NEGATIVE_INFINITY;
         }
-        return Math.exp(k * Math.log(lambda) - lambda - Arithmetic.logFactorial(k));
+        return k * Math.log(lambda) - lambda - Arithmetic.logFactorial(k);
     }
 
     @Override

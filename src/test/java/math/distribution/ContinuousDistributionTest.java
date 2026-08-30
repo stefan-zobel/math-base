@@ -243,6 +243,10 @@ public class ContinuousDistributionTest {
                 .floors(14.0, 14.0, 13.0, 15.0, 14.0, 14.0));
         r.add(row("Gamma", "k=9, theta=0.5", new Gamma(9.0, 0.5), 0.0, 30.0).moments(0.0, 40.0)
                 .floors(14.0, 14.0, 13.0, 15.0, 14.0, 14.0));
+        r.add(row("InverseGamma", "alpha=7, beta=1", new InverseGamma(7.0, 1.0), 0.0, 10.0).moments(0.0, 100.0)
+                .tail(2.0e-11).floors(15.0, 15.5, 13.5, 15.0, 15.0, 13.0));
+        r.add(row("InverseGamma", "alpha=3, beta=2", new InverseGamma(3.0, 2.0), 0.0, 1000.0)
+                .moments(0.0, 1.0e6).tail(1.4e-9).floors(15.5, 15.0, 13.5, 15.0, 11.0, 5.0));
         r.add(row("LogNormal", "0, 1", new LogNormal(0.0, 1.0), 0.0, 1000.0).moments(0.0, 1.0e4).tail(3.0e-12)
                 .floors(15.0, 15.0, 13.0, 15.0, 15.0, 12.0));
         r.add(row("LogNormal", "0, 2", new LogNormal(0.0, 2.0), 0.0, 1.0e5).moments(0.0, 1.0e7).tail(5.0e-9)
@@ -325,7 +329,7 @@ public class ContinuousDistributionTest {
     @Test
     public void theTableIsIntact() {
         List<Row> rows = rows();
-        assertEquals(38, rows.size());
+        assertEquals(40, rows.size());
         int distinct = 0;
         String previous = "";
         for (int i = 0; i < rows.size(); ++i) {
@@ -341,7 +345,7 @@ public class ContinuousDistributionTest {
                 previous = row.name;
             }
         }
-        assertEquals("every continuous distribution in the package is covered", 11, distinct);
+        assertEquals("every continuous distribution in the package is covered", 12, distinct);
     }
 
     /**

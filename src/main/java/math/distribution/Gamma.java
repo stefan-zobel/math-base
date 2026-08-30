@@ -99,6 +99,39 @@ public class Gamma implements ContinuousDistribution {
         return rate_beta * Math.exp((shape_k - 1.0) * Math.log(y) - y - FastGamma.logGamma(shape_k));
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The expression {@link #pdf(double)} evaluates, with the rate that stands
+     * outside the exponential there brought inside as a logarithm.
+     */
+    @Override
+    public double logPdf(double x) {
+        if (x < 0.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        if (x == 0.0) {
+            if (shape_k == 1.0) {
+                return Math.log(rate_beta);
+            } else if (shape_k < 1.0) {
+                return Double.POSITIVE_INFINITY;
+            } else {
+                return Double.NEGATIVE_INFINITY;
+            }
+        }
+        double y = rate_beta * x;
+        if (y > Double.MAX_VALUE) {
+            // -y dominates the sum, and it has left the range downwards.
+            // pdf caps y here instead, which is the same zero density; a
+            // logarithm can say more, but not from a product that overflowed
+            return Double.NEGATIVE_INFINITY;
+        }
+        if (shape_k == 1.0) {
+            return Math.log(rate_beta) - y;
+        }
+        return Math.log(rate_beta) + (shape_k - 1.0) * Math.log(y) - y - FastGamma.logGamma(shape_k);
+    }
+
     @Override
     public double cdf(double x) {
         return ProbabilityFuncs.gamma(shape_k, rate_beta, x);

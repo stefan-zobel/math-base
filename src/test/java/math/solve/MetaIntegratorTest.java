@@ -3,6 +3,7 @@ package math.solve;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import math.fun.DFunction;
 import math.fun.DBiFunction;
@@ -199,5 +200,37 @@ public class MetaIntegratorTest {
         double result = MetaIntegrator.integrate3DSmart(ruleSetup, highFreq3D, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, TOLERANCE);
 
         assertEquals("High frequency 3D Clenshaw-Curtis routing failed", exactValue, result, 1e-4);
+    }
+
+    /**
+     * Both branches of the routing supply an estimate, and the value is the one
+     * the plain form returns either way -- including the oscillating integrand
+     * that is answered by Clenshaw-Curtis rather than by the subdivision.
+     */
+    @Test
+    public void bothBranchesCarryTheirEstimate() {
+        DFunction smooth = x -> Math.exp(-x * x);
+        assertEquals("smooth, the subdivision branch",
+                MetaIntegrator.integrate1DSmart(ruleSetup, smooth, -3.0, 3.0, 1.0e-10),
+                MetaIntegrator.integrate1DSmartWithError(ruleSetup, smooth, -3.0, 3.0, 1.0e-10).value, 0.0);
+
+        DFunction oscillating = x -> Math.sin(200.0 * x);
+        assertEquals("oscillating, the Clenshaw-Curtis branch",
+                MetaIntegrator.integrate1DSmart(ruleSetup, oscillating, 0.0, 1.0, 1.0e-10),
+                MetaIntegrator.integrate1DSmartWithError(ruleSetup, oscillating, 0.0, 1.0, 1.0e-10).value, 0.0);
+
+        AdaptiveGaussKronrod.IntegralResult osc =
+                MetaIntegrator.integrate1DSmartWithError(ruleSetup, oscillating, 0.0, 1.0, 1.0e-10);
+        assertTrue("the oscillating case converged, was " + osc, osc.converged);
+        assertEquals("and is right", (1.0 - Math.cos(200.0)) / 200.0, osc.value, 1.0e-10);
+
+        assertEquals("2D", MetaIntegrator.integrate2DSmart(ruleSetup, (x, y) -> Math.exp(-(x * x + y * y)),
+                -3.0, 3.0, -3.0, 3.0, 1.0e-9),
+                MetaIntegrator.integrate2DSmartWithError(ruleSetup, (x, y) -> Math.exp(-(x * x + y * y)),
+                        -3.0, 3.0, -3.0, 3.0, 1.0e-9).value, 0.0);
+        assertEquals("3D", MetaIntegrator.integrate3DSmart(ruleSetup, (x, y, z) -> Math.exp(-(x * x + y * y + z * z)),
+                -3.0, 3.0, -3.0, 3.0, -3.0, 3.0, 1.0e-6),
+                MetaIntegrator.integrate3DSmartWithError(ruleSetup, (x, y, z) -> Math.exp(-(x * x + y * y + z * z)),
+                        -3.0, 3.0, -3.0, 3.0, -3.0, 3.0, 1.0e-6).value, 0.0);
     }
 }

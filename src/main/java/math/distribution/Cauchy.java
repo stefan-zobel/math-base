@@ -45,6 +45,19 @@ public class Cauchy implements ContinuousDistribution {
         return 1.0 / (Math.PI * scale * (1.0 + y * y));
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * {@code Math.PI * scale} is not formed, since it overflows for a scale
+     * above about {@code 5.7e307} where the density is still an ordinary
+     * number.
+     */
+    @Override
+    public double logPdf(double x) {
+        double y = (x - loc) / scale;
+        return -Math.log(Math.PI) - Math.log(scale) - Math.log1p(y * y);
+    }
+
     @Override
     public double cdf(double x) {
         double y = (x - loc) / scale;

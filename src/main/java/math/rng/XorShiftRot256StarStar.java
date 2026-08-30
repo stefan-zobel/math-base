@@ -27,17 +27,43 @@ package math.rng;
  */
 public class XorShiftRot256StarStar extends Xoshiro256 {
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public XorShiftRot256StarStar() {
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public XorShiftRot256StarStar(long seed) {
         super(seed);
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public XorShiftRot256StarStar(long[] seed) {
         super(seed);
     }
 
+    /**
+     * Creates a generator from raw state, as {@link #split()} does.
+     *
+     * @param x0
+     *            the first state word
+     * @param x1
+     *            the second state word
+     * @param x2
+     *            the third state word
+     * @param x3
+     *            the fourth state word
+     */
     protected XorShiftRot256StarStar(long x0, long x1, long x2, long x3) {
         super(x0, x1, x2, x3);
     }

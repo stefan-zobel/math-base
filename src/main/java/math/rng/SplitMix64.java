@@ -44,19 +44,41 @@ public class SplitMix64 extends AbstractRng64 implements SplittablePseudoRandom 
      */
     private final long gamma;
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public SplitMix64() {
         state = SplitMix64Seed.seed();
         gamma = mixGamma(state + GOLDEN);
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public SplitMix64(long seed) {
         this(SplitMix64Seed.seed(seed), GOLDEN);
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public SplitMix64(long[] seed) {
         this(SplitMix64Seed.seed(seed), GOLDEN);
     }
 
+    /**
+     * Creates a generator from raw state, as {@link #split()} does.
+     *
+     * @param seed
+     *            the initial state
+     * @param gamma
+     *            the Weyl step added on every draw, not a second seed
+     */
     protected SplitMix64(long seed, long gamma) {
         this.state = seed;
         this.gamma = gamma;

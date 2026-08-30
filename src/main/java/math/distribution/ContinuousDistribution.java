@@ -45,6 +45,31 @@ public interface ContinuousDistribution {
     double pdf(double x);
 
     /**
+     * The natural logarithm of the density at {@code x}.
+     * <p>
+     * This is the form a likelihood is summed in, and the reason is that
+     * {@link #pdf(double)} leaves the {@code double} range long before the
+     * logarithm does. A standard normal density is <b>exactly zero from
+     * {@code x = 38.5755} outwards</b>, where the logarithm is still
+     * {@code -744.95} and goes on answering: {@code -2977.06} at twice that
+     * distance and {@code -500000.92} at {@code x = 1000}. Measured over a
+     * thousand standard normal draws, the product of the densities is
+     * {@code 0.0} and the sum of the logarithms is {@code -1434.17}.
+     * <p>
+     * The default takes the logarithm of the density, which is correct
+     * wherever the density is. Every implementation in this package overrides
+     * it with a form that keeps answering past that point.
+     *
+     * @param x
+     *            where to compute the log density
+     * @return the natural logarithm of the density at {@code x}, which is
+     *         {@link Double#NEGATIVE_INFINITY} outside the support
+     */
+    default double logPdf(double x) {
+        return Math.log(pdf(x));
+    }
+
+    /**
      * For a random variable {@code X} whose values are distributed according to
      * this distribution, this method returns {@code P(X <= x)}. In other words,
      * this method represents the (cumulative) distribution function (CDF) for

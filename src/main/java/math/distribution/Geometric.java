@@ -60,6 +60,23 @@ public class Geometric implements DiscreteDistribution {
         return p * Math.exp(k * log1mp);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The mass of a {@code Geometric(0.5)} underflows to zero from
+     * {@code k = 1074} upwards, where this is still answering.
+     */
+    @Override
+    public double logPmf(int k) {
+        if (k < 0) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        if (p == 1.0) {
+            return k == 0 ? 0.0 : Double.NEGATIVE_INFINITY;
+        }
+        return Math.log(p) + k * log1mp;
+    }
+
     @Override
     public double cdf(int k) {
         if (k < 0) {

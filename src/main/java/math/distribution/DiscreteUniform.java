@@ -60,6 +60,17 @@ public class DiscreteUniform implements DiscreteDistribution {
         return 1.0 / count;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double logPmf(int k) {
+        if (k < a || k > b) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        return -Math.log(count);
+    }
+
     @Override
     public double cdf(int k) {
         if (k < a) {

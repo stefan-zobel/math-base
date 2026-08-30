@@ -59,8 +59,23 @@ public class Beta implements ContinuousDistribution {
      */
     @Override
     public double pdf(double x) {
+        // the density was already formed as the exponential of the logarithm,
+        // so this is the expression it always was and returns the same bits:
+        // each branch of logPdf below exponentiates to the branch that used to
+        // stand here, the two infinities included
+        return Math.exp(logPdf(x));
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The form {@link #pdf(double)} is the exponential of, which this class was
+     * computing and throwing away before the interface asked for it.
+     */
+    @Override
+    public double logPdf(double x) {
         if (x < 0.0 || x > 1.0) {
-            return 0.0;
+            return Double.NEGATIVE_INFINITY;
         }
         if (x == 0.0) {
             // the shape alone decides the left end: a pole below one, the
@@ -69,15 +84,15 @@ public class Beta implements ContinuousDistribution {
             if (alpha < 1.0) {
                 return Double.POSITIVE_INFINITY;
             }
-            return (alpha == 1.0) ? Math.exp(logPdfNormFactor) : 0.0;
+            return (alpha == 1.0) ? logPdfNormFactor : Double.NEGATIVE_INFINITY;
         }
         if (x == 1.0) {
             if (beta < 1.0) {
                 return Double.POSITIVE_INFINITY;
             }
-            return (beta == 1.0) ? Math.exp(logPdfNormFactor) : 0.0;
+            return (beta == 1.0) ? logPdfNormFactor : Double.NEGATIVE_INFINITY;
         }
-        return Math.exp(logPdfNormFactor + (alpha - 1.0) * Math.log(x) + (beta - 1.0) * Math.log1p(-x));
+        return logPdfNormFactor + (alpha - 1.0) * Math.log(x) + (beta - 1.0) * Math.log1p(-x);
     }
 
     @Override

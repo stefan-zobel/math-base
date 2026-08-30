@@ -26,14 +26,19 @@ final class FisherFSpliterator extends PseudoRandomSpliterator implements Splite
     final PseudoRandom prng_U;
     final PseudoRandom prng_V;
 
-    FisherFSpliterator(PseudoRandom prng, long index, long fence, int numeratorDF, int denominatorDF) {
-        super(index, fence);
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkParameters(int numeratorDF, int denominatorDF) {
         if (numeratorDF < 1) {
             throw new IllegalArgumentException("numeratorDF < 1 (" + numeratorDF + ")");
         }
         if (denominatorDF < 1) {
             throw new IllegalArgumentException("denominatorDF < 1 (" + denominatorDF + ")");
         }
+    }
+
+    FisherFSpliterator(PseudoRandom prng, long index, long fence, int numeratorDF, int denominatorDF) {
+        super(index, fence);
+        checkParameters(numeratorDF, denominatorDF);
         this.d1 = numeratorDF;
         this.d2 = denominatorDF;
         this.prng_U = prng;
@@ -120,14 +125,16 @@ final class FisherFSpliterator extends PseudoRandomSpliterator implements Splite
      * @param prng_U
      *            the generator for the numerator variate
      * @param prng_V
-     *            an independent generator for the denominator variate
+     *            the generator for the denominator variate. It may be
+     *            {@code prng_U} itself, in which case the two are drawn from
+     *            it in sequence, which is what a single draw does
      * @param d1
      *            the numerator degrees of freedom
      * @param d2
      *            the denominator degrees of freedom
      * @return an {@code F(d1, d2)} variate
      */
-    private static double sample(PseudoRandom prng_U, PseudoRandom prng_V, double d1, double d2) {
+    static double sample(PseudoRandom prng_U, PseudoRandom prng_V, double d1, double d2) {
         double logX = GammaSpliterator.logSample(prng_U, d1 / 2.0);
         double logY = GammaSpliterator.logSample(prng_V, d2 / 2.0);
         return Math.exp(logX - logY + Math.log(d2 / d1));

@@ -8,6 +8,7 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 
 import math.optim.OwlQnTest.Rosenbrock;
+import math.optim.OwlQnTest.ScaledQuadratic;
 
 /**
  * Tests for {@link LimitedMemoryBFGS} and the {@link BackTrackLineSearch} it
@@ -409,6 +410,54 @@ public class LimitedMemoryBfgsTest {
             assertTrue("stalled gradient norm " + stalled.getGradientNorm(), stalled.getGradientNorm() < 1.0e-2);
             assertTrue("the two must be orders of magnitude apart",
                     budget.getGradientNorm() > 1000.0 * stalled.getGradientNorm());
+        }
+    }
+
+    /**
+     * The same problem at any scale must stop the same way. The objective is
+     * the separable quadratic from {@link OwlQnTest}, whose solution does not
+     * depend on the factor in front of it, so a power of two moves the whole
+     * problem along the exponent axis and changes nothing else. Bit for bit,
+     * since a power of two scales every term of the criterion exactly.
+     * <p>
+     * What ends the run here is a stalled line search, not a tolerance: one
+     * step solves this quadratic to about {@code 4e-16} and no further step
+     * improves it. That is not what the test is about. Before the floor under
+     * the value tolerance was tied to the scale of the objective,
+     * {@code 2^-500} and {@code 2^-100} reported {@code VALUE_TOLERANCE}
+     * after no iterations at all while {@code 2^0} took its step -- the
+     * stopping rule saw a different problem purely because of the exponent.
+     * <p>
+     * The band is bounded elsewhere: below about {@code 2^-537} the line
+     * search rejects the step because {@code dotProduct(g, line)} underflows,
+     * which is a different defect and not this one.
+     */
+    @Test
+    public void testTheStoppingRuleDoesNotDependOnTheScaleOfTheObjective() {
+        int[] exponents = { -500, -100, 0, 100, 500 };
+        double[] reference = null;
+        int referenceIterations = -1;
+        Termination referenceTermination = null;
+        for (int ei = 0; ei < exponents.length; ++ei) {
+            String where = "at 2^" + exponents[ei];
+            ScaledQuadratic f = new ScaledQuadratic(Math.scalb(1.0, exponents[ei]));
+            LimitedMemoryBFGS bfgs = new LimitedMemoryBFGS(f, 1000, 1.0e-14, 0.0, 4);
+            bfgs.optimize();
+
+            double[] w = new double[f.getNumParameters()];
+            f.getParameters(w);
+            if (reference == null) {
+                reference = w;
+                referenceIterations = bfgs.getIteration();
+                referenceTermination = bfgs.getTermination();
+            } else {
+                assertEquals("the rule that fired, " + where, referenceTermination, bfgs.getTermination());
+                assertEquals("iterations " + where, referenceIterations, bfgs.getIteration());
+                for (int j = 0; j < w.length; ++j) {
+                    assertEquals("coefficient " + j + " " + where, Double.doubleToRawLongBits(reference[j]),
+                            Double.doubleToRawLongBits(w[j]));
+                }
+            }
         }
     }
 

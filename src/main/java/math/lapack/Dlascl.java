@@ -96,7 +96,8 @@ final class Dlascl {
 
         boolean done = false;
         // Get machine parameters
-        final double smlnum = 2.2250738585072014E-308;
+        // DLAMCH('S'), the smallest normal number, and its reciprocal
+        final double smlnum = Double.MIN_NORMAL;
         final double bignum = 4.49423283715579E307;
         double cfromc = cfrom;
         double ctoc = cto;

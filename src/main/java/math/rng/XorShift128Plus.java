@@ -37,16 +37,30 @@ public class XorShift128Plus extends AbstractRng64 {
     private long x0;
     private long x1;
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public XorShift128Plus() {
         x0 = SplitMix64Seed.seed();
         x1 = SplitMix64Seed.seed();
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public XorShift128Plus(long seed) {
         this(new XorShift64Star(seed));
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public XorShift128Plus(long[] seed) {
         this(new XorShift64Star(seed));
     }

@@ -25,14 +25,19 @@ final class WeibullSpliterator extends PseudoRandomSpliterator implements Splite
     final double shape_k;
     final PseudoRandom prng;
 
+    /** The parameter check, shared by the stream and the single draw. */
+    static void checkParameters(double scale, double shape) {
+        if (!(scale > 0.0)) {
+            throw new IllegalArgumentException("scale must be greater than zero (" + scale + ")");
+        }
+        if (!(shape > 0.0)) {
+            throw new IllegalArgumentException("shape must be greater than zero (" + shape + ")");
+        }
+    }
+
     WeibullSpliterator(PseudoRandom prng, long index, long fence, double scale, double shape) {
         super(index, fence);
-        if (scale <= 0.0) {
-            throw new IllegalArgumentException("scale <= 0.0");
-        }
-        if (shape <= 0.0) {
-            throw new IllegalArgumentException("shape <= 0.0");
-        }
+        checkParameters(scale, shape);
         this.scale_lambda = scale;
         this.shape_k = shape;
         this.prng = prng;

@@ -84,6 +84,36 @@ public class Weibull implements ContinuousDistribution {
 
     /**
      * {@inheritDoc}
+     * <p>
+     * The power that {@link #pdf(double)} forms twice is taken once here, as a
+     * logarithm, so the two ends that method has to branch on -- an overflowing
+     * power in front of an underflowing exponential -- are one subtraction.
+     */
+    @Override
+    public double logPdf(double x) {
+        if (x < 0.0) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        if (x == 0.0) {
+            // the shape alone decides the left end, as in pdf
+            if (shape_k < 1.0) {
+                return Double.POSITIVE_INFINITY;
+            }
+            return (shape_k == 1.0) ? Math.log(shape_dividedby_scale) : Double.NEGATIVE_INFINITY;
+        }
+        if (x == Double.POSITIVE_INFINITY) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        double logXScale = Math.log(x) - Math.log(scale_lambda);
+        // the exponential of this overflows exactly where the density
+        // underflows, and an infinite subtrahend is the minus infinity that
+        // says so
+        double powered = Math.exp(shape_k * logXScale);
+        return Math.log(shape_dividedby_scale) + (shape_k - 1.0) * logXScale - powered;
+    }
+
+    /**
+     * {@inheritDoc}
      */
     @Override
     public double cdf(double x) {

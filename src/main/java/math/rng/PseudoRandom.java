@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, 2024 Stefan Zobel
+ * Copyright 2013, 2026 Stefan Zobel
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,7 +77,8 @@ public interface PseudoRandom extends PseudoRandomStream {
      * @param stdDeviation the standard deviation of the distribution, positive
      * @return a pseudorandom {@code double} from
      *         {@code N(mean, stdDeviation^2)}
-     * @throws IllegalArgumentException if {@code stdDeviation <= 0.0}
+     * @throws IllegalArgumentException if {@code stdDeviation} is not
+     *             greater than zero
      */
     double nextGaussian(double mean, double stdDeviation);
 
@@ -215,4 +216,377 @@ public interface PseudoRandom extends PseudoRandomStream {
      * @return a copy of the initial seed, or {@code null} if none was recorded
      */
     long[] getSeed();
+
+    /**
+     * Returns one pseudorandom value from the Cauchy distribution with the
+     * given location and scale.
+     * <p>
+     * The same value {@link #cauchy(long, double, double)} would put first in
+     * its stream, without building one.
+     *
+     * @param location the location of the distribution, its median
+     * @param scale the scale of the distribution, strictly positive
+     * @return a {@code Cauchy(location, scale)} variate
+     * @throws IllegalArgumentException if {@code scale} is not greater than
+     *             zero
+     * @since 1.5.3
+     */
+    default double nextCauchy(double location, double scale) {
+        CauchySpliterator.checkScale(scale);
+        return CauchySpliterator.sample(this, location, scale);
+    }
+
+    /**
+     * Returns one pseudorandom value from the exponential distribution with
+     * the given rate.
+     *
+     * @param lambda the rate of the distribution, strictly positive. Its mean
+     *            is {@code 1 / lambda}
+     * @return an {@code Exponential(lambda)} variate
+     * @throws IllegalArgumentException if {@code lambda} is not greater
+     *             than zero
+     * @since 1.5.3
+     */
+    default double nextExponential(double lambda) {
+        ExponentialSpliterator.checkRate(lambda);
+        return ExponentialSpliterator.sample(this, lambda);
+    }
+
+    /**
+     * Returns one pseudorandom value from the gamma distribution with the
+     * given shape and scale.
+     *
+     * @param k the shape of the distribution, strictly positive
+     * @param theta the scale of the distribution, strictly positive. The mean
+     *            is {@code k * theta}
+     * @return a {@code Gamma(k, theta)} variate
+     * @throws IllegalArgumentException if {@code k} or {@code theta} is not
+     *             greater than zero
+     * @since 1.5.3
+     */
+    default double nextGamma(double k, double theta) {
+        GammaSpliterator.checkParameters(k, theta);
+        return GammaSpliterator.sample(this, k, theta);
+    }
+
+    /**
+     * Returns one pseudorandom value from the beta distribution with the given
+     * shapes.
+     * <p>
+     * A beta variate is built from two gamma variates. {@link #beta(long,
+     * double, double)} draws the second from an independent generator split off
+     * this one, and refuses to run where that is impossible; a single draw takes
+     * both from this generator in sequence, which is equally independent and
+     * works for every generator. The two therefore do <b>not</b> return the same
+     * value from the same seed.
+     *
+     * @param alpha the first shape of the distribution, strictly positive
+     * @param beta the second shape of the distribution, strictly positive
+     * @return a {@code Beta(alpha, beta)} variate in {@code [0, 1]}
+     * @throws IllegalArgumentException if {@code alpha} or {@code beta} is
+     *             not greater than zero
+     * @since 1.5.3
+     */
+    default double nextBeta(double alpha, double beta) {
+        BetaSpliterator.checkParameters(alpha, beta);
+        return BetaSpliterator.sample(this, this, alpha, beta);
+    }
+
+    /**
+     * Returns one pseudorandom value from the chi-squared distribution with the
+     * given degrees of freedom.
+     *
+     * @param k the degrees of freedom, strictly positive. It need not be a
+     *            whole number
+     * @return a chi-squared variate with {@code k} degrees of freedom
+     * @throws IllegalArgumentException if {@code k} is not greater than zero
+     * @since 1.5.3
+     */
+    default double nextChiSquare(double k) {
+        ChiSquareSpliterator.checkDegreesOfFreedom(k);
+        return ChiSquareSpliterator.sample(this, k);
+    }
+
+    /**
+     * Returns one pseudorandom value from the F distribution with the given
+     * degrees of freedom.
+     * <p>
+     * As with {@link #nextBeta(double, double)} both underlying variates come
+     * from this generator in sequence, where {@link #fisherF(long, int, int)}
+     * splits a second generator off, so the two do not agree from the same seed.
+     *
+     * @param numeratorDF the numerator degrees of freedom, at least one
+     * @param denominatorDF the denominator degrees of freedom, at least one
+     * @return an {@code F(numeratorDF, denominatorDF)} variate
+     * @throws IllegalArgumentException if either argument is smaller than one
+     * @since 1.5.3
+     */
+    default double nextFisherF(int numeratorDF, int denominatorDF) {
+        FisherFSpliterator.checkParameters(numeratorDF, denominatorDF);
+        return FisherFSpliterator.sample(this, this, numeratorDF, denominatorDF);
+    }
+
+    /**
+     * Returns one pseudorandom value from the log-normal distribution whose
+     * logarithm has the given mean and standard deviation.
+     *
+     * @param mu the mean of the logarithm of the distribution
+     * @param sigma the standard deviation of the logarithm of the
+     *            distribution, strictly positive
+     * @return a {@code LogNormal(mu, sigma)} variate, strictly positive
+     * @throws IllegalArgumentException if {@code sigma} is not greater than
+     *             zero
+     * @since 1.5.3
+     */
+    default double nextLogNormal(double mu, double sigma) {
+        LogNormalSpliterator.checkSigma(sigma);
+        return LogNormalSpliterator.sample(this, mu, sigma);
+    }
+
+    /**
+     * Returns one pseudorandom value from Student's t distribution with the
+     * given degrees of freedom.
+     *
+     * @param df the degrees of freedom, strictly positive. It need not be a
+     *            whole number
+     * @return a {@code t(df)} variate
+     * @throws IllegalArgumentException if {@code df} is not greater than zero
+     * @since 1.5.3
+     */
+    default double nextStudentT(double df) {
+        StudentTSpliterator.checkDegreesOfFreedom(df);
+        return StudentTSpliterator.sample(this, df);
+    }
+
+    /**
+     * Returns one pseudorandom value from the Weibull distribution with the
+     * given scale and shape.
+     *
+     * @param scale the scale of the distribution, strictly positive
+     * @param shape the shape of the distribution, strictly positive
+     * @return a {@code Weibull(scale, shape)} variate
+     * @throws IllegalArgumentException if {@code scale} or {@code shape} is
+     *             not greater than zero
+     * @since 1.5.3
+     */
+    default double nextWeibull(double scale, double shape) {
+        WeibullSpliterator.checkParameters(scale, shape);
+        return WeibullSpliterator.sample(this, scale, shape);
+    }
+
+    /**
+     * Returns one pseudorandom value from the standard normal distribution
+     * truncated to {@code (min, max)}.
+     * <p>
+     * The result lies strictly between the two bounds. For an untruncated
+     * normal use {@link #nextGaussian(double, double)}, which is what a
+     * {@code nextNormal} would be.
+     *
+     * @param min the lower bound, exclusive
+     * @param max the upper bound, exclusive, strictly greater than {@code min}
+     * @return a standard normal variate conditioned on {@code (min, max)}
+     * @throws IllegalArgumentException if {@code min} is not smaller than
+     *             {@code max}
+     * @since 1.5.3
+     */
+    default double nextTruncatedStandardNormal(double min, double max) {
+        return TruncatedNormalSpliterator.sampleFor(this, min, max);
+    }
+
+    /**
+     * Returns one pseudorandom value from the LeCun normal distribution with
+     * the given standard deviation.
+     *
+     * @param sigma the standard deviation of the distribution, strictly
+     *            positive
+     * @return a LeCun normal variate
+     * @throws IllegalArgumentException if {@code sigma} is not greater than
+     *             zero
+     * @since 1.5.3
+     */
+    default double nextLeCunNormal(double sigma) {
+        return LeCunNormalSpliterator.sampleFor(this, sigma);
+    }
+
+    /**
+     * Returns one pseudorandom value from the inverse gamma distribution with
+     * the given shape and scale.
+     *
+     * @param alpha the shape of the distribution, strictly positive
+     * @param beta the scale of the distribution, strictly positive
+     * @return an {@code InverseGamma(alpha, beta)} variate
+     * @throws IllegalArgumentException if {@code alpha} or {@code beta} is
+     *             not greater than zero
+     * @since 1.5.3
+     */
+    default double nextInverseGamma(double alpha, double beta) {
+        return InverseGammaSpliterator.sampleFor(this, alpha, beta);
+    }
+
+    /**
+     * Returns one pseudorandom count from the Poisson distribution with the
+     * given mean.
+     *
+     * @param lambda the mean of the distribution, strictly positive
+     * @return a {@code Poisson(lambda)} count, zero or more
+     * @throws IllegalArgumentException if {@code lambda} is not strictly
+     *             positive or is too large to draw from
+     * @since 1.5.3
+     */
+    default int nextPoisson(double lambda) {
+        PoissonSpliterator.checkMean(lambda);
+        return PoissonSpliterator.sample(this, lambda);
+    }
+
+    /**
+     * Returns one pseudorandom count from the binomial distribution with the
+     * given number of trials and success probability.
+     *
+     * @param n the number of trials, zero or more
+     * @param p the success probability of a single trial, in {@code [0, 1]}
+     * @return a {@code Binomial(n, p)} count, from zero to {@code n}
+     * @throws IllegalArgumentException if {@code n} is negative or {@code p}
+     *             lies outside {@code [0, 1]}
+     * @since 1.5.3
+     */
+    default int nextBinomial(int n, double p) {
+        BinomialSpliterator.checkParameters(n, p);
+        return BinomialSpliterator.sample(this, n, p);
+    }
+
+    /**
+     * Returns one pseudorandom count from the geometric distribution with the
+     * given success probability: the number of failures before the first
+     * success.
+     *
+     * @param p the success probability, in {@code (0, 1]}
+     * @return a {@code Geometric(p)} count, zero or more
+     * @throws IllegalArgumentException if {@code p} is not in {@code (0, 1]}
+     * @since 1.5.3
+     */
+    default int nextGeometric(double p) {
+        GeometricSpliterator.checkProbability(p);
+        return GeometricSpliterator.sampleFor(this, p);
+    }
+
+    /**
+     * Returns one pseudorandom count from the negative binomial distribution:
+     * the number of failures before the {@code r}th success.
+     *
+     * @param r the number of successes to wait for, at least one
+     * @param p the success probability of a single trial, in {@code (0, 1]}
+     * @return a {@code NegativeBinomial(r, p)} count, zero or more
+     * @throws IllegalArgumentException if {@code r} is smaller than one or
+     *             {@code p} is not in {@code (0, 1]}
+     * @since 1.5.3
+     */
+    default int nextNegativeBinomial(int r, double p) {
+        NegativeBinomialSpliterator.checkParameters(r, p);
+        return NegativeBinomialSpliterator.sampleFor(this, r, p);
+    }
+
+    /**
+     * Returns one pseudorandom count from the hypergeometric distribution: the
+     * number of successes among {@code draws} taken without replacement from a
+     * population holding {@code successes} of them.
+     *
+     * @param population the size of the population, zero or more
+     * @param successes the number of successes in it, from zero to
+     *            {@code population}
+     * @param draws the number of items drawn, from zero to {@code population}
+     * @return the number of successes drawn
+     * @throws IllegalArgumentException if any argument is negative, or if
+     *             {@code successes} or {@code draws} exceeds {@code population}
+     * @since 1.5.3
+     */
+    default int nextHypergeometric(int population, int successes, int draws) {
+        HypergeometricSpliterator.checkParameters(population, successes, draws);
+        return HypergeometricSpliterator.sample(this, population, successes, draws);
+    }
+
+    /**
+     * Draws one vector of proportions from the Dirichlet distribution with
+     * the given concentrations into {@code proportions}.
+     * <p>
+     * Unlike the scalar draws above, this one builds a
+     * {@link DirichletSampler} per call: validating the concentrations and
+     * copying them is what that class is for, and there is nowhere here to
+     * keep the result. For more than a handful of draws hold a sampler, or a
+     * {@code Dirichlet} from the {@code math.distribution} package, and call
+     * it directly.
+     *
+     * @param alpha the concentration of each component, at least one of them,
+     *            each finite and strictly positive. Not modified
+     * @param proportions where the result is written, one entry per
+     *            component. Its previous contents are overwritten
+     * @throws IllegalArgumentException if {@code alpha} or
+     *             {@code proportions} is {@code null}, if {@code alpha} is
+     *             empty or holds a value that is not finite and strictly
+     *             positive, or if {@code proportions} is not as long as
+     *             {@code alpha}
+     * @since 1.5.3
+     */
+    default void nextDirichlet(double[] alpha, double[] proportions) {
+        DirichletSampler.of(alpha).sample(this, proportions);
+    }
+
+    /**
+     * Draws one vector of counts from the multinomial distribution that places
+     * {@code n} draws according to the given weights into {@code counts}.
+     * <p>
+     * As with {@link #nextDirichlet(double[], double[])}, this builds a
+     * {@link MultinomialSampler} per call, and for the same reason: validating
+     * the weights and turning them into conditional probabilities is what that
+     * class is for, and there is nowhere here to keep the result. For more
+     * than a handful of draws hold a sampler, or a {@code Multinomial} from the
+     * {@code math.distribution} package, and call it directly.
+     *
+     * @param n
+     *            the number of draws to place, not negative
+     * @param probabilities
+     *            the weight of each category, at least one of them, each finite
+     *            and not negative, and not all zero. They need not sum to one.
+     *            Not modified
+     * @param counts
+     *            where the result is written, one entry per category. Its
+     *            previous contents are overwritten
+     * @throws IllegalArgumentException
+     *             if {@code probabilities} or {@code counts} is {@code null},
+     *             if {@code n} is negative, if {@code probabilities} is empty
+     *             or holds a value that is negative or not finite or sums to
+     *             zero, or if {@code counts} is not as long as
+     *             {@code probabilities}
+     * @since 1.5.3
+     */
+    default void nextMultinomial(int n, double[] probabilities, int[] counts) {
+        MultinomialSampler.of(probabilities).sample(this, n, counts);
+    }
+
+    /**
+     * Returns one pseudorandom category from the categorical distribution the
+     * given weights describe: a single draw landing in a single category.
+     * <p>
+     * As with {@link #nextDirichlet(double[], double[])} and
+     * {@link #nextMultinomial(int, double[], int[])}, this builds its
+     * {@link AliasTable} per call, and for the same reason: validating and
+     * pairing up the weights is what that class is for, and there is nowhere
+     * here to keep the result. For more than a handful of draws hold a table
+     * -- or a {@code Categorical} from the {@code math.distribution} package
+     * -- and call it directly, or take the whole stream from
+     * {@link PseudoRandomStream#categorical(long, double[])}.
+     *
+     * @param weights
+     *            the weight of each category, at least one of them, each finite
+     *            and not negative, and not all zero. They need not sum to one.
+     *            Not modified
+     * @return a category in {@code 0 .. weights.length - 1}
+     * @throws IllegalArgumentException
+     *             if {@code weights} is {@code null}, is empty, holds a value
+     *             that is negative or not finite, or does not sum to a finite
+     *             positive number
+     * @since 1.5.3
+     */
+    default int nextCategorical(double[] weights) {
+        return AliasTable.of(weights).sample(this);
+    }
 }
