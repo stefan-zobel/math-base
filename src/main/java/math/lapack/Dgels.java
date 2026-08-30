@@ -192,13 +192,31 @@ public final class Dgels {
      *            offset into the array {@code work}
      * @param lwork
      *            the dimension of the array work
-     * @return {@code true} if the computation did succeed,
-     *         {@code false otherwise}
+     * @return {@code true} if the computation did succeed, {@code false} if
+     *         the triangular factor of {@code A} is exactly singular so that
+     *         {@code A} does not have full rank, or if {@code A} or {@code B}
+     *         holds an entry that is not finite -- a {@code NaN} or an
+     *         infinity is reported here rather than propagated into the
+     *         answer, which is what {@link Dgesv} and {@link LuFactorization}
+     *         do as well
+     * @throws NullPointerException
+     *             if {@code trans}, {@code a}, {@code b} or {@code work} is
+     *             {@code null}
+     * @throws IllegalArgumentException
+     *             if a size, an offset or a leading dimension is out of range,
+     *             or an array is too short for the problem described. On a
+     *             workspace query ({@code lwork == -1}) only {@code work} is
+     *             read, so the array lengths are not checked and
+     *             {@code new double[0]} is a valid argument for {@code a} and
+     *             {@code b}
      */
     public static boolean dgels(Trans trans, int m, int n, int nrhs, double[] a, int _a_offset, int lda, double[] b,
             int _b_offset, int ldb, double[] work, int _work_offset, int lwork) {
 
-        requireNonNull(trans, a, b, work);
+        Objects.requireNonNull(trans, "trans");
+        Objects.requireNonNull(a, "a");
+        Objects.requireNonNull(b, "b");
+        Objects.requireNonNull(work, "work");
 
         intW info = new intW(0);
         int mn = Math.min(m, n);
@@ -252,6 +270,18 @@ public final class Dgels {
         if (lquery) {
             return true;
         }
+        // Only now, past the workspace query: on a query nothing but WORK(1)
+        // is touched, and a caller is entitled to pass empty arrays for A and
+        // B, which is what LinearEquationsSolver does
+        checkOffset(_a_offset, "_a_offset");
+        checkOffset(_b_offset, "_b_offset");
+        checkOffset(_work_offset, "_work_offset");
+        // the tight bounds: the last column of A needs m entries and not lda
+        // of them, so a validly packed array is not rejected. B is written as
+        // far down as max(m, n) rows, by the quick return below among others
+        checkLen(a, _a_offset, n > 0 ? (long) lda * (n - 1) + m : 0L, "a");
+        checkLen(b, _b_offset, nrhs > 0 ? (long) ldb * (nrhs - 1) + Math.max(m, n) : 0L, "b");
+        checkLen(work, _work_offset, lwork, "work");
         // Quick return if possible
         if (Util.min(m, n, nrhs) == 0) {
             Dlaset.dlaset("Full", Math.max(m, n), nrhs, 0.0, 0.0, b, _b_offset, ldb);
@@ -264,6 +294,20 @@ public final class Dgels {
         // Scale A, B if max element outside range [SMLNUM,BIGNUM]
         double[] rwork = new double[1];
         double anrm = Dlange.dlange("M", m, n, a, _a_offset, lda, rwork, 0);
+        // Dlange takes a maximum of absolute values, and Math.max propagates a
+        // NaN, so anrm is NaN exactly when A holds one and infinite exactly
+        // when A holds an infinity. anrm is never negative, so the negated
+        // comparison against MAX_VALUE is false for both and true for every
+        // finite matrix, in one test.
+        //
+        // Left to itself a NaN makes every comparison below false, so A goes
+        // into the factorization unscaled and comes out NaN, reported as
+        // success; an infinity reaches Dlascl, which rejects it by throwing.
+        // Both are reported here instead, so that all three public entry
+        // points answer a non-finite argument the same way
+        if (!(anrm <= Double.MAX_VALUE)) {
+            return false;
+        }
         int iascl = 0;
         if (anrm > 0.0 && anrm < smlnum.val) {
             // Scale matrix norm up to SMLNUM
@@ -284,6 +328,9 @@ public final class Dgels {
             brow = n;
         }
         double bnrm = Dlange.dlange("M", brow, nrhs, b, _b_offset, ldb, rwork, 0);
+        if (!(bnrm <= Double.MAX_VALUE)) {
+            return false;
+        }
         int ibscl = 0;
         if (bnrm > 0.0 && bnrm < smlnum.val) {
             // Scale matrix norm up to SMLNUM
@@ -392,17 +439,22 @@ public final class Dgels {
         }
 
         work[_work_offset] = wsize;
-        if (info.val > 0) {
-            return false;
-        } else if (info.val < 0) {
-            throw new IllegalArgumentException();
-        }
-        return true;
+        // A negative info would mean an illegal argument, which the checks
+        // above have already ruled out and which Xerbla would throw on in any
+        // case, so only the rank report can come back from here
+        return info.val <= 0;
     }
 
-    private static void requireNonNull(Object... args) {
-        for (Object arg : args) {
-            Objects.requireNonNull(arg);
+    private static void checkOffset(int offset, String name) {
+        if (offset < 0) {
+            throw new IllegalArgumentException(name + " must not be negative, but is " + offset);
+        }
+    }
+
+    private static void checkLen(double[] array, int offset, long needed, String name) {
+        if (array.length - offset < needed) {
+            throw new IllegalArgumentException("Array '" + name + "' must hold at least " + needed
+                    + " entries from offset " + offset + " (length = " + array.length + ")");
         }
     }
 
