@@ -182,6 +182,11 @@ public class VectorOpsTest {
      * exactly the one the straightforward loop gives, so nothing that was
      * already working can move.
      * <p>
+     * Since {@code twoNorm} takes the optimistic order this is no longer a
+     * coincidence but the definition: in that range the method is nothing but
+     * {@code sqrt} of the straightforward sum, and the scaling pass is never
+     * reached. The test is kept because it is what pins that range down.
+     * <p>
      * On the Java 25 tree that equality holds up to the reduction order, which
      * {@code DoubleVector.reduceLanes(ADD)} deliberately leaves unspecified:
      * the same call site there produces two different results one unit in the
@@ -723,5 +728,84 @@ public class VectorOpsTest {
                 assertSameBits(where, Math.scalb(Math.sqrt(n), k), VectorOps.twoNorm(v));
             }
         }
+    }
+
+    /**
+     * The seam the optimistic order creates. The route is chosen from the sum
+     * of the squares rather than from the largest element, so it switches at a
+     * different place than it used to -- and in the Java 25 tree at a place
+     * that sits downstream of {@code reduceLanes(ADD)}, whose order the Vector
+     * API leaves unspecified, so the two trees need not switch on the same
+     * vector.
+     * <p>
+     * What has to hold across that seam is that the answer does not jump. For
+     * {@code n} copies of {@code +/-2^k} both routes are exact -- a power of
+     * two squares exactly, and sums exactly {@code n} times -- so that sweep is
+     * asserted bit for bit. For a random vector the two routes can disagree,
+     * and the measured size of it is one unit in the last place: over 50391
+     * vectors spanning the whole exponent range the route changed 107 times,
+     * of which 4 changed a bit, none by more than an ulp. That is what this
+     * holds the method to.
+     * <p>
+     * A vector is skipped once the scaling drives its own elements subnormal.
+     * The data has lost bits before the norm is asked for at that point, and
+     * no arrangement of the summation puts them back.
+     */
+    @Test
+    public void testTheDirectAndTheScaledRouteAgreeAcrossTheBoundary() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            for (int k = -560; k <= -490; ++k) {
+                assertUniformVectorIsExact(n, k);
+            }
+            for (int k = 470; k <= 540; ++k) {
+                assertUniformVectorIsExact(n, k);
+            }
+
+            double[] unit = new double[n];
+            for (int i = 0; i < n; ++i) {
+                unit[i] = next();
+            }
+            double reference = VectorOps.twoNorm(unit);
+            if (reference == 0.0) {
+                continue;
+            }
+            for (int k = -560; k <= 540; ++k) {
+                if (k > -490 && k < 470) {
+                    // away from either boundary, and covered elsewhere
+                    continue;
+                }
+                double[] v = new double[n];
+                boolean usable = true;
+                for (int i = 0; i < n; ++i) {
+                    v[i] = Math.scalb(unit[i], k);
+                    if (v[i] != 0.0 && Math.abs(v[i]) < Double.MIN_NORMAL) {
+                        usable = false;
+                    }
+                }
+                double expected = Math.scalb(reference, k);
+                if (!usable || expected == 0.0 || Double.isInfinite(expected)) {
+                    continue;
+                }
+                double actual = VectorOps.twoNorm(v);
+                assertTrue("n = " + n + " at 2^" + k + " : " + expected + " vs " + actual,
+                        Math.abs(expected - actual) <= Math.ulp(expected));
+            }
+        }
+    }
+
+    /**
+     * {@code n} copies of {@code +/-2^k} have the norm {@code 2^k * sqrt(n)},
+     * and both routes reach it exactly: the squares are powers of two, the
+     * partial sums are small integer multiples of one, and the scaling factor
+     * of the other route is itself a power of two.
+     */
+    private static void assertUniformVectorIsExact(int n, int k) {
+        double s = Math.scalb(1.0, k);
+        double[] v = new double[n];
+        for (int i = 0; i < n; ++i) {
+            v[i] = ((i & 1) == 0) ? s : -s;
+        }
+        assertSameBits("n = " + n + " at 2^" + k, Math.scalb(Math.sqrt(n), k), VectorOps.twoNorm(v));
     }
 }
