@@ -41,9 +41,12 @@ final class Ilaenv {
         label0: {
             boolean flag1;
             boolean flag2;
-            String s1;
-            String s2;
-            String s3;
+            // the uppercased routine name. It is read at fixed offsets --
+            // LAPACK's SUBNAM is a one-character type prefix, a two-character
+            // matrix group and a three-character routine -- so it has to be
+            // visible in the ispec 2 and ispec 3 blocks below, which sit
+            // outside the labeled block it is assigned in
+            String s4;
 
             label1: {
                 label2: {
@@ -89,8 +92,8 @@ final class Ilaenv {
                         break label0;
                     }
 
-                    String s4 = name;
-                    char c = s4.substring(0, 1).charAt(0);
+                    s4 = name;
+                    char c = name.charAt(0);
                     // Reference ILAENV asks the runtime what number 'Z' has and
                     // uppercases the name with the arithmetic that fits the
                     // answer: 90 or 122 for ASCII, 233 or 169 for EBCDIC, whose
@@ -107,22 +110,18 @@ final class Ilaenv {
                         s4 = Util.stringInsert(s4, Character.valueOf((char) (c - 32)).toString(), 1, 1);
                         j = 2;
                         for (i = 5; i > 0; i--) {
-                            c = s4.substring(j + -1, j).charAt(0);
+                            c = s4.charAt(j - 1);
                             if ((c >= 'a') && (c <= 'z')) {
                                 s4 = Util.stringInsert(s4, Character.valueOf((char) (c - 32)).toString(), j, j);
                             }
                             j++;
                         }
                     }
-                    String s5 = s4.substring(0, 1);
-                    flag2 = s5.regionMatches(0, "S", 0, 1) || s5.regionMatches(0, "D", 0, 1);
-                    flag1 = s5.regionMatches(0, "C", 0, 1) || s5.regionMatches(0, "Z", 0, 1);
+                    flag2 = prefix(s4, "S") || prefix(s4, "D");
+                    flag1 = prefix(s4, "C") || prefix(s4, "Z");
                     if (!(flag1 || flag2)) {
                         return 1;
                     }
-                    s1 = s4.substring(1, 3);
-                    s3 = s4.substring(3, 6);
-                    s2 = s3.substring(1, 3);
                     i = ispec;
                     if (i != 1) {
                         if (i == 2) {
@@ -133,84 +132,84 @@ final class Ilaenv {
                         }
                     }
                     int x0 = 1;
-                    if (s1.regionMatches(0, "GE", 0, 2)) {
-                        if (s3.regionMatches(0, "TRF", 0, 3)) {
+                    if (group(s4, "GE")) {
+                        if (routine(s4, "TRF")) {
                             if (flag2)
                                 x0 = 64;
                             else
                                 x0 = 64;
-                        } else if (((s3.regionMatches(0, "QRF", 0, 3) || s3.regionMatches(0, "RQF", 0, 3))
-                                || s3.regionMatches(0, "LQF", 0, 3)) || s3.regionMatches(0, "QLF", 0, 3)) {
-                            if (flag2)
-                                x0 = 32;
-                            else
-                                x0 = 32;
-                        } else if (s3.regionMatches(0, "HRD", 0, 3)) {
+                        } else if (((routine(s4, "QRF") || routine(s4, "RQF"))
+                                || routine(s4, "LQF")) || routine(s4, "QLF")) {
                             if (flag2)
                                 x0 = 32;
                             else
                                 x0 = 32;
-                        } else if (s3.regionMatches(0, "BRD", 0, 3)) {
+                        } else if (routine(s4, "HRD")) {
                             if (flag2)
                                 x0 = 32;
                             else
                                 x0 = 32;
-                        } else if (s3.regionMatches(0, "TRI", 0, 3))
+                        } else if (routine(s4, "BRD")) {
+                            if (flag2)
+                                x0 = 32;
+                            else
+                                x0 = 32;
+                        } else if (routine(s4, "TRI"))
                             if (flag2)
                                 x0 = 64;
                             else
                                 x0 = 64;
-                    } else if (s1.regionMatches(0, "PO", 0, 2)) {
-                        if (s3.regionMatches(0, "TRF", 0, 3))
+                    } else if (group(s4, "PO")) {
+                        if (routine(s4, "TRF"))
                             if (flag2)
                                 x0 = 64;
                             else
                                 x0 = 64;
-                    } else if (s1.regionMatches(0, "SY", 0, 2)) {
-                        if (s3.regionMatches(0, "TRF", 0, 3)) {
+                    } else if (group(s4, "SY")) {
+                        if (routine(s4, "TRF")) {
                             if (flag2)
                                 x0 = 64;
                             else
                                 x0 = 64;
-                        } else if (flag2 && s3.regionMatches(0, "TRD", 0, 3))
+                        } else if (flag2 && routine(s4, "TRD"))
                             x0 = 32;
-                        else if (flag2 && s3.regionMatches(0, "GST", 0, 3))
+                        else if (flag2 && routine(s4, "GST"))
                             x0 = 64;
-                    } else if (flag1 && s1.regionMatches(0, "HE", 0, 2)) {
-                        if (s3.regionMatches(0, "TRF", 0, 3))
+                    } else if (flag1 && group(s4, "HE")) {
+                        if (routine(s4, "TRF"))
                             x0 = 64;
-                        else if (s3.regionMatches(0, "TRD", 0, 3))
+                        else if (routine(s4, "TRD"))
                             x0 = 32;
-                        else if (s3.regionMatches(0, "GST", 0, 3))
+                        else if (routine(s4, "GST"))
                             x0 = 64;
-                    } else if (flag2 && s1.regionMatches(0, "OR", 0, 2)) {
-                        if (s3.substring(0, 1).regionMatches(0, "G", 0, 1)) {
-                            if ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                    || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                    || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                    || s2.regionMatches(0, "BR", 0, 2))
+                    } else if (flag2 && group(s4, "OR")) {
+                        if (action(s4, "G")) {
+                            if ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                    || pair(s4, "LQ")) || pair(s4, "QL"))
+                                    || pair(s4, "HR")) || pair(s4, "TR"))
+                                    || pair(s4, "BR"))
                                 x0 = 32;
-                        } else if (s3.substring(0, 1).regionMatches(0, "M", 0, 1)
-                                && ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                        || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                        || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                        || s2.regionMatches(0, "BR", 0, 2)))
+                        } else if (action(s4, "M")
+                                && ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                        || pair(s4, "LQ")) || pair(s4, "QL"))
+                                        || pair(s4, "HR")) || pair(s4, "TR"))
+                                        || pair(s4, "BR")))
                             x0 = 32;
-                    } else if (flag1 && s1.regionMatches(0, "UN", 0, 2)) {
-                        if (s3.substring(0, 1).regionMatches(0, "G", 0, 1)) {
-                            if ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                    || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                    || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                    || s2.regionMatches(0, "BR", 0, 2))
+                    } else if (flag1 && group(s4, "UN")) {
+                        if (action(s4, "G")) {
+                            if ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                    || pair(s4, "LQ")) || pair(s4, "QL"))
+                                    || pair(s4, "HR")) || pair(s4, "TR"))
+                                    || pair(s4, "BR"))
                                 x0 = 32;
-                        } else if (s3.substring(0, 1).regionMatches(0, "M", 0, 1)
-                                && ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                        || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                        || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                        || s2.regionMatches(0, "BR", 0, 2)))
+                        } else if (action(s4, "M")
+                                && ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                        || pair(s4, "LQ")) || pair(s4, "QL"))
+                                        || pair(s4, "HR")) || pair(s4, "TR"))
+                                        || pair(s4, "BR")))
                             x0 = 32;
-                    } else if (s1.regionMatches(0, "GB", 0, 2)) {
-                        if (s3.regionMatches(0, "TRF", 0, 3))
+                    } else if (group(s4, "GB")) {
+                        if (routine(s4, "TRF"))
                             if (flag2) {
                                 if (n4 <= 64)
                                     x0 = 1;
@@ -220,8 +219,8 @@ final class Ilaenv {
                                 x0 = 1;
                             else
                                 x0 = 32;
-                    } else if (s1.regionMatches(0, "PB", 0, 2)) {
-                        if (s3.regionMatches(0, "TRF", 0, 3))
+                    } else if (group(s4, "PB")) {
+                        if (routine(s4, "TRF"))
                             if (flag2) {
                                 if (n2 <= 64)
                                     x0 = 1;
@@ -231,125 +230,157 @@ final class Ilaenv {
                                 x0 = 1;
                             else
                                 x0 = 32;
-                    } else if (s1.regionMatches(0, "TR", 0, 2)) {
-                        if (s3.regionMatches(0, "TRI", 0, 3))
+                    } else if (group(s4, "TR")) {
+                        if (routine(s4, "TRI"))
                             if (flag2)
                                 x0 = 64;
                             else
                                 x0 = 64;
-                    } else if (s1.regionMatches(0, "LA", 0, 2)) {
-                        if (s3.regionMatches(0, "UUM", 0, 3))
+                    } else if (group(s4, "LA")) {
+                        if (routine(s4, "UUM"))
                             if (flag2)
                                 x0 = 64;
                             else
                                 x0 = 64;
-                    } else if ((flag2 && s1.regionMatches(0, "ST", 0, 2)) && s3.regionMatches(0, "EBZ", 0, 3))
+                    } else if ((flag2 && group(s4, "ST")) && routine(s4, "EBZ"))
                         x0 = 1;
 
                     return x0;
                 } // label2
                 int x1 = 2;
-                if (s1.regionMatches(0, "GE", 0, 2)) {
-                    if (((s3.regionMatches(0, "QRF", 0, 3) || s3.regionMatches(0, "RQF", 0, 3))
-                            || s3.regionMatches(0, "LQF", 0, 3)) || s3.regionMatches(0, "QLF", 0, 3)) {
+                if (group(s4, "GE")) {
+                    if (((routine(s4, "QRF") || routine(s4, "RQF"))
+                            || routine(s4, "LQF")) || routine(s4, "QLF")) {
                         if (flag2)
                             x1 = 2;
                         else
                             x1 = 2;
-                    } else if (s3.regionMatches(0, "HRD", 0, 3)) {
+                    } else if (routine(s4, "HRD")) {
                         if (flag2)
                             x1 = 2;
                         else
                             x1 = 2;
-                    } else if (s3.regionMatches(0, "BRD", 0, 3)) {
+                    } else if (routine(s4, "BRD")) {
                         if (flag2)
                             x1 = 2;
                         else
                             x1 = 2;
-                    } else if (s3.regionMatches(0, "TRI", 0, 3))
+                    } else if (routine(s4, "TRI"))
                         if (flag2)
                             x1 = 2;
                         else
                             x1 = 2;
-                } else if (s1.regionMatches(0, "SY", 0, 2)) {
-                    if (s3.regionMatches(0, "TRF", 0, 3)) {
+                } else if (group(s4, "SY")) {
+                    if (routine(s4, "TRF")) {
                         if (flag2)
                             x1 = 8;
                         else
                             x1 = 8;
-                    } else if (flag2 && s3.regionMatches(0, "TRD", 0, 3))
+                    } else if (flag2 && routine(s4, "TRD"))
                         x1 = 2;
-                } else if (flag1 && s1.regionMatches(0, "HE", 0, 2)) {
-                    if (s3.regionMatches(0, "TRD", 0, 3))
+                } else if (flag1 && group(s4, "HE")) {
+                    if (routine(s4, "TRD"))
                         x1 = 2;
-                } else if (flag2 && s1.regionMatches(0, "OR", 0, 2)) {
-                    if (s3.substring(0, 1).regionMatches(0, "G", 0, 1)) {
-                        if ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                || s2.regionMatches(0, "BR", 0, 2))
+                } else if (flag2 && group(s4, "OR")) {
+                    if (action(s4, "G")) {
+                        if ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                || pair(s4, "LQ")) || pair(s4, "QL"))
+                                || pair(s4, "HR")) || pair(s4, "TR"))
+                                || pair(s4, "BR"))
                             x1 = 2;
-                    } else if (s3.substring(0, 1).regionMatches(0, "M", 0, 1)
-                            && ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                    || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                    || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                    || s2.regionMatches(0, "BR", 0, 2)))
+                    } else if (action(s4, "M")
+                            && ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                    || pair(s4, "LQ")) || pair(s4, "QL"))
+                                    || pair(s4, "HR")) || pair(s4, "TR"))
+                                    || pair(s4, "BR")))
                         x1 = 2;
-                } else if (flag1 && s1.regionMatches(0, "UN", 0, 2))
-                    if (s3.substring(0, 1).regionMatches(0, "G", 0, 1)) {
-                        if ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                || s2.regionMatches(0, "BR", 0, 2))
+                } else if (flag1 && group(s4, "UN"))
+                    if (action(s4, "G")) {
+                        if ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                || pair(s4, "LQ")) || pair(s4, "QL"))
+                                || pair(s4, "HR")) || pair(s4, "TR"))
+                                || pair(s4, "BR"))
                             x1 = 2;
-                    } else if (s3.substring(0, 1).regionMatches(0, "M", 0, 1)
-                            && ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                    || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                    || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                    || s2.regionMatches(0, "BR", 0, 2)))
+                    } else if (action(s4, "M")
+                            && ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                    || pair(s4, "LQ")) || pair(s4, "QL"))
+                                    || pair(s4, "HR")) || pair(s4, "TR"))
+                                    || pair(s4, "BR")))
                         x1 = 2;
 
                 return x1;
             } // label1
             char c2 = '\0';
-            if (s1.regionMatches(0, "GE", 0, 2)) {
-                if (((s3.regionMatches(0, "QRF", 0, 3) || s3.regionMatches(0, "RQF", 0, 3))
-                        || s3.regionMatches(0, "LQF", 0, 3)) || s3.regionMatches(0, "QLF", 0, 3)) {
+            if (group(s4, "GE")) {
+                if (((routine(s4, "QRF") || routine(s4, "RQF"))
+                        || routine(s4, "LQF")) || routine(s4, "QLF")) {
                     if (flag2)
                         c2 = '\200';
                     else
                         c2 = '\200';
-                } else if (s3.regionMatches(0, "HRD", 0, 3)) {
+                } else if (routine(s4, "HRD")) {
                     if (flag2)
                         c2 = '\200';
                     else
                         c2 = '\200';
-                } else if (s3.regionMatches(0, "BRD", 0, 3))
+                } else if (routine(s4, "BRD"))
                     if (flag2)
                         c2 = '\200';
                     else
                         c2 = '\200';
-            } else if (s1.regionMatches(0, "SY", 0, 2)) {
-                if (flag2 && s3.regionMatches(0, "TRD", 0, 3))
+            } else if (group(s4, "SY")) {
+                if (flag2 && routine(s4, "TRD"))
                     c2 = ' ';
-            } else if (flag1 && s1.regionMatches(0, "HE", 0, 2)) {
-                if (s3.regionMatches(0, "TRD", 0, 3))
+            } else if (flag1 && group(s4, "HE")) {
+                if (routine(s4, "TRD"))
                     c2 = ' ';
-            } else if (flag2 && s1.regionMatches(0, "OR", 0, 2)) {
-                if (s3.substring(0, 1).regionMatches(0, "G", 0, 1)
-                        && ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                                || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                                || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                                || s2.regionMatches(0, "BR", 0, 2)))
+            } else if (flag2 && group(s4, "OR")) {
+                if (action(s4, "G")
+                        && ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                                || pair(s4, "LQ")) || pair(s4, "QL"))
+                                || pair(s4, "HR")) || pair(s4, "TR"))
+                                || pair(s4, "BR")))
                     c2 = '\200';
-            } else if ((flag1 && s1.regionMatches(0, "UN", 0, 2)) && s3.substring(0, 1).regionMatches(0, "G", 0, 1)
-                    && ((((((s2.regionMatches(0, "QR", 0, 2) || s2.regionMatches(0, "RQ", 0, 2))
-                            || s2.regionMatches(0, "LQ", 0, 2)) || s2.regionMatches(0, "QL", 0, 2))
-                            || s2.regionMatches(0, "HR", 0, 2)) || s2.regionMatches(0, "TR", 0, 2))
-                            || s2.regionMatches(0, "BR", 0, 2)))
+            } else if ((flag1 && group(s4, "UN")) && action(s4, "G")
+                    && ((((((pair(s4, "QR") || pair(s4, "RQ"))
+                            || pair(s4, "LQ")) || pair(s4, "QL"))
+                            || pair(s4, "HR")) || pair(s4, "TR"))
+                            || pair(s4, "BR")))
                 c2 = '\200';
             return c2;
         } // label0
         return 1;
+    }
+
+    // LAPACK addresses a routine by the layout of its name, SUBNAM, which is a
+    // one-character type prefix, a two-character matrix group and a
+    // three-character routine whose first letter is the action. The f2j
+    // translation cut the name into four substrings to match those pieces,
+    // which allocated five to seven strings on every call; regionMatches takes
+    // an offset into the receiver, so the pieces never have to exist.
+
+    /** the type prefix: S or D for real, C or Z for complex */
+    private static boolean prefix(String s, String lit) {
+        return s.regionMatches(0, lit, 0, 1);
+    }
+
+    /** the two-character matrix group, GE, SY, PO and the rest */
+    private static boolean group(String s, String lit) {
+        return s.regionMatches(1, lit, 0, 2);
+    }
+
+    /** the three-character routine, TRF, QRF, TRD and the rest */
+    private static boolean routine(String s, String lit) {
+        return s.regionMatches(3, lit, 0, 3);
+    }
+
+    /** the first letter of the routine alone: G generates a factor, M multiplies by one */
+    private static boolean action(String s, String lit) {
+        return s.regionMatches(3, lit, 0, 1);
+    }
+
+    /** the two characters after the action, naming the factorization: QR, LQ and the rest */
+    private static boolean pair(String s, String lit) {
+        return s.regionMatches(4, lit, 0, 2);
     }
 }
