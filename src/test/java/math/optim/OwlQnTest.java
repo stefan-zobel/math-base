@@ -9,6 +9,7 @@ import org.junit.Test;
 
 import math.linalg.DMatrix;
 import math.linalg.Lasso;
+import math.linalg.VectorOps;
 
 /**
  * Tests for {@link OrthantWiseLimitedMemoryBFGS}, cross-checked against
@@ -526,6 +527,157 @@ public class OwlQnTest {
         f.getParameters(w);
         for (int i = 0; i < w.length; ++i) {
             assertEquals("w[" + i + "] must be exactly zero", 0.0, w[i], 0.0);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // the same problem moved along the exponent axis, where the squared
+    // directional derivative used to leave the range
+    // ------------------------------------------------------------------
+
+    /** The solution of {@link ScaledQuadratic}, whatever it is scaled by. */
+    private static final double[] QUADRATIC_TARGET = { 1.0, -2.0, 3.0, 0.5 };
+
+    /**
+     * The separable quadratic {@code 0.5*c*||w - t||^2}. Its solution is
+     * {@code t} for every {@code c}, so a power of two in {@code c} moves the
+     * whole problem along the exponent axis and changes nothing else. MALLET
+     * maximizes {@code getValue()}, hence the negation.
+     */
+    static final class ScaledQuadratic implements Optimizable.ByGradientValue {
+
+        private final double c;
+        private final double[] w = new double[QUADRATIC_TARGET.length];
+
+        ScaledQuadratic(double c) {
+            this.c = c;
+        }
+
+        @Override
+        public int getNumParameters() {
+            return w.length;
+        }
+
+        @Override
+        public void getParameters(double[] buffer) {
+            System.arraycopy(w, 0, buffer, 0, w.length);
+        }
+
+        @Override
+        public double getParameter(int index) {
+            return w[index];
+        }
+
+        @Override
+        public void setParameters(double[] params) {
+            System.arraycopy(params, 0, w, 0, w.length);
+        }
+
+        @Override
+        public void setParameter(int index, double value) {
+            w[index] = value;
+        }
+
+        @Override
+        public double getValue() {
+            double s = 0.0;
+            for (int i = 0; i < w.length; i++) {
+                double d = w[i] - QUADRATIC_TARGET[i];
+                s += d * d;
+            }
+            return -0.5 * c * s;
+        }
+
+        @Override
+        public void getValueGradient(double[] buffer) {
+            for (int i = 0; i < w.length; i++) {
+                buffer[i] = -c * (w[i] - QUADRATIC_TARGET[i]);
+            }
+        }
+    }
+
+    /**
+     * The scaled quadratic with a zero gradient tolerance, so that a gradient
+     * which is merely small is not mistaken for a converged one -- which is the
+     * whole point at the scales below.
+     */
+    private static OrthantWiseLimitedMemoryBFGS forScale(ScaledQuadratic f) {
+        return new OrthantWiseLimitedMemoryBFGS(f, 0.0, 1000, 1.0e-14, 0.0, 4);
+    }
+
+    /**
+     * While no curvature pair is stored the direction is the steepest descent,
+     * whose length says nothing, and the step is normalized to one. So the
+     * first step lands on exactly the same point however far the objective is
+     * moved along the exponent axis, including at the four scales where the
+     * line search used to fail outright.
+     * <p>
+     * Bit for bit rather than to a tolerance: the factor is a power of two, so
+     * scaling the problem is exact, and {@code twoNorm} is exactly homogeneous
+     * under powers of two -- which is what
+     * {@code VectorOpsTest.testTheTwoNormIsAbsolutelyHomogeneous} pins.
+     */
+    @Test
+    public void testTheFirstStepIsTheSameHoweverTheObjectiveIsScaled() {
+        int[] exponents = { 0, -600, -540, -500, 500, 512, 520 };
+        double[] reference = null;
+        for (int ei = 0; ei < exponents.length; ++ei) {
+            String where = "at 2^" + exponents[ei];
+            ScaledQuadratic f = new ScaledQuadratic(Math.scalb(1.0, exponents[ei]));
+            forScale(f).optimize(1);
+
+            double[] w = new double[QUADRATIC_TARGET.length];
+            f.getParameters(w);
+            assertEquals("the first step must have unit length, " + where, 1.0, VectorOps.twoNorm(w), 0.0);
+            if (reference == null) {
+                reference = w;
+            } else {
+                for (int j = 0; j < w.length; ++j) {
+                    assertEquals("coefficient " + j + " " + where, Double.doubleToRawLongBits(reference[j]),
+                            Double.doubleToRawLongBits(w[j]));
+                }
+            }
+        }
+    }
+
+    /**
+     * The two ends at which the line search used to fail, which are one defect
+     * seen twice. The directional derivative of the unnormalized steepest
+     * descent is {@code -||g||^2}: below about {@code 1.5e-162} it underflowed
+     * to zero and was read as a non-ascent direction, so a correct gradient was
+     * rejected with "check your gradient!"; above about {@code 1.3e154} it
+     * overflowed, no step could satisfy an Armijo bound of {@code -Infinity},
+     * and the search stalled without leaving the starting point.
+     * <p>
+     * The upper end is asserted down to the solution. The lower end is not, and
+     * deliberately: there the run still stops early on
+     * {@code checkValueTerminationCondition}, whose {@code eps} is an absolute
+     * {@code 1.0e-5} added to an otherwise relative test, so an objective whose
+     * values sit far below that converges on the floor instead. That is a
+     * separate defect and not this one.
+     */
+    @Test
+    public void testABadlyScaledObjectiveIsNeitherABadGradientNorAStalledSearch() {
+        int[] tiny = { -600, -540 };
+        for (int ei = 0; ei < tiny.length; ++ei) {
+            ScaledQuadratic f = new ScaledQuadratic(Math.scalb(1.0, tiny[ei]));
+            assertTrue("a correct gradient must not be rejected as a non-ascent direction, at 2^" + tiny[ei],
+                    forScale(f).optimize());
+        }
+
+        int[] huge = { 512, 520 };
+        for (int ei = 0; ei < huge.length; ++ei) {
+            String where = "at 2^" + huge[ei];
+            ScaledQuadratic f = new ScaledQuadratic(Math.scalb(1.0, huge[ei]));
+            OrthantWiseLimitedMemoryBFGS owlqn = forScale(f);
+
+            assertTrue(where, owlqn.optimize());
+            assertFalse("the line search must not stall, " + where,
+                    owlqn.getTermination() == Termination.LINE_SEARCH_STALLED);
+            double[] w = new double[QUADRATIC_TARGET.length];
+            f.getParameters(w);
+            assertTrue("deviation " + maxDeviation(QUADRATIC_TARGET, w) + " " + where,
+                    maxDeviation(QUADRATIC_TARGET, w) < 1.0e-9);
         }
     }
 }

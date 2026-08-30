@@ -530,23 +530,29 @@ public final class OrthantWiseLimitedMemoryBFGS implements Optimizer {
 
     // backtrack line search; returns false if no acceptable step was found
     private boolean backTrackingLineSearch() {
+        double alpha = 1.0;
+        double backoff = 0.5;
+        if (s.size() == 0) {
+            // With no curvature pair stored the direction is the steepest
+            // descent, whose length carries no information, so the step is
+            // normalized to one. Normalizing the direction itself rather
+            // than dividing alpha by its length is what keeps the
+            // derivative below out of a square: d.g for the unnormalized
+            // steepest descent is -||g||^2, which leaves the range from
+            // about 1.3e154 upwards and from about 1.5e-162 down, while
+            // for the normalized one it is -||g||, and everything the line
+            // search forms from it stays well inside. The norm has to be
+            // the safe one for the same reason, and it cannot be zero: the
+            // check above the line search falls back to the steepest
+            // descent when it is.
+            VectorOps.timesEquals(direction, 1.0 / VectorOps.twoNorm(direction));
+            backoff = 0.1;
+        }
+
         double origDirDeriv = dirDeriv();
         if (origDirDeriv >= 0) {
             throw new InvalidOptimizableException(
                     "L-BFGS chose a non-ascent direction: check your gradient!");
-        }
-
-        double alpha = 1.0;
-        double backoff = 0.5;
-        if (iterations == 0) {
-            // the first step is normalized to unit length, so the norm
-            // here must be the safe one -- the naive sum of squares
-            // this used to take answers Infinity above about 8.4e152
-            // per element and 0.0 below about 1.1e-162, and alpha is
-            // one divided by it
-            double normDir = VectorOps.twoNorm(direction);
-            alpha = 1.0 / normDir;
-            backoff = 0.1;
         }
 
         final double c1 = 1e-4;
