@@ -294,6 +294,11 @@ public final class VectorOps {
 
     /**
      * The signed sum {@code sum m_i}.
+     * <p>
+     * This can overflow to an infinity, and nothing can be done about that: a
+     * sum that leaves the range has no representable answer.
+     * {@link #mean(double[])} does repair the case where the mean itself is
+     * still representable.
      *
      * @param m The array
      * @return the sum of the elements, {@code 0.0} for an empty array
@@ -337,12 +342,45 @@ public final class VectorOps {
         return false;
     }
 
+    /**
+     * The arithmetic mean {@code (sum m_i) / n}, computed so that it does not
+     * overflow for a vector whose sum leaves the range while its mean does
+     * not.
+     * <p>
+     * The elements are summed directly, which for every vector that has no
+     * problem is bit for bit what the straightforward loop gives. Only where
+     * that sum comes back infinite -- a thousand elements of {@code 1e306}
+     * reach it, and so does {@code (1e308, 1e308, -1e308)}, whose overflow
+     * cancels away again -- are the elements scaled by a power of two, which
+     * is exact, and the result scaled back. {@link #sum(double[])} has no such
+     * repair available to it: a sum that overflows has no representable
+     * answer.
+     * <p>
+     * Both loops are scalar in the Java 8 and the Java 25 source tree, so
+     * unlike {@link #twoNorm(double[])} and
+     * {@link #dotProduct(double[], double[])} this method returns the same
+     * bits in either.
+     *
+     * @param m The array
+     * @return the arithmetic mean, {@code Double.NaN} for an empty array
+     */
     public static double mean(double[] m) {
         double sum = 0.0;
         for (int i = 0; i < m.length; i++) {
             sum += m[i];
         }
-        return sum / m.length;
+        if (Math.abs(sum) <= Double.MAX_VALUE) {
+            return sum / m.length;
+        }
+        // NaN and infinite input reach this branch as well and carry through
+        // it unchanged: the scaling is a multiplication by a power of two
+        int exponent = Math.getExponent(maxAbs(m));
+        double scale = Math.scalb(1.0, -exponent);
+        double scaled = 0.0;
+        for (int i = 0; i < m.length; i++) {
+            scaled += m[i] * scale;
+        }
+        return Math.scalb(scaled / m.length, exponent);
     }
 
     public static double max(double[] elems) {

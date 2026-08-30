@@ -483,4 +483,159 @@ public class VectorOpsTest {
                     VectorOps.infinityNorm(w));
         }
     }
+
+    // ------------------------------------------------------------------
+    // mean, whose accumulator can leave the range where the answer does not
+    // ------------------------------------------------------------------
+
+    /** The mean as the straightforward loop computes it. */
+    private static double naiveMean(double[] v) {
+        double sum = 0.0;
+        for (int i = 0; i < v.length; i++) {
+            sum += v[i];
+        }
+        return sum / v.length;
+    }
+
+    /**
+     * For every vector whose sum stays in range -- which is every vector this
+     * library is likely to see -- the result is exactly the one the
+     * straightforward loop gives, so nothing that was already working can move.
+     * <p>
+     * Unlike the same assertion for {@code twoNorm} above, this one needs no
+     * {@link VectorOps#isVectorized()} case. Both loops in {@code mean} are
+     * scalar in both source trees, so the reduction order that
+     * {@code DoubleVector.reduceLanes(ADD)} leaves unspecified never enters,
+     * and every assertion in this section holds bit for bit on either tree.
+     */
+    @Test
+    public void testTheMeanOfTheOrdinaryCaseIsExactlyTheStraightforwardLoop() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            for (int trial = 0; trial < 60; ++trial) {
+                double s = Math.scalb(1.0, -240 + trial * 8);
+                double[] v = new double[n];
+                for (int i = 0; i < n; ++i) {
+                    v[i] = next() * s;
+                }
+                double naive = naiveMean(v);
+                assertTrue("the probe itself must not overflow, n = " + n + " trial " + trial,
+                        !Double.isInfinite(naive));
+                assertSameBits("n = " + n + " trial " + trial, naive, VectorOps.mean(v));
+            }
+        }
+    }
+
+    /**
+     * A vector of {@code n} copies of {@code 2^k} has mean {@code 2^k},
+     * whether or not the sum of the copies overflows on the way. The value is
+     * a power of two so that the answer is exact on both paths and the
+     * assertion can be made on the bits: {@code 1000} copies of {@code 2^1020}
+     * sum to {@code Infinity}, and {@code 1000} scaled copies sum to exactly
+     * {@code 1000}.
+     */
+    @Test
+    public void testTheMeanOfAConstantVectorIsThatConstant() {
+        int[] exponents = { 1023, 1020, 1000, 900, 0, -900, -1020 };
+        for (int ei = 0; ei < exponents.length; ++ei) {
+            double c = Math.scalb(1.0, exponents[ei]);
+            for (int li = 0; li < LENGTHS.length; ++li) {
+                int n = LENGTHS[li];
+                double[] v = new double[n];
+                java.util.Arrays.fill(v, c);
+                assertSameBits("n = " + n + " at 2^" + exponents[ei], c, VectorOps.mean(v));
+            }
+        }
+    }
+
+    /**
+     * The two shapes the direct accumulation gets wrong: a sum that runs past
+     * the range although the mean is well inside it, and a sum that overflows
+     * in the middle and would have cancelled back afterwards. The second is
+     * the one a division at the end could not have repaired either.
+     */
+    @Test
+    public void testTheMeanDoesNotOverflowWhereTheAnswerIsRepresentable() {
+        // the sum runs to Infinity, the mean is Double.MAX_VALUE
+        double[] atTheTop = { Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE };
+        assertSameBits("three copies of MAX_VALUE", Double.MAX_VALUE, VectorOps.mean(atTheTop));
+
+        // the sum overflows on the second element and cancels back on the
+        // third, so the naive loop keeps an Infinity that is not in the answer
+        double top = Math.scalb(1.0, 1023);
+        double[] cancelling = { top, top, -top };
+        assertSameBits("an overflow that cancels", Math.scalb(1.0 / 3.0, 1023), VectorOps.mean(cancelling));
+        assertTrue("the probe must be one the naive loop gets wrong",
+                Double.isInfinite(naiveMean(cancelling)));
+
+        // and a thousand elements just below the top
+        double[] many = new double[1000];
+        java.util.Arrays.fill(many, 1.0e306);
+        double mean = VectorOps.mean(many);
+        assertTrue("the mean of a finite vector must be finite", !Double.isInfinite(mean));
+        assertEquals("a thousand copies of 1e306", 1.0e306, mean, 1.0e-12 * 1.0e306);
+        assertTrue("the probe must be one the naive loop gets wrong", Double.isInfinite(naiveMean(many)));
+    }
+
+    /**
+     * {@code mean(c * v) == c * mean(v)} for {@code c} a power of two, which
+     * scales every term by the same exact factor and so cannot change the
+     * rounding. The exponents run high enough for the scaled vectors to
+     * overflow the direct sum, so this crosses the branch and must stay exact
+     * across it.
+     * <p>
+     * It stops being exact at the other end, and the guard below is where that
+     * boundary is recorded: once an element falls under
+     * {@link Double#MIN_NORMAL} the multiplication by {@code c} rounds, and no
+     * arrangement of the summation can put back what the data lost before it
+     * arrived.
+     */
+    @Test
+    public void testTheMeanIsHomogeneousUnderPowersOfTwo() {
+        for (int li = 0; li < LENGTHS.length; ++li) {
+            int n = LENGTHS[li];
+            double[] v = new double[n];
+            for (int i = 0; i < n; ++i) {
+                v[i] = next();
+            }
+            double base = VectorOps.mean(v);
+            for (int k = -1020; k <= 1020; k += 20) {
+                double c = Math.scalb(1.0, k);
+                double[] scaled = new double[n];
+                boolean allNormal = true;
+                for (int i = 0; i < n; ++i) {
+                    scaled[i] = v[i] * c;
+                    allNormal = allNormal && Math.abs(scaled[i]) >= Double.MIN_NORMAL;
+                }
+                if (!allNormal) {
+                    continue;
+                }
+                assertSameBits("n = " + n + " at 2^" + k, base * c, VectorOps.mean(scaled));
+            }
+        }
+    }
+
+    /** Both branches carry a {@code NaN} and an infinity through unchanged. */
+    @Test
+    public void testANaNOrAnInfinityReachesTheMean() {
+        assertTrue("a NaN anywhere", Double.isNaN(VectorOps.mean(new double[] { 1.0, Double.NaN, 3.0 })));
+        assertTrue("a NaN beside an infinity",
+                Double.isNaN(VectorOps.mean(new double[] { Double.POSITIVE_INFINITY, Double.NaN })));
+        assertTrue("both infinities cancel to a NaN",
+                Double.isNaN(VectorOps.mean(new double[] { Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY })));
+        assertSameBits("an infinity alone", Double.POSITIVE_INFINITY,
+                VectorOps.mean(new double[] { Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY }));
+        assertSameBits("an infinity beside a finite element", Double.NEGATIVE_INFINITY,
+                VectorOps.mean(new double[] { 1.0, Double.NEGATIVE_INFINITY }));
+    }
+
+    /**
+     * An empty array gives {@code NaN}, from the division by a length of zero.
+     * That is what the method always did and what its javadoc now says; a
+     * published method does not start throwing.
+     */
+    @Test
+    public void testTheMeanOfAnEmptyArrayIsNotANumber() {
+        assertTrue(Double.isNaN(VectorOps.mean(new double[0])));
+    }
 }
