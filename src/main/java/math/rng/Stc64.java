@@ -32,21 +32,44 @@ public class Stc64 extends AbstractRng64 implements SplittablePseudoRandom {
     private long inc = 0L;
     private final long seq;
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public Stc64() {
         seq = init(SplitMix64Seed.seed());
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public Stc64(long seed) {
         seq = init(SplitMix64Seed.seed(seed));
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public Stc64(long[] seed) {
         seq = init(SplitMix64Seed.seed(seed));
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed} and picks the stream {@code seq}.
+     *
+     * @param seed
+     *            the seed
+     * @param seq
+     *            the stream selector; the value used is {@code seq | 1},
+     *            since the step must be odd
+     */
     public Stc64(long seed, long seq) {
         init(SplitMix64Seed.seed(seed));
         this.seq = seq | 1L;
@@ -62,6 +85,20 @@ public class Stc64 extends AbstractRng64 implements SplittablePseudoRandom {
         return (((seed + 0x3504f333d3aa0b37L) << 1) | 1L);
     }
 
+    /**
+     * Creates a generator from raw state, as {@link #split()} does.
+     *
+     * @param s0
+     *            the first state word
+     * @param s1
+     *            the second state word
+     * @param s2
+     *            the third state word
+     * @param s3
+     *            the fourth state word
+     * @param seq
+     *            the stream selector, used as given rather than forced odd
+     */
     protected Stc64(long s0, long s1, long s2, long s3, long seq) {
         this.s0 = s0;
         this.s1 = s1;

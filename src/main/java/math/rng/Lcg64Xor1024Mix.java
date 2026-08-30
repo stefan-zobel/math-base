@@ -53,14 +53,28 @@ public class Lcg64Xor1024Mix extends AbstractRng64 implements SplittablePseudoRa
     private int pos = 15;
     private final long[] seed;
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public Lcg64Xor1024Mix() {
         this(new XorShift64Star());
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public Lcg64Xor1024Mix(long seed) {
         this(new XorShift64Star(seed));
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public Lcg64Xor1024Mix(long[] seed) {
         this(new XorShift64Star(seed));
     }
@@ -73,6 +87,18 @@ public class Lcg64Xor1024Mix extends AbstractRng64 implements SplittablePseudoRa
         saveSeed();
     }
 
+    /**
+     * Creates a generator from raw state, as {@link #split()} does.
+     *
+     * @param a
+     *            the additive constant of the LCG; the value used is
+     *            {@code a | 1}, since it must be odd
+     * @param s
+     *            the state of the LCG
+     * @param seed
+     *            the 16 state words of the xor-based subgenerator, kept by
+     *            reference
+     */
     protected Lcg64Xor1024Mix(long a, long s, long[] seed) {
         this.a = a | 1; // must be odd
         this.s = s;

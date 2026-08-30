@@ -52,6 +52,9 @@ public abstract class AbstractRng64 implements PseudoRandom {
     /** cache for the next gaussian */
     private double nextGaussian = Double.NaN;
 
+    protected AbstractRng64() {
+    }
+
     @Override
     public abstract long nextLong();
 

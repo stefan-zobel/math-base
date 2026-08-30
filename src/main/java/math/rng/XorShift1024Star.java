@@ -40,24 +40,50 @@ public class XorShift1024Star extends AbstractRng64 implements SplittablePseudoR
     private int pos = 0;
     private final long[] seed = new long[16];
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public XorShift1024Star() {
         XorShift64Star seeder = new XorShift64Star();
         seeder.nextLongs(this.seed);
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public XorShift1024Star(long seed) {
         XorShift64Star seeder = new XorShift64Star(seed);
         seeder.nextLongs(this.seed);
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public XorShift1024Star(long[] seed) {
         XorShift64Star seeder = new XorShift64Star(seed);
         seeder.nextLongs(this.seed);
         escape();
     }
 
+    /**
+     * Creates a generator from raw state, as {@link #split()} does. The array
+     * is the state itself, not seed material to be hashed.
+     *
+     * @param seed
+     *            the 16 state words
+     * @param unused
+     *            not read; it only separates this signature from
+     *            {@link #XorShift1024Star(long[])}
+     * @throws IllegalArgumentException
+     *             if {@code seed} does not hold exactly 16 elements
+     */
     protected XorShift1024Star(long[] seed, boolean unused) {
         if (seed.length != this.seed.length) {
             throw new IllegalArgumentException("long[] seed has wrong length");

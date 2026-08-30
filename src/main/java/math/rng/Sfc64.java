@@ -28,21 +28,47 @@ public class Sfc64 extends AbstractRng64 implements SplittablePseudoRandom {
     private long c;
     private long counter;
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public Sfc64() {
         a = b = c = SplitMix64Seed.seed();
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public Sfc64(long seed) {
         a = b = c = SplitMix64Seed.seed(seed);
         escape();
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public Sfc64(long[] seed) {
         a = b = c = SplitMix64Seed.seed(seed);
         escape();
     }
 
+    /**
+     * Creates a generator from raw state, as {@link #split()} does.
+     *
+     * @param a
+     *            the first state word
+     * @param b
+     *            the second state word
+     * @param c
+     *            the third state word
+     * @param counter
+     *            the initial counter value
+     */
     protected Sfc64(long a, long b, long c, long counter) {
         this.a = a;
         this.b = b;

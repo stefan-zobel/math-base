@@ -34,13 +34,27 @@ package math.rng;
  */
 public class XorShift64Star extends Marsaglia64 {
 
+    /** Seeds from {@link SplitMix64Seed#seed()}; not reproducible. */
     public XorShift64Star() {
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}.
+     *
+     * @param seed
+     *            the seed
+     */
     public XorShift64Star(long seed) {
         super(seed);
     }
 
+    /**
+     * Seeds reproducibly from {@code seed}, hashed to one {@code long} by
+     * {@link SplitMix64Seed#seed(long[])}.
+     *
+     * @param seed
+     *            the seed; {@code null} or empty selects one fixed stream
+     */
     public XorShift64Star(long[] seed) {
         super(seed);
     }
