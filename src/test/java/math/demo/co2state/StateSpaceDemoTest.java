@@ -439,8 +439,8 @@ public final class StateSpaceDemoTest {
     @Test
     public void testTheDemoStillPrintsItsEightSteps() throws UnsupportedEncodingException {
         String output = output();
-        String[] required = { "1. how many harmonics", "2. level, slope and season",
-                "3. the residuals the other demo could not get rid of",
+        String[] required = { "1. the residuals the other demo could not get rid of",
+                "2. what the four variances are", "3. level, slope and season",
                 "4. the two months NOAA interpolated", "5. the eruption",
                 "6. the uncertainty NOAA publishes", "7. seven months in ten thrown away",
                 "8. when does it reach 450 ppm" };
@@ -448,6 +448,101 @@ public final class StateSpaceDemoTest {
             assertTrue("the demo no longer prints \"" + required[i] + "\"",
                     output.contains(required[i]));
         }
+    }
+
+    /**
+     * The page has to state the question it answers, and answer it first. The
+     * demo exists because {@code MaunaLoaDemo} diagnoses a defect about itself,
+     * and until 2026-08-30 that sentence lived only in the class comment while
+     * the page opened on a procedure and buried the answer at position three.
+     *
+     * @throws UnsupportedEncodingException
+     *             if UTF-8 is not available, which it is
+     */
+    @Test
+    public void testThePageAsksItsQuestionBeforeAnsweringIt()
+            throws UnsupportedEncodingException {
+        String output = output();
+        int question = output.indexOf("acf(1) = 0.906");
+        int answer = output.indexOf("1. the residuals the other demo could not get rid of");
+        int machinery = output.indexOf("2. what the four variances are");
+        assertTrue("the page never states the defect it exists to repair", question >= 0);
+        assertTrue("and it has to come before any section", question < answer);
+        assertTrue("the answer comes before the machinery", answer < machinery);
+    }
+
+    /**
+     * Section 2's sweep is the demo explaining its own vocabulary by turning the
+     * one knob from end to end, so the shape of it is asserted rather than the
+     * digits: the first autocorrelation has to fall monotonically as the level
+     * is let loose, pass through white where the likelihood put it, and come
+     * back with the other sign once the level is chasing the noise.
+     */
+    @Test
+    public void testTheSweepGoesFromRigidThroughWhiteToOvershooting() {
+        StateSpaceDemo.Knob[] sweep = StateSpaceDemo.knobSweep(fit());
+        assertTrue("the sweep needs both ends and the middle", sweep.length >= 5);
+
+        double previous = Double.MAX_VALUE;
+        int fitted = -1;
+        for (int i = 0; i < sweep.length; ++i) {
+            assertTrue(sweep[i].label + " does not continue the sweep: " + sweep[i].acf1
+                    + " after " + previous, sweep[i].acf1 < previous);
+            previous = sweep[i].acf1;
+            if (sweep[i].fitted) {
+                fitted = i;
+            }
+        }
+        assertTrue("exactly one row is the fitted one", fitted > 0 && fitted < sweep.length - 1);
+
+        assertTrue("a frozen level leaves the innovations correlated: " + sweep[0].acf1,
+                sweep[0].acf1 > 0.9);
+        assertEquals("and every lag outside the band", 24, sweep[0].outside);
+        assertTrue("the fitted row is white: " + sweep[fitted].acf1,
+                Math.abs(sweep[fitted].acf1) < 0.05);
+        assertTrue("and the far end overshoots: " + sweep[sweep.length - 1].acf1,
+                sweep[sweep.length - 1].acf1 < -0.1);
+
+        assertTrue("the gain has to rise with the freedom",
+                sweep[0].gain < sweep[fitted].gain
+                        && sweep[fitted].gain < sweep[sweep.length - 1].gain);
+        assertTrue("a frozen level is a coefficient, so its gain is nearly nothing",
+                sweep[0].gain < 0.01);
+    }
+
+    /**
+     * And the point of the sweep: two criteria that share no arithmetic agree.
+     * The likelihood never sees an autocorrelation, and it lands where the
+     * autocorrelation is smallest.
+     */
+    @Test
+    public void testTheLikelihoodAndTheWhitenessAgreeWithoutBeingTold() {
+        StateSpaceDemo.Knob[] sweep = StateSpaceDemo.knobSweep(fit());
+        int whitest = 0;
+        for (int i = 1; i < sweep.length; ++i) {
+            if (Math.abs(sweep[i].acf1) < Math.abs(sweep[whitest].acf1)) {
+                whitest = i;
+            }
+        }
+        assertTrue("the whitest row is not the one the likelihood chose",
+                sweep[whitest].fitted);
+    }
+
+    /**
+     * The four capability sections have one claim in common, and saying it is
+     * what keeps them from reading as a feature tour.
+     *
+     * @throws UnsupportedEncodingException
+     *             if UTF-8 is not available, which it is
+     */
+    @Test
+    public void testTheCapabilitySectionsShareAStatedReason()
+            throws UnsupportedEncodingException {
+        String output = output();
+        int reason = output.indexOf("a fitted curve can do");
+        int missing = output.indexOf("4. the two months NOAA interpolated");
+        assertTrue("the four sections carry no shared claim", reason >= 0);
+        assertTrue("which has to be made before them", reason < missing);
     }
 
     @Test

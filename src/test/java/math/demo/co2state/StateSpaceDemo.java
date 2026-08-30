@@ -37,15 +37,28 @@ import math.ts.TimeVaryingModel;
  * against the deterministic fit's {@code 0.906}, and 5 of 24 lags outside the
  * two-sigma band against 24 of 24.
  * <p>
+ * <b>The page states that question and answers it first</b>, which it did not
+ * always: until 2026-08-30 the paragraph above lived only here, the page opened
+ * on a procedure -- how many harmonics, and what are the four variances -- and
+ * the answer went past at position three in a dozen lines. Sections 4 to 7 also
+ * say what they have in common, because a reader is owed the reason four
+ * capabilities are in one demo: <b>a fitted curve can do none of them</b>. It
+ * has nowhere to put a missing month, no scale on which a surprise is large or
+ * small, no way of being told that one observation was better measured than
+ * another, and nothing to say when the months are not evenly spaced.
+ * <p>
  * Eight steps, across {@code math.ts}, {@code math.optim}, {@code math.probe}
  * and {@code math.linalg}:
  * <ol>
- * <li>fit the four variances by maximum likelihood, and let the likelihood
- * choose how many seasonal harmonics the series wants,</li>
+ * <li>test the innovations for whiteness against the deterministic residuals,
+ * which is the question the demo exists to answer and so is answered first,</li>
+ * <li>fit the four variances by maximum likelihood, let the likelihood choose
+ * how many seasonal harmonics the series wants, and -- since three of the four
+ * are three more than the page needs -- turn the one that matters from end to
+ * end, from a level frozen into a coefficient to one that follows every
+ * reading, and watch the innovations,</li>
  * <li>decompose the series into level, slope and season, and check the level
  * against the deseasonalized series NOAA publishes beside the data,</li>
- * <li>test the innovations for whiteness against the deterministic
- * residuals,</li>
  * <li>blank the two months NOAA interpolated and see what the smoother puts
  * back,</li>
  * <li>look for the 2022 eruption in the anomaly score,</li>
@@ -68,7 +81,6 @@ import math.ts.TimeVaryingModel;
  * uncertainties, at no extra fitted parameter. And step 7 discards 578 of the
  * 821 months, with gaps of up to 18 months, and still recovers the level to
  * 0.09 ppm.
- * <p>
  * <p>
  * <b>One number is deliberately missing from the page.</b> The demo does not
  * print how many iterations the fit took, because that is the one quantity on
@@ -329,6 +341,71 @@ public final class StateSpaceDemo {
             ph += predicted.get(0, j) * h.get(0, j);
         }
         return ph / filtered.innovationCovariance[last].get(0, 0);
+    }
+
+    /**
+     * One row of the sweep in section 2: the same model with the level allowed
+     * to move a different amount, and what that does to the innovations.
+     */
+    static final class Knob {
+
+        /** How the row is labelled on the page. */
+        public final String label;
+        /** The share of a month's surprise the filter takes as a real move. */
+        public final double gain;
+        /** First autocorrelation of the standardized innovations. */
+        public final double acf1;
+        /** How many of the first 24 lags fall outside the two sigma band. */
+        public final int outside;
+        /** Whether this is the row the likelihood chose. */
+        public final boolean fitted;
+
+        Knob(String label, double gain, double acf1, int outside, boolean fitted) {
+            this.label = label;
+            this.gain = gain;
+            this.acf1 = acf1;
+            this.outside = outside;
+            this.fitted = fitted;
+        }
+    }
+
+    /**
+     * The same model at six settings of the one knob that matters, from a rigid
+     * curve to a level that follows every reading.
+     * <p>
+     * The frozen row is what a deterministic fit <i>is</i> in this vocabulary:
+     * the level, the slope and the seasonal shape are all coefficients rather
+     * than states, so the model has to explain the whole record with a straight
+     * line plus fixed harmonics and everything it cannot follow is left in the
+     * residuals. It is a worse curve than {@code MaunaLoaDemo}'s quadratic and
+     * its residuals are correspondingly worse.
+     */
+    static Knob[] knobSweep(Fit fit) {
+        double frozen = Math.log(1.0e-24);
+        double[] v = fit.logVariance;
+        return new Knob[] {
+                knob("not at all (a rigid line)", fit.harmonics,
+                        new double[] { frozen, frozen, frozen, v[3] }, false),
+                knob("a tenth of the fitted", fit.harmonics, scaled(v, 0.1), false),
+                knob("half", fit.harmonics, scaled(v, 0.5), false),
+                knob("as fitted", fit.harmonics, v.clone(), true),
+                knob("twice", fit.harmonics, scaled(v, 2.0), false),
+                knob("ten times", fit.harmonics, scaled(v, 10.0), false) };
+    }
+
+    /** The fitted variances with the level's standard deviation scaled. */
+    private static double[] scaled(double[] logVariance, double factor) {
+        double[] out = logVariance.clone();
+        out[0] = logVariance[0] + 2.0 * Math.log(factor);
+        return out;
+    }
+
+    private static Knob knob(String label, int harmonics, double[] logVariance, boolean fitted) {
+        Fit f = new Fit(harmonics, logVariance, 0.0, 0, true);
+        double[] z = standardizedInnovations(f);
+        double[] acf = ACF.acf(z, 24);
+        double bound = 1.96 / Math.sqrt(z.length);
+        return new Knob(label, steadyStateLevelGain(f), acf[1], countOutside(acf, bound), fitted);
     }
 
     // ------------------------------------------------------ 2. take it apart
@@ -1001,9 +1078,46 @@ public final class StateSpaceDemo {
         System.out.println(Datasets.size() + " monthly means, " + Datasets.label(0) + " to "
                 + Datasets.label(Datasets.size() - 1));
 
-        title("1. how many harmonics, and what are the four variances");
+        System.out.println();
+        System.out.println("MaunaLoaDemo fits this record with a curve -- a quadratic and two");
+        System.out.println("harmonics -- and then, in its own step 5, finds that the residuals of");
+        System.out.println("that fit remember each other: acf(1) = 0.906. It draws the right");
+        System.out.println("conclusion and prints it: its standard errors are therefore too small.");
+        System.out.println();
+        System.out.println("That is not a bad fit. It is a fit of the wrong shape. A quadratic");
+        System.out.println("cannot bend when the atmosphere bends, so everything the curve fails to");
+        System.out.println("follow is left in the residuals, and a residual that remembers the");
+        System.out.println("previous one is what a misspecified mean looks like.");
+        System.out.println();
+        System.out.println("So: what happens if the shape is allowed to move? Here the level and");
+        System.out.println("the slope are not coefficients fitted once but states that wander, and");
+        System.out.println("if that is the right repair then what is left over is only measurement");
+        System.out.println("error -- and measurement error has no memory. Section 1 is that test.");
+        System.out.println("Everything after it is what the repair also buys.");
+
+        // both fits are needed before any of it can be printed
         Fit two = fit(DETERMINISTIC_HARMONICS);
         Fit fit = fit(HARMONICS);
+
+        title("1. the residuals the other demo could not get rid of");
+        Whiteness white = whiteness(fit);
+        System.out.printf(L, "  two standard errors for an autocorrelation here: %.4f%n", white.bound);
+        System.out.printf(L, "  deterministic trend plus harmonics : acf(1) %7.4f, %2d of 24 lags outside%n",
+                white.deterministicAcf1, Integer.valueOf(white.deterministicOutside));
+        System.out.printf(L, "  state space innovations            : acf(1) %7.4f, %2d of 24 lags outside%n",
+                white.structuralAcf1, Integer.valueOf(white.structuralOutside));
+        System.out.printf(L, "  the innovations have mean %.4f and standard deviation %.4f,%n",
+                white.innovationMean, white.innovationSd);
+        System.out.println("  which is what the model claims they should be.");
+        System.out.println();
+        System.out.println("  So the repair works, and note what it is not: nothing here improves");
+        System.out.println("  the other demo's fit. The correlation has not been removed, it has");
+        System.out.printf(L, "  been moved into the model. What is left at lag 12 is %.4f, so the%n",
+                white.structuralAcf12);
+        System.out.println("  seasonal shape is still not quite captured, and section 2 is where");
+        System.out.println("  the model says how much of each month it believes.");
+
+        title("2. what the four variances are, and the one that matters");
         System.out.printf(L, "  %d harmonics (d = %d): log likelihood %12.4f%n", two.harmonics,
                 dimension(two.harmonics), two.logLikelihood);
         System.out.printf(L, "  %d harmonics (d = %d): log likelihood %12.4f%n", fit.harmonics,
@@ -1021,17 +1135,52 @@ public final class StateSpaceDemo {
             System.out.printf(L, "    sigma %-12s %12.6f ppm%s%n", names[i], fit.sigma(i),
                     i == 1 ? " per month" : "");
         }
-        System.out.println("  Only the first and the last of these matter on their own, and only");
-        System.out.printf(L, "  through their ratio: sigmaLevel^2 / sigmaObs^2 = %.4f. The level is%n",
+        System.out.println();
+        System.out.println("  Four numbers is three more than the page needs. What the filter does");
+        System.out.println("  is decided by one thing: how far the level may move from one month");
+        System.out.printf(L, "  to the next, against how badly a month is measured. Here that is%n");
+        System.out.printf(L, "  %.4f, and its consequence is the gain -- the share of each month's%n",
                 fit.signalToNoise());
-        System.out.println("  allowed to move by about as much as the measurement is wrong, so the");
-        System.out.printf(L, "  filter takes %.1f percent of each month's surprise as a real move of%n",
+        System.out.printf(L, "  surprise the filter takes as a real move of the atmosphere: %.1f%%.%n",
                 100.0 * steadyStateLevelGain(fit));
-        System.out.println("  the atmosphere and the rest as noise. A fitted curve is the corner");
-        System.out.println("  where that fraction is zero: it is not allowed to move at all, and");
-        System.out.println("  everything it fails to follow is left in its residuals.");
+        System.out.println();
+        System.out.println("  That one knob is the whole difference between a curve and a state.");
+        System.out.println("  Turn it down and the level is not allowed to move at all, which is");
+        System.out.println("  what a coefficient is: a state that may not move. Turn it up and the");
+        System.out.println("  level follows every reading. Both ends are here, with the same");
+        System.out.println("  machinery and only that number changed:");
+        System.out.println();
+        System.out.printf(L, "  %-26s %-9s %-10s %-12s%n", "the level may move", "gain", "acf(1)",
+                "lags outside");
+        Knob[] knobs = knobSweep(fit);
+        for (int i = 0; i < knobs.length; ++i) {
+            System.out.printf(L, "  %-26s %-9.4f %-10.4f %2d of 24%s%n", knobs[i].label,
+                    knobs[i].gain, knobs[i].acf1, Integer.valueOf(knobs[i].outside),
+                    knobs[i].fitted ? "   <- the likelihood picked this" : "");
+        }
+        System.out.println();
+        System.out.println("  Read the middle column downwards. Frozen, the innovations remember");
+        System.out.println("  each other almost perfectly and every lag is outside the band -- the");
+        System.out.println("  model cannot follow the series so everything is left over. That is");
+        System.out.println("  worse than MaunaLoaDemo's 0.906, and it should be: a straight line");
+        System.out.println("  is a worse curve than a quadratic. Too free, and the correlation");
+        System.out.println("  comes back with the other sign, because a level that chases the");
+        System.out.println("  noise overshoots and the next surprise undoes the last one.");
+        System.out.println();
+        System.out.println("  The last column is the blunter instrument of the two and stops");
+        System.out.println("  separating the rows at the free end: ten times the fitted movement");
+        System.out.println("  leaves as few lags outside the band as the fit does, on an acf(1)");
+        System.out.println("  seven times larger. Counting how many lags cross a threshold throws");
+        System.out.println("  away how far they crossed it, which is what makes it blunt.");
+        System.out.println();
+        System.out.println("  White is the middle, and nothing above told the fit where the middle");
+        System.out.println("  was. The likelihood chose it without ever being shown an");
+        System.out.println("  autocorrelation, and the autocorrelation agrees. Two criteria that");
+        System.out.println("  share no arithmetic land on the same number, which is the reason to");
+        System.out.println("  believe section 1 rather than merely to read it.");
 
-        title("2. level, slope and season");
+
+        title("3. level, slope and season");
         Decomposition parts = decompose(fit);
         int n = Datasets.size();
         System.out.printf(L, "  level at %s : %.3f ppm, rising %.4f ppm per month%n",
@@ -1048,22 +1197,13 @@ public final class StateSpaceDemo {
         System.out.printf(L, "    worst %.4f ppm, at %s%n", parts.worstAgainstNoaa,
                 Datasets.label(parts.worstAt));
 
-        title("3. the residuals the other demo could not get rid of");
-        Whiteness white = whiteness(fit);
-        System.out.printf(L, "  two standard errors for an autocorrelation here: %.4f%n", white.bound);
-        System.out.printf(L, "  deterministic trend plus harmonics : acf(1) %7.4f, %2d of 24 lags outside%n",
-                white.deterministicAcf1, Integer.valueOf(white.deterministicOutside));
-        System.out.printf(L, "  state space innovations            : acf(1) %7.4f, %2d of 24 lags outside%n",
-                white.structuralAcf1, Integer.valueOf(white.structuralOutside));
-        System.out.printf(L, "  the innovations have mean %.4f and standard deviation %.4f,%n",
-                white.innovationMean, white.innovationSd);
-        System.out.println("  which is what the model claims they should be.");
         System.out.println();
-        System.out.println("  MaunaLoaDemo step 5 concludes from its 0.906 that the standard errors");
-        System.out.println("  of its step 3 are too small. Nothing here fixes that fit -- the point");
-        System.out.printf(L, "  is that the correlation belongs in the model. What is left at lag 12%n");
-        System.out.printf(L, "  is %.4f, so the seasonal shape is still not quite captured.%n",
-                white.structuralAcf12);
+        System.out.println("The four sections that follow have one thing in common, and it is why");
+        System.out.println("they are here rather than in a list of features: a fitted curve can do");
+        System.out.println("none of them. Not badly -- at all. A curve has nowhere to put a missing");
+        System.out.println("month, no scale on which a surprise is large or small, no way of being");
+        System.out.println("told that one observation was better measured than another, and nothing");
+        System.out.println("to say when the months are not evenly spaced.");
 
         title("4. the two months NOAA interpolated");
         Filled filled = fillTheInterpolatedMonths(fit);

@@ -1,5 +1,5 @@
 /**
- * Worked examples: seven published datasets, each taken apart with the pieces
+ * Worked examples: eight published datasets, each taken apart with the pieces
  * this library provides.
  * <p>
  * Every subpackage holds the same three files -- {@code Datasets} with the
@@ -22,11 +22,17 @@
  * linear Gaussian state space model, through {@code math.ts} and
  * {@code math.optim}. It exists because of a defect the demo above diagnoses
  * about itself: its residuals are autocorrelated at {@code 0.906}, so its
- * standard errors mean less than they say. Letting the level and the slope
- * wander puts that memory in the model instead, and the innovations come out
- * at {@code 0.030}. The move to Maunakea after the 2022 eruption leaves no
- * trace; the largest anomaly in sixty-eight years is the 2016 El Nino; and
- * seven months in ten can be thrown away for a hundredth of a ppm.</li>
+ * standard errors mean less than they say. The repair has one knob, how far the
+ * level may move from one month to the next, and turning it to zero is what a
+ * fitted curve is -- a state that may not move. Swept, the innovations run from
+ * {@code 0.99} frozen through {@code 0.030} at the setting the likelihood
+ * chose, and it chose that setting without ever being shown an autocorrelation.
+ * The sections after it are the ones a curve cannot do at all rather than
+ * badly: a blanked-out month, a scale on which a surprise is large, an
+ * observation known to be better measured than its neighbours, months that are
+ * not evenly spaced. Along the way the move to Maunakea after the 2022 eruption
+ * leaves no trace, and the largest anomaly in sixty-eight years is the 2016
+ * El Nino.</li>
  * <li>{@link math.demo.centralpark.WeatherDemo} -- a year of daily maxima and
  * minima at one weather station, and the first demo whose observation has two
  * components rather than one. The two readings are not two series: they are one
@@ -62,6 +68,21 @@
  * samples around it, which sounds like safety; the mountain leaves that range
  * twice as often as the bicubic surface does, and where the bicubic surface
  * leaves it, it is the nearer of the two.</li>
+ * <li>{@link math.demo.measles.MeaslesDemo} -- thirty-five years of weekly
+ * measles reports through {@code ode}, {@code probe} and {@code solve}, and the
+ * question a solver cannot answer for you: is the number it just handed you a
+ * property of your equation, or of the step sizes it happened to choose? It is
+ * asked at a place the record picks rather than one the demo invents. The
+ * standard model has exactly one free parameter, how far contact swings over a
+ * year, and a heavy measles year against the light one beside it measures it --
+ * so the record calibrates itself, and turns out not to be in one state:
+ * Massachusetts in the 1930s sits at about 0.06 and in the early 1950s at 0.17,
+ * a short step from where the model stops having an answer at all. Past that
+ * the cycle breaks up, a trough becomes a property of the trajectory rather
+ * than of the attractor, and one decade of tolerance moves it by orders of
+ * magnitude. Where that edge is cannot be read off the parameter, which is the
+ * argument for running the check rather than for knowing when to. The record
+ * says the same from the other side, in the shape Bartlett named.</li>
  * </ul>
  */
 package math.demo;
