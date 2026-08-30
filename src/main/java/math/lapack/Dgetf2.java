@@ -68,7 +68,9 @@ final class Dgetf2 {
                 }
                 // Compute elements J+1:M of J-th column
                 if (j < m) {
-                    if (Math.abs(a[j - 1 + (j - 1) * lda + _a_offset]) >= 2.2250738585072014E-308) {
+                    // the reference tests against DLAMCH('S'), the smallest
+                    // normal number, which is what Double.MIN_NORMAL holds
+                    if (Math.abs(a[j - 1 + (j - 1) * lda + _a_offset]) >= Double.MIN_NORMAL) {
                         Dscal.dscal(m - j, 1.0 / a[j - 1 + (j - 1) * lda + _a_offset], a, j + (j - 1) * lda + _a_offset,
                                 1);
                     } else {

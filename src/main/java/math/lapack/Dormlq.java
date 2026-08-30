@@ -140,14 +140,18 @@ final class Dormlq {
                 ic = 1;
             }
             Trans transt = notran ? Trans.TRANS : Trans.NO_TRANS;
-            double[] buffer = new double[(nbmax + 1) * nbmax];
+            // The reference declares this T(LDT, NBMAX) as a fixed local. Here
+            // it is a heap allocation on every blocked call, so it is sized to
+            // the block size actually in use: ib is at most nb throughout the
+            // loop below, so nb + 1 is a sufficient leading dimension
+            double[] buffer = new double[(nb + 1) * nb];
             int i = i1;
             for (int p = ((i2 - i1) + i3) / i3; p > 0; p--) {
                 int ib = Math.min(nb, k - i + 1);
                 // Form the triangular factor of the block reflector
                 // H = H(i) H(i+1) . . . H(i+ib-1)
                 Dlarft.dlarft("Forward", "Rowwise", nq - i + 1, ib, a, i - 1 + (i - 1) * lda + _a_offset, lda, tau,
-                        i - 1 + _tau_offset, buffer, 0, (nbmax + 1));
+                        i - 1 + _tau_offset, buffer, 0, (nb + 1));
                 if (left) {
                     // H or H**T is applied to C(i:m,1:n)
                     mi = m - i + 1;
@@ -160,7 +164,7 @@ final class Dormlq {
                 // Apply H or H**T
                 Side side_ = left ? Side.LEFT : Side.RIGHT;
                 Dlarfb.dlarfb(side_, transt, "Forward", "Rowwise", mi, ni, ib, a, i - 1 + (i - 1) * lda + _a_offset, lda,
-                        buffer, 0, (nbmax + 1), c, ic - 1 + (jc - 1) * ldc + _c_offset, ldc, work, _work_offset, ldwork);
+                        buffer, 0, (nb + 1), c, ic - 1 + (jc - 1) * ldc + _c_offset, ldc, work, _work_offset, ldwork);
                 i += i3;
             }
         }
