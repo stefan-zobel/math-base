@@ -717,6 +717,23 @@ public final class Arithmetic {
     }
 
     /**
+     * Computes the inverse hyperbolic sine (asinh) of a real number.
+     * 
+     * Optimizes precision near zero using {@link Math#log1p} and prevents 
+     * overflow for extremely large values.
+     *
+     * @param t the real number
+     * @return the asinh of t
+     */
+    public static double asinh(double t) {
+        double a = Math.abs(t);
+        // beyond this a * a would overflow, and asinh(a) is ln(2a) there anyway
+        double r = (a > 1.0e150) ? Math.log(a) + MathConsts.LN_2
+                : Math.log1p(a + a * a / (1.0 + Math.sqrt(1.0 + a * a)));
+        return Math.copySign(r, t);
+    }
+
+    /**
      * Checks whether the passed {@code value} is one of {@link Double#NaN},
      * {@link Double#NEGATIVE_INFINITY} or {@link Double#POSITIVE_INFINITY}.
      * Returns {@code true} if this is the case, otherwise returns
